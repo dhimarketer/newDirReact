@@ -1,6 +1,7 @@
 // 2025-01-27: Created comprehensive admin user management page with CRUD operations
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Users, 
   Plus, 
@@ -19,6 +20,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { useAuth } from '../store/authStore';
+import { apiService } from '../services/api';
 
 interface User {
   id: number;
@@ -60,9 +62,82 @@ interface EditUserData {
   is_banned: boolean;
 }
 
+// Comprehensive Modal Component with guaranteed visibility
+const Modal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
+}> = ({ isOpen, onClose, title, children, size = 'md' }) => {
+  console.log('Modal component called with:', { isOpen, title, size });
+  
+  if (!isOpen) {
+    console.log('Modal not open, returning null');
+    return null;
+  }
+
+  console.log('Modal is open, rendering portal');
+  
+  const sizeClasses = {
+    sm: 'max-w-md',
+    md: 'max-w-lg', 
+    lg: 'max-w-2xl'
+  };
+
+  return createPortal(
+    <div 
+      className="fixed inset-0 z-[99999] overflow-y-auto"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 99999,
+        backgroundColor: 'rgba(0, 0, 0, 0.75)'
+      }}
+    >
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div 
+          className={`relative w-full ${sizeClasses[size]} transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all`}
+          style={{
+            zIndex: 100000,
+            position: 'relative',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}
+        >
+          {/* Header */}
+          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+              <button
+                onClick={onClose}
+                className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                style={{ zIndex: 100001 }}
+              >
+                <span className="sr-only">Close</span>
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+          </div>
+          
+          {/* Content */}
+          <div className="px-6 py-4">
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 const AdminUserManagementPage: React.FC = () => {
-  const { tokens, user, isAuthenticated } = useAuth();
-  const token = tokens?.access;
+  const { user, isAuthenticated } = useAuth();
+  const token = apiService.getAuthToken();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,21 +187,8 @@ const AdminUserManagementPage: React.FC = () => {
         throw new Error('No authentication token available');
       }
       
-      const response = await fetch('/api/users/', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Error response:', errorData);
-        throw new Error(errorData.detail || errorData.error || `HTTP ${response.status}: Failed to fetch users`);
-      }
-
-      const data = await response.json();
-      setUsers(data.results || data);
+      const response = await apiService.getUsers();
+      setUsers(response.data.results || response.data);
     } catch (err) {
       console.error('Error fetching users:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch users');
@@ -159,27 +221,15 @@ const AdminUserManagementPage: React.FC = () => {
         return;
       }
 
-      console.log('Creating user with data:', createUserData);
-      
-      const response = await fetch('/api/auth/register/', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(createUserData)
-      });
+      const response = await apiService.registerUser(createUserData);
 
-      console.log('Create user response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (response.status !== 200 && response.status !== 201) {
+        const errorData = response.data;
         console.error('Create user error:', errorData);
         throw new Error(errorData.detail || errorData.error || 'Failed to create user');
       }
 
-      const result = await response.json();
-      console.log('User created successfully:', result);
+      const result = response.data;
 
       setShowCreateModal(false);
       setCreateUserData({
@@ -215,27 +265,26 @@ const AdminUserManagementPage: React.FC = () => {
         return;
       }
 
-      console.log('Updating user with data:', editUserData);
+      // Prepare the data for update - only include fields that can be updated
+      const updateData = {
+        username: editUserData.username,
+        email: editUserData.email,
+        first_name: editUserData.first_name,
+        last_name: editUserData.last_name,
+        user_type: editUserData.user_type,
+        status: editUserData.status,
+        is_banned: editUserData.is_banned
+      };
       
-      const response = await fetch(`/api/users/${selectedUser.id}/`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(editUserData)
-      });
+      const response = await apiService.updateUser(selectedUser.id, updateData);
 
-      console.log('Update user response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (response.status !== 200 && response.status !== 201) {
+        const errorData = response.data;
         console.error('Update user error:', errorData);
         throw new Error(errorData.detail || errorData.error || 'Failed to update user');
       }
 
-      const result = await response.json();
-      console.log('User updated successfully:', result);
+      const result = response.data;
 
       setShowEditModal(false);
       setSelectedUser(null);
@@ -257,21 +306,10 @@ const AdminUserManagementPage: React.FC = () => {
         return;
       }
 
-      console.log('Attempting to deactivate user:', selectedUser.username);
+      const response = await apiService.deleteUser(selectedUser.id);
 
-      const response = await fetch(`/api/users/${selectedUser.id}/`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      console.log('Deactivate user response status:', response.status);
-      console.log('Deactivate user response headers:', response.headers);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      if (response.status !== 200 && response.status !== 204) {
+        const errorData = response.data || {};
         console.error('Deactivate user error:', errorData);
         
         // Show detailed error message
@@ -289,8 +327,7 @@ const AdminUserManagementPage: React.FC = () => {
         throw new Error(errorMessage);
       }
 
-      const result = await response.json().catch(() => ({}));
-      console.log('Deactivate user success:', result);
+      const result = response.data || {};
 
       setShowDeleteModal(false);
       setSelectedUser(null);
@@ -312,24 +349,33 @@ const AdminUserManagementPage: React.FC = () => {
         return;
       }
 
-      const response = await fetch(`/api/users/${selectedUser.id}/update_score/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(scoreUpdateData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to update score');
+      if (scoreUpdateData.points === 0) {
+        setError('Please enter a non-zero score value');
+        return;
       }
 
+      if (!scoreUpdateData.reason.trim()) {
+        setError('Please provide a reason for the score change');
+        return;
+      }
+
+      const response = await apiService.updateUserScore(selectedUser.id, scoreUpdateData);
+
+      if (response.status !== 200 && response.status !== 201) {
+        const errorData = response.data;
+        console.error('Update score error:', errorData);
+        throw new Error(errorData.detail || errorData.error || 'Failed to update score');
+      }
+
+      const result = response.data;
+
       setShowScoreModal(false);
+      setSelectedUser(null);
       setScoreUpdateData({ points: 0, reason: '' });
+      setError(null);
       fetchUsers();
     } catch (err) {
+      console.error('Error updating score:', err);
       setError(err instanceof Error ? err.message : 'Failed to update score');
     }
   };
@@ -338,42 +384,49 @@ const AdminUserManagementPage: React.FC = () => {
   const changeUserPassword = async () => {
     if (!selectedUser) return;
 
-    if (!token) {
-      setError('No authentication token available');
-      return;
-    }
-
-    if (passwordData.new_password !== passwordData.confirm_password) {
-      setError('New passwords do not match');
-      return;
-    }
-
     try {
-      const response = await fetch(`/api/users/${selectedUser.id}/change_password/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ new_password: passwordData.new_password })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to change password');
+      if (!token) {
+        setError('No authentication token available');
+        return;
       }
 
+      if (!passwordData.new_password || !passwordData.confirm_password) {
+        setError('Please fill in both password fields');
+        return;
+      }
+
+      if (passwordData.new_password !== passwordData.confirm_password) {
+        setError('Passwords do not match');
+        return;
+      }
+
+      if (passwordData.new_password.length < 8) {
+        setError('Password must be at least 8 characters long');
+        return;
+      }
+
+      const response = await apiService.changeUserPassword(selectedUser.id, { new_password: passwordData.new_password });
+
+      if (response.status !== 200 && response.status !== 201) {
+        const errorData = response.data;
+        console.error('Change password error:', errorData);
+        throw new Error(errorData.detail || errorData.error || 'Failed to change password');
+      }
+
+      const result = response.data;
+
       setShowPasswordModal(false);
+      setSelectedUser(null);
       setPasswordData({ new_password: '', confirm_password: '' });
       setError(null);
     } catch (err) {
+      console.error('Error changing password:', err);
       setError(err instanceof Error ? err.message : 'Failed to change password');
     }
   };
 
   // Open edit modal
   const openEditModal = (user: User) => {
-    console.log('openEditModal called with user:', user);
     setSelectedUser(user);
     setEditUserData({
       username: user.username,
@@ -385,12 +438,6 @@ const AdminUserManagementPage: React.FC = () => {
       is_banned: user.is_banned
     });
     setShowEditModal(true);
-    console.log('Edit modal state set to true');
-    
-    // Test alert to confirm state change
-    setTimeout(() => {
-      alert(`Modal state changed! showEditModal: ${true}, selectedUser: ${user.username}`);
-    }, 100);
   };
 
   // Open score update modal
@@ -453,7 +500,6 @@ const AdminUserManagementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    console.log('useEffect triggered:', { isAuthenticated, token: !!token, user });
     if (isAuthenticated && token) {
       fetchUsers();
     }
@@ -491,95 +537,18 @@ const AdminUserManagementPage: React.FC = () => {
           Manage user accounts, permissions, and access levels
         </p>
         
-
-      </div>
-
-      {/* Debug Info */}
-      <div className="mb-6 bg-blue-50 border border-blue-200 rounded-md p-4">
-        <div className="flex">
-          <div className="ml-3">
-            <p className="text-sm text-blue-800">
-              Debug: showEditModal={showEditModal.toString()}, showDeleteModal={showDeleteModal.toString()}, selectedUser={selectedUser ? selectedUser.username : 'null'}
-            </p>
-            {showEditModal && (
-              <p className="text-sm text-red-600 font-bold mt-2">
-                ⚠️ EDIT MODAL IS ACTIVE - You should see a red border overlay!
-              </p>
-            )}
-            {showDeleteModal && (
-              <p className="text-sm text-red-600 font-bold mt-2">
-                ⚠️ DEACTIVATE MODAL IS ACTIVE - You should see a deactivation confirmation!
-              </p>
-            )}
+        {/* Debug Info */}
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+          <h4 className="font-semibold text-blue-800 mb-2">Debug Info:</h4>
+          <div className="text-sm text-blue-700 space-y-1">
+            <p>showEditModal: {showEditModal.toString()}</p>
+            <p>showDeleteModal: {showDeleteModal.toString()}</p>
+            <p>selectedUser: {selectedUser ? selectedUser.username : 'null'}</p>
+            <p>Users loaded: {users.length}</p>
+            <p>Modal component should render: {(showEditModal && !!selectedUser).toString()}</p>
           </div>
         </div>
       </div>
-      
-      {/* Modal State Indicator */}
-      <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-md p-4">
-        <div className="flex">
-          <div className="ml-3">
-            <h4 className="font-bold text-yellow-800">Modal State:</h4>
-            <p className="text-sm text-yellow-700">
-              showEditModal: <span className="font-mono bg-white px-2 py-1 rounded">{showEditModal.toString()}</span>
-            </p>
-            <p className="text-sm text-yellow-700">
-              showDeactivateModal: <span className="font-mono bg-white px-2 py-1 rounded">{showDeleteModal.toString()}</span>
-            </p>
-            <p className="text-sm text-yellow-700">
-              selectedUser: <span className="font-mono bg-white px-2 py-1 rounded">{selectedUser?.username || 'null'}</span>
-            </p>
-            <p className="text-sm text-yellow-700">
-              Edit Modal should render: <span className="font-mono bg-white px-2 py-1 rounded">{(showEditModal && !!selectedUser).toString()}</span>
-            </p>
-            <p className="text-sm text-yellow-700">
-              Deactivate Modal should render: <span className="font-mono bg-white px-2 py-1 rounded">{(showDeleteModal && !!selectedUser).toString()}</span>
-            </p>
-          </div>
-        </div>
-      </div>
-      
-      {/* Simple Modal Test */}
-      {showEditModal && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'red',
-            color: 'white',
-            padding: '20px',
-            fontSize: '24px',
-            fontWeight: 'bold',
-            zIndex: 10000,
-            border: '5px solid yellow'
-          }}
-        >
-          🚨 EDIT MODAL IS ACTIVE - RED BOX SHOULD BE VISIBLE! 🚨
-        </div>
-      )}
-      
-      {/* Deactivate Modal Test */}
-      {showDeleteModal && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: 'orange',
-            color: 'white',
-            padding: '20px',
-            fontSize: '24px',
-            fontWeight: 'bold',
-            zIndex: 10000,
-            border: '5px solid purple'
-          }}
-        >
-          🚨 DEACTIVATE MODAL IS ACTIVE - ORANGE BOX SHOULD BE VISIBLE! 🚨
-        </div>
-      )}
 
       {/* Error Display */}
       {error && (
@@ -589,7 +558,7 @@ const AdminUserManagementPage: React.FC = () => {
               <XCircle className="h-5 w-5 text-red-400" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-blue-800">{error}</p>
+              <p className="text-sm text-red-800">{error}</p>
             </div>
             <div className="ml-auto pl-3">
               <button
@@ -654,14 +623,15 @@ const AdminUserManagementPage: React.FC = () => {
         {/* Test Modal Button */}
         <button
           onClick={() => {
-            console.log('Test button clicked');
+            console.log('Test modal button clicked');
             setSelectedUser(users[0]);
             setShowEditModal(true);
           }}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ml-2"
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 ml-2"
         >
-          Test Edit Modal
+          Test Modal
         </button>
+
       </div>
 
       {/* Users Table */}
@@ -747,10 +717,7 @@ const AdminUserManagementPage: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => {
-                          console.log('Edit button clicked for user:', user);
-                          openEditModal(user);
-                        }}
+                        onClick={() => openEditModal(user)}
                         className="text-blue-600 hover:text-blue-900"
                         title="Edit User"
                       >
@@ -772,10 +739,8 @@ const AdminUserManagementPage: React.FC = () => {
                       </button>
                       <button
                         onClick={() => {
-                          console.log('Deactivate button clicked for user:', user);
                           setSelectedUser(user);
                           setShowDeleteModal(true);
-                          console.log('Deactivate modal state set to true');
                         }}
                         className="text-red-600 hover:text-red-900"
                         title="Deactivate User"
@@ -806,332 +771,276 @@ const AdminUserManagementPage: React.FC = () => {
 
       {/* Create User Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Create New User</h3>
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Username"
-                  value={createUserData.username}
-                  onChange={(e) => setCreateUserData({...createUserData, username: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={createUserData.email}
-                  onChange={(e) => setCreateUserData({...createUserData, email: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={createUserData.password}
-                  onChange={(e) => setCreateUserData({...createUserData, password: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-                <input
-                  type="password"
-                  placeholder="Confirm Password"
-                  value={createUserData.password_confirm}
-                  onChange={(e) => setCreateUserData({...createUserData, password_confirm: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-                <select
-                  value={createUserData.user_type}
-                  onChange={(e) => setCreateUserData({...createUserData, user_type: e.target.value as any})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="basic">Basic</option>
-                  <option value="premium">Premium</option>
-                  <option value="moderator">Moderator</option>
-                  <option value="admin">Admin</option>
-                </select>
-                <input
-                  type="text"
-                  placeholder="First Name (optional)"
-                  value={createUserData.first_name}
-                  onChange={(e) => setCreateUserData({...createUserData, first_name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-                <input
-                  type="text"
-                  placeholder="Last Name (optional)"
-                  value={createUserData.last_name}
-                  onChange={(e) => setCreateUserData({...createUserData, last_name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={createUser}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
-                >
-                  Create User
-                </button>
-              </div>
-            </div>
+        <Modal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          title="Create New User"
+        >
+          <div className="space-y-4">
+            <input
+              type="text"
+              placeholder="Username"
+              value={createUserData.username}
+              onChange={(e) => setCreateUserData({...createUserData, username: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              value={createUserData.email}
+              onChange={(e) => setCreateUserData({...createUserData, email: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={createUserData.password}
+              onChange={(e) => setCreateUserData({...createUserData, password: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+            <input
+              type="password"
+              placeholder="Confirm Password"
+              value={createUserData.password_confirm}
+              onChange={(e) => setCreateUserData({...createUserData, password_confirm: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+            <select
+              value={createUserData.user_type}
+              onChange={(e) => setCreateUserData({...createUserData, user_type: e.target.value as any})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="basic">Basic</option>
+              <option value="premium">Premium</option>
+              <option value="moderator">Moderator</option>
+              <option value="admin">Admin</option>
+            </select>
+            <input
+              type="text"
+              placeholder="First Name (optional)"
+              value={createUserData.first_name}
+              onChange={(e) => setCreateUserData({...createUserData, first_name: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+            <input
+              type="text"
+              placeholder="Last Name (optional)"
+              value={createUserData.last_name}
+              onChange={(e) => setCreateUserData({...createUserData, last_name: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
           </div>
-        </div>
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              onClick={() => setShowCreateModal(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={createUser}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+            >
+              Create User
+            </button>
+          </div>
+        </Modal>
       )}
 
       {/* Edit User Modal */}
       {showEditModal && selectedUser && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            zIndex: 9999,
-            border: '10px solid red',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
+        <Modal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          title={`Edit User: ${selectedUser.username}`}
         >
-          <div 
-            style={{
-              backgroundColor: 'white',
-              padding: '20px',
-              borderRadius: '8px',
-              border: '5px solid blue',
-              minWidth: '400px',
-              maxWidth: '90%',
-              maxHeight: '90%',
-              overflow: 'auto'
-            }}
-          >
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Edit User: {selectedUser.username}</h3>
-              <p style={{color: 'red', fontWeight: 'bold', fontSize: '18px'}}>🚨 MODAL IS VISIBLE - RED BORDER SHOULD BE VISIBLE 🚨</p>
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Username"
-                  value={editUserData.username}
-                  onChange={(e) => setEditUserData({...editUserData, username: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={editUserData.email}
-                  onChange={(e) => setEditUserData({...editUserData, email: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-                <select
-                  value={editUserData.user_type}
-                  onChange={(e) => setEditUserData({...editUserData, user_type: e.target.value as any})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="basic">Basic</option>
-                  <option value="premium">Premium</option>
-                  <option value="moderator">Moderator</option>
-                  <option value="admin">Admin</option>
-                </select>
-                <input
-                  type="text"
-                  placeholder="First Name (optional)"
-                  value={editUserData.first_name}
-                  onChange={(e) => setEditUserData({...editUserData, first_name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-                <input
-                  type="text"
-                  placeholder="Last Name (optional)"
-                  value={editUserData.last_name}
-                  onChange={(e) => setEditUserData({...editUserData, last_name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-                <select
-                  value={editUserData.status}
-                  onChange={(e) => setEditUserData({...editUserData, status: e.target.value as any})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="suspended">Suspended</option>
-                </select>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={editUserData.is_banned}
-                    onChange={(e) => setEditUserData({...editUserData, is_banned: e.target.checked})}
-                    className="mr-2"
-                  />
-                  Banned
-                </label>
-              </div>
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={updateUser}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
-                >
-                  Update User
-                </button>
-              </div>
-            </div>
+          <div className="space-y-4">
+            <input
+              type="text"
+              placeholder="Username"
+              value={editUserData.username}
+              onChange={(e) => setEditUserData({...editUserData, username: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              value={editUserData.email}
+              onChange={(e) => setEditUserData({...editUserData, email: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+            <select
+              value={editUserData.user_type}
+              onChange={(e) => setEditUserData({...editUserData, user_type: e.target.value as any})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="basic">Basic</option>
+              <option value="premium">Premium</option>
+              <option value="moderator">Moderator</option>
+              <option value="admin">Admin</option>
+            </select>
+            <input
+              type="text"
+              placeholder="First Name (optional)"
+              value={editUserData.first_name}
+              onChange={(e) => setEditUserData({...editUserData, first_name: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+            <input
+              type="text"
+              placeholder="Last Name (optional)"
+              value={editUserData.last_name}
+              onChange={(e) => setEditUserData({...editUserData, last_name: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+            <select
+              value={editUserData.status}
+              onChange={(e) => setEditUserData({...editUserData, status: e.target.value as any})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="suspended">Suspended</option>
+            </select>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={editUserData.is_banned}
+                onChange={(e) => setEditUserData({...editUserData, is_banned: e.target.checked})}
+                className="mr-2"
+              />
+              Banned
+            </label>
           </div>
-        </div>
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={updateUser}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+            >
+              Update User
+            </button>
+          </div>
+        </Modal>
       )}
 
       {/* Deactivate User Modal */}
       {showDeleteModal && selectedUser && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            zIndex: 9999,
-            border: '10px solid orange',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
+        <Modal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          title="Deactivate User"
         >
-          <div 
-            style={{
-              backgroundColor: 'white',
-              padding: '20px',
-              borderRadius: '8px',
-              border: '5px solid purple',
-              minWidth: '400px',
-              maxWidth: '90%',
-              maxHeight: '90%',
-              overflow: 'auto'
-            }}
-          >
-            <div>
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-orange-100">
-                <Trash2 className="h-6 w-6 text-orange-600" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mt-4">Deactivate User</h3>
-              <p className="text-sm text-gray-500 mt-2">
-                Are you sure you want to deactivate user "{selectedUser.username}"? This will set their status to inactive and they won't appear in searches, but their data will be preserved.
-              </p>
-              <p style={{color: 'orange', fontWeight: 'bold', fontSize: '18px'}}>🚨 DEACTIVATE MODAL IS VISIBLE - ORANGE BORDER SHOULD BE VISIBLE 🚨</p>
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={deleteUser}
-                  className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700"
-                >
-                  Deactivate User
-                </button>
-              </div>
-            </div>
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-orange-100">
+            <Trash2 className="h-6 w-6 text-orange-600" />
           </div>
-        </div>
+          <h3 className="text-lg font-medium text-gray-900 mt-4">Deactivate User</h3>
+          <p className="text-sm text-gray-500 mt-2">
+            Are you sure you want to deactivate user "{selectedUser.username}"? This will set their status to inactive and they won't appear in searches, but their data will be preserved.
+          </p>
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={deleteUser}
+              className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700"
+            >
+              Deactivate User
+            </button>
+          </div>
+        </Modal>
       )}
 
       {/* Update Score Modal */}
       {showScoreModal && selectedUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Update Score for {selectedUser.username}</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Current Score: {selectedUser.score}</label>
-                  <input
-                    type="number"
-                    placeholder="Points to add/subtract"
-                    value={scoreUpdateData.points}
-                    onChange={(e) => setScoreUpdateData({...scoreUpdateData, points: parseInt(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Reason for score change"
-                  value={scoreUpdateData.reason}
-                  onChange={(e) => setScoreUpdateData({...scoreUpdateData, reason: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowScoreModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={updateUserScore}
-                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700"
-                >
-                  Update Score
-                </button>
-              </div>
+        <Modal
+          isOpen={showScoreModal}
+          onClose={() => setShowScoreModal(false)}
+          title={`Update Score for ${selectedUser.username}`}
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Current Score: {selectedUser.score}</label>
+              <input
+                type="number"
+                placeholder="Points to add/subtract"
+                value={scoreUpdateData.points}
+                onChange={(e) => setScoreUpdateData({...scoreUpdateData, points: parseInt(e.target.value) || 0})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
+            <input
+              type="text"
+              placeholder="Reason for score change"
+              value={scoreUpdateData.reason}
+              onChange={(e) => setScoreUpdateData({...scoreUpdateData, reason: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
           </div>
-        </div>
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              onClick={() => setShowScoreModal(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={updateUserScore}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700"
+            >
+              Update Score
+            </button>
+          </div>
+        </Modal>
       )}
 
       {/* Change Password Modal */}
       {showPasswordModal && selectedUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Change Password for {selectedUser.username}</h3>
-              <div className="space-y-4">
-                <input
-                  type="password"
-                  placeholder="New Password"
-                  value={passwordData.new_password}
-                  onChange={(e) => setPasswordData({...passwordData, new_password: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-                <input
-                  type="password"
-                  placeholder="Confirm New Password"
-                  value={passwordData.confirm_password}
-                  onChange={(e) => setPasswordData({...passwordData, confirm_password: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowPasswordModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={changeUserPassword}
-                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md hover:bg-purple-700"
-                >
-                  Change Password
-                </button>
-              </div>
-            </div>
+        <Modal
+          isOpen={showPasswordModal}
+          onClose={() => setShowPasswordModal(false)}
+          title={`Change Password for ${selectedUser.username}`}
+        >
+          <div className="space-y-4">
+            <input
+              type="password"
+              placeholder="New Password"
+              value={passwordData.new_password}
+              onChange={(e) => setPasswordData({...passwordData, new_password: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+            <input
+              type="password"
+              placeholder="Confirm New Password"
+              value={passwordData.confirm_password}
+              onChange={(e) => setPasswordData({...passwordData, confirm_password: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
           </div>
-        </div>
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              onClick={() => setShowPasswordModal(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={changeUserPassword}
+              className="px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md hover:bg-purple-700"
+            >
+              Change Password
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );

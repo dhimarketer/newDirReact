@@ -134,3 +134,30 @@ class SystemConfiguration(models.Model):
     
     def __str__(self):
         return f"{self.key}: {self.value}"
+
+class Island(models.Model):
+    """Model to store Maldivian island information"""
+    name = models.CharField(max_length=100, unique=True)
+    atoll = models.CharField(max_length=100, blank=True)
+    island_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('inhabited', 'Inhabited Island'),
+            ('uninhabited', 'Uninhabited Island'),
+            ('resort', 'Resort Island'),
+            ('airport', 'Airport Island'),
+            ('capital', 'Capital Island'),
+        ],
+        default='inhabited'
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Island'
+        verbose_name_plural = 'Islands'
+
+    def __str__(self):
+        return f"{self.name} ({self.atoll})"

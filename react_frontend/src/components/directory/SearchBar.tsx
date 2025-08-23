@@ -67,15 +67,20 @@ const SearchBar: React.FC<SearchBarProps> = ({
   }, []);
 
   // Handle query changes
-  const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleQueryChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newQuery = e.target.value;
     setQuery(newQuery);
     
     // Parse the query to show what fields were detected
     if (newQuery.trim()) {
-      const parsed = parseSmartQuery(newQuery);
-      const formatted = formatParsedQuery(parsed);
-      setParsedQueryInfo(formatted);
+      try {
+        const parsed = await parseSmartQuery(newQuery);
+        const formatted = formatParsedQuery(parsed);
+        setParsedQueryInfo(formatted);
+      } catch (error) {
+        console.error('Error parsing query:', error);
+        setParsedQueryInfo('');
+      }
     } else {
       setParsedQueryInfo('');
     }
@@ -106,29 +111,52 @@ const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   // Handle search submission
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (query.trim()) {
-      // Parse the smart query to extract specific filters
-      const parsed = parseSmartQuery(query.trim());
-      
-      // Merge parsed filters with existing filters
-      const mergedFilters = { ...filters, ...parsed.filters };
-      
-      // If we have specific filters from parsing, use them
-      if (Object.keys(parsed.filters).length > 0) {
-        console.log('Smart search with parsed filters:', parsed.filters);
-        onSearch(mergedFilters);
-      } else {
-        // Fallback to general search
-        const updatedFilters = { ...filters, query: query.trim() };
-        onSearch(updatedFilters);
+      try {
+        // Parse the smart query to extract specific filters
+        const parsed = await parseSmartQuery(query.trim());
+        
+        // Clear all existing specific field filters and use only the parsed ones
+        // This prevents old filter values from persisting between searches
+        const clearedFilters = {
+          query: query.trim(),
+          name: '',
+          contact: '',
+          nid: '',
+          address: '',
+          atoll: '',
+          island: '',
+          party: '',
+          profession: '',
+          gender: '',
+          remark: '',
+          pep_status: '',
+          min_age: undefined,
+          max_age: undefined
+        };
+        
+        // Merge parsed filters with cleared filters
+        const mergedFilters = { ...clearedFilters, ...parsed.filters };
+        
+        // If we have specific filters from parsing, use them
+        if (Object.keys(parsed.filters).length > 0) {
+          console.log('Smart search with parsed filters:', parsed.filters);
+          onSearch(mergedFilters);
+        } else {
+          // Fallback to general search
+          onSearch(clearedFilters);
+        }
+        
+        setShowSuggestions(false);
+        setSuggestions([]);
+        setParsedQueryInfo('');
+      } catch (error) {
+        console.error('Error parsing search query:', error);
+        toast.error('Error processing search query');
       }
-      
-      setShowSuggestions(false);
-      setSuggestions([]);
-      setParsedQueryInfo('');
     } else {
       toast.error('Please enter a search term');
     }
@@ -256,13 +284,16 @@ const SearchBar: React.FC<SearchBarProps> = ({
         <div className="text-sm text-gray-600">
           <strong>Smart Search Examples:</strong>
           <ul className="mt-1 space-y-1 text-xs">
-            <li>• <code>ali, heena, male</code> → Name: ali, Name: heena, Atoll: male</li>
+            <li>• <code>hulhumale, male</code> → Address: hulhumale, Island: male</li>
+            <li>• <code>ali, heena, male</code> → Name: ali, Name: heena, Island: male</li>
             <li>• <code>ali%</code> → Wildcard search for names starting with "ali"</li>
             <li>• <code>name:ali, atoll:male</code> → Specific field search</li>
             <li>• <code>1234567</code> → Contact number search</li>
             <li>• <code>MDP</code> → Political party search</li>
             <li>• <code>M</code> → Gender: M (male)</li>
             <li>• <code>F</code> → Gender: F (female)</li>
+            <li>• <code>hulhumale ge</code> → Address search (detects "ge" suffix)</li>
+            <li>• <code>male villa</code> → Address search (detects "villa" suffix)</li>
           </ul>
         </div>
       </div>

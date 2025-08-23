@@ -149,6 +149,31 @@ class ApiService {
     }
   }
 
+  // User Management Methods
+  async getUsers(): Promise<any> {
+    return this.get('/api/users/');
+  }
+
+  async registerUser(userData: any): Promise<any> {
+    return this.post('/api/auth/register/', userData);
+  }
+
+  async updateUser(userId: number, userData: any): Promise<any> {
+    return this.put(`/api/users/${userId}/`, userData);
+  }
+
+  async deleteUser(userId: number): Promise<any> {
+    return this.delete(`/api/users/${userId}/`);
+  }
+
+  async updateUserScore(userId: number, scoreData: any): Promise<any> {
+    return this.post(`/api/users/${userId}/update_score/`, scoreData);
+  }
+
+  async changeUserPassword(userId: number, passwordData: any): Promise<any> {
+    return this.post(`/api/users/${userId}/change_password/`, passwordData);
+  }
+
   // Error handling
   private handleError(error: AxiosError) {
     if (error.response) {

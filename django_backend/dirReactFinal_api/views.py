@@ -472,12 +472,22 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             data = serializer.validated_data
             queryset = PhoneBookEntry.objects.all()
             
+            # Check if we have specific address and island filters (smart search case)
+            has_address_filter = data.get('address') and data['address'].strip()
+            has_island_filter = data.get('island') and data['island'].strip()
+            has_party_filter = data.get('party') and data['party'].strip()
+            has_query = data.get('query') and data['query'].strip()
+            has_name_filter = data.get('name') and data['name'].strip()
+            is_family_search = data.get('limit_results', False)  # Flag for family searches
+            
+            print(f"Search analysis - Address: {has_address_filter}, Island: {has_island_filter}, Query: {has_query}, Family search: {is_family_search}")
+            
             # Smart search logic - analyze query and apply to appropriate fields
-            if data.get('query'):
+            if has_query:
                 query = data['query'].strip()
                 print(f"Smart search query: '{query}'")
                 
-                # Analyze the query to determine what type of data it is
+                # Enhanced smart search logic for better field detection
                 if query.isdigit():
                     # Numeric query - likely phone number or NID
                     if len(query) >= 7:
@@ -504,19 +514,356 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                     print(f"Query '{query}' appears to be an atoll code")
                     queryset = queryset.filter(atoll__icontains=query)
                 else:
-                    # Text query - search in name, address, island, profession, remark
-                    print(f"Query '{query}' appears to be text - searching in name, address, island, profession, remark")
-                    queryset = queryset.filter(
-                        Q(name__icontains=query) |
-                        Q(address__icontains=query) |
-                        Q(island__icontains=query) |
-                        Q(profession__icontains=query) |
-                        Q(remark__icontains=query)
-                    )
+                    # Enhanced text query analysis for better field detection
+                    print(f"Query '{query}' appears to be text - analyzing for specific field types")
+                    
+                    # Check if query looks like an address (contains common address indicators)
+                    address_indicators = ['ge', 'maa', 'villa', 'house', 'flat', 'room', 'floor', 'block', 'area', 'zone', 'district', 'ward', 'sector', 'street', 'road', 'avenue', 'lane', 'drive', 'place', 'court', 'building', 'apartment', 'habaruge']
+                    is_likely_address = any(indicator in query.lower() for indicator in address_indicators)
+                    
+                    # Special handling for "ge" suffix patterns (very common in Maldivian addresses)
+                    if not is_likely_address:
+                        # Check if query ends with "ge" or contains " ge" (with space)
+                        if query.lower().endswith('ge') or ' ge' in query.lower():
+                            is_likely_address = True
+                            print(f"Query '{query}' detected as address due to 'ge' suffix pattern")
+                    
+                    # Check if query looks like an island name (common Maldivian island patterns)
+                    island_indicators = ['male', 'addu', 'fuamulah', 'gan', 'fuvahmulah', 'thinadhoo', 'vaadhoo', 'keyodhoo', 'maradhoo', 'feydhoo', 'hithadhoo', 'kudahuvadhoo', 'kulhudhuffushi', 'naifaru', 'dhidhoo', 'hulhumale', 'viligili', 'hulhule', 'villingili']
+                    is_likely_island = any(island in query.lower() for island in island_indicators)
+                    
+                    # Check if query looks like a profession
+                    profession_indicators = ['teacher', 'doctor', 'engineer', 'lawyer', 'business', 'fisherman', 'farmer', 'student', 'retired', 'unemployed', 'government', 'private', 'self-employed', 'nurse', 'accountant', 'manager', 'driver', 'cook', 'cleaner', 'security']
+                    is_likely_profession = any(prof in query.lower() for prof in profession_indicators)
+                    
+                    # Apply smart field-specific search based on analysis
+                    if is_likely_address:
+                        print(f"Query '{query}' detected as address - searching in address field")
+                        queryset = queryset.filter(address__icontains=query)
+                    elif is_likely_island:
+                        print(f"Query '{query}' detected as island - searching in island field")
+                        queryset = queryset.filter(island__icontains=query)
+                    elif is_likely_profession:
+                        print(f"Query '{query}' detected as profession - searching in profession field")
+                        queryset = queryset.filter(profession__icontains=query)
+                    else:
+                        # Default to comprehensive search across multiple fields
+                        print(f"Query '{query}' - performing comprehensive search across name, address, island, profession, remark")
+                        queryset = queryset.filter(
+                            Q(name__icontains=query) |
+                            Q(address__icontains=query) |
+                            Q(island__icontains=query) |
+                            Q(profession__icontains=query) |
+                            Q(remark__icontains=query)
+                        )
                 
                 print(f"Results after smart query: {queryset.count()}")
             
-            # Individual field filters (only apply if they don't conflict with smart query)
+            # Handle the case where we have both address and island filters (smart search case)
+            if has_address_filter and has_island_filter:
+                print(f"Smart search case: Address='{data['address']}', Island='{data['island']}'")
+                
+                # Reset queryset to all entries since we're doing custom field-based search
+                # The smart query analysis was filtering out results prematurely
+                queryset = PhoneBookEntry.objects.all()
+                print(f"Reset queryset to all entries: {queryset.count()}")
+                
+                # For address + island combination, try AND logic first for precise results
+                # If no results, fall back to OR logic for broader results
+                address_term = data['address'].strip()
+                island_term = data['island'].strip()
+                
+                # Pad terms with wildcards for more flexible matching
+                # This helps catch partial matches within longer text
+                padded_address_term = f"*{address_term}*"
+                padded_island_term = f"*{island_term}*"
+                
+                print(f"Searching for address term: '{address_term}' (padded: '{padded_address_term}') AND island term: '{island_term}' (padded: '{padded_island_term}')")
+                print(f"First trying AND logic for precise results...")
+                
+                # Debug: Check what exists in the database for these terms
+                print(f"Database check - Entries with address containing '{address_term}': {PhoneBookEntry.objects.filter(address__icontains=address_term).count()}")
+                print(f"Database check - Entries with island containing '{island_term}': {PhoneBookEntry.objects.filter(island__icontains=island_term).count()}")
+                
+                # Show some sample entries for debugging
+                address_entries = PhoneBookEntry.objects.filter(address__icontains=address_term)[:3]
+                island_entries = PhoneBookEntry.objects.filter(island__icontains=island_term)[:3]
+                
+                if address_entries.exists():
+                    print(f"Sample address entries for '{address_term}':")
+                    for entry in address_entries:
+                        print(f"  - {entry.name}: address='{entry.address}', island='{entry.island}'")
+                
+                if island_entries.exists():
+                    print(f"Sample island entries for '{island_term}':")
+                    for entry in island_entries:
+                        print(f"  - {entry.name}: address='{entry.address}', island='{entry.island}'")
+                
+                # First try: Use AND logic for precise results (narrow scope)
+                # For family searches, use exact matching; otherwise use partial matching
+                if is_family_search:
+                    print("Using exact matching for family search")
+                    precise_queryset = queryset.filter(
+                        Q(address__iexact=address_term) & Q(island__iexact=island_term)
+                    )
+                else:
+                    # Using padded terms for more flexible matching
+                    precise_queryset = queryset.filter(
+                        Q(address__icontains=address_term) & Q(island__icontains=island_term)
+                    )
+                
+                print(f"Results after AND logic (precise): {precise_queryset.count()}")
+                
+                if precise_queryset.count() > 0:
+                    # Use the precise results
+                    queryset = precise_queryset
+                    print("Using precise AND logic results")
+                else:
+                    # No precise results, try OR logic for broader results
+                    print("No precise results found, trying OR logic for broader results...")
+                    
+                    broader_queryset = queryset.filter(
+                        Q(address__icontains=address_term) |
+                        Q(island__icontains=island_term)
+                    )
+                    
+                    print(f"Results after OR logic (broader): {broader_queryset.count()}")
+                    
+                    if broader_queryset.count() > 0:
+                        queryset = broader_queryset
+                        print("Using broader OR logic results")
+                        print("Note: These results match EITHER address OR island, not necessarily both")
+                        
+                        # Show some sample entries to understand what was found
+                        sample_entries = queryset[:3]
+                        for entry in sample_entries:
+                            print(f"Sample entry: {entry.name} - Address: {entry.address} - Island: {entry.island} - Atoll: {entry.atoll}")
+                    else:
+                        print("No results found with either AND or OR logic")
+                        print("This combination may not exist in the database")
+            
+            # Handle the case where we have both address and party filters (smart search case)
+            elif has_address_filter and has_party_filter:
+                print(f"Smart search case: Address='{data['address']}', Party='{data['party']}'")
+                
+                # Reset queryset to all entries since we're doing custom field-based search
+                queryset = PhoneBookEntry.objects.all()
+                print(f"Reset queryset to all entries: {queryset.count()}")
+                
+                # For address + party combination, try AND logic first for precise results
+                # If no results, fall back to OR logic for broader results
+                address_term = data['address'].strip()
+                party_term = data['party'].strip()
+                
+                print(f"Searching for address term: '{address_term}' AND party term: '{party_term}'")
+                print(f"First trying AND logic for precise results...")
+                
+                # Debug: Check what exists in the database for these terms
+                print(f"Database check - Entries with address containing '{address_term}': {PhoneBookEntry.objects.filter(address__icontains=address_term).count()}")
+                print(f"Database check - Entries with party containing '{party_term}': {PhoneBookEntry.objects.filter(party__icontains=party_term).count()}")
+                
+                # Show some sample entries for debugging
+                address_entries = PhoneBookEntry.objects.filter(address__icontains=address_term)[:3]
+                party_entries = PhoneBookEntry.objects.filter(party__icontains=party_term)[:3]
+                
+                if address_entries.exists():
+                    print(f"Sample address entries for '{address_term}':")
+                    for entry in address_entries:
+                        print(f"  - {entry.name}: address='{entry.address}', party='{entry.party}'")
+                
+                if party_entries.exists():
+                    print(f"Sample party entries for '{party_term}':")
+                    for entry in party_entries:
+                        print(f"  - {entry.name}: address='{entry.address}', party='{entry.party}'")
+                
+                # First try: Use AND logic for precise results (narrow scope)
+                precise_queryset = queryset.filter(
+                    Q(address__icontains=address_term) & Q(party__icontains=party_term)
+                )
+                
+                print(f"Results after AND logic (precise): {precise_queryset.count()}")
+                
+                if precise_queryset.count() > 0:
+                    # Use the precise results
+                    queryset = precise_queryset
+                    print("Using precise AND logic results")
+                else:
+                    # No precise results, try OR logic for broader results
+                    print("No precise results found, trying OR logic for broader results...")
+                    
+                    broader_queryset = queryset.filter(
+                        Q(address__icontains=address_term) |
+                        Q(party__icontains=party_term)
+                    )
+                    
+                    print(f"Results after OR logic (broader): {broader_queryset.count()}")
+                    
+                    if broader_queryset.count() > 0:
+                        queryset = broader_queryset
+                        print("Using broader OR logic results")
+                        print("Note: These results match EITHER address OR party, not necessarily both")
+                        
+                        # Show some sample entries to understand what was found
+                        sample_entries = queryset[:3]
+                        for entry in sample_entries:
+                            print(f"Sample entry: {entry.name} - Address: {entry.address} - Party: {entry.party}")
+                    else:
+                        print("No results found with either AND or OR logic")
+                        print("This combination may not exist in the database")
+            
+            # Handle the case where we have both name and party filters (smart search case)
+            elif has_name_filter and has_party_filter:
+                print(f"Smart search case: Name='{data['name']}', Party='{data['party']}'")
+                
+                # Reset queryset to all entries since we're doing custom field-based search
+                queryset = PhoneBookEntry.objects.all()
+                print(f"Reset queryset to all entries: {queryset.count()}")
+                
+                # For name + party combination, try AND logic first for precise results
+                # If no results, fall back to OR logic for broader results
+                name_term = data['name'].strip()
+                party_term = data['party'].strip()
+                
+                print(f"Searching for name term: '{name_term}' AND party term: '{party_term}'")
+                print(f"First trying AND logic for precise results...")
+                
+                # Debug: Check what exists in the database for these terms
+                print(f"Database check - Entries with name containing '{name_term}': {PhoneBookEntry.objects.filter(name__icontains=name_term).count()}")
+                print(f"Database check - Entries with party containing '{party_term}': {PhoneBookEntry.objects.filter(party__icontains=party_term).count()}")
+                
+                # Show some sample entries for debugging
+                name_entries = PhoneBookEntry.objects.filter(name__icontains=name_term)[:3]
+                party_entries = PhoneBookEntry.objects.filter(party__icontains=party_term)[:3]
+                
+                if name_entries.exists():
+                    print(f"Sample name entries for '{name_term}':")
+                    for entry in name_entries:
+                        print(f"  - {entry.name}: party='{entry.party}', address='{entry.address}'")
+                
+                if party_entries.exists():
+                    print(f"Sample party entries for '{party_term}':")
+                    for entry in party_entries:
+                        print(f"  - {entry.name}: party='{entry.party}', address='{entry.address}'")
+                
+                # First try: Use AND logic for precise results (narrow scope)
+                precise_queryset = queryset.filter(
+                    Q(name__icontains=name_term) & Q(party__icontains=party_term)
+                )
+                
+                print(f"Results after AND logic (precise): {precise_queryset.count()}")
+                
+                if precise_queryset.count() > 0:
+                    # Use the precise results
+                    queryset = precise_queryset
+                    print("Using precise AND logic results")
+                else:
+                    # No precise results, try OR logic for broader results
+                    print("No precise results found, trying OR logic for broader results...")
+                    
+                    broader_queryset = queryset.filter(
+                        Q(name__icontains=name_term) |
+                        Q(party__icontains=party_term)
+                    )
+                    
+                    print(f"Results after OR logic (broader): {broader_queryset.count()}")
+                    
+                    if broader_queryset.count() > 0:
+                        queryset = broader_queryset
+                        print("Using broader OR logic results")
+                        print("Note: These results match EITHER name OR party, not necessarily both")
+                        
+                        # Show some sample entries to understand what was found
+                        sample_entries = queryset[:3]
+                        for entry in sample_entries:
+                            print(f"Sample entry: {entry.name} - Party: {entry.party} - Address: {entry.address}")
+                    else:
+                        print("No results found with either AND or OR logic")
+                        print("This combination may not exist in the database")
+            
+            # Handle the case where we have both island and party filters (smart search case)
+            elif has_island_filter and has_party_filter:
+                print(f"Smart search case: Island='{data['island']}', Party='{data['party']}'")
+                
+                # Reset queryset to all entries since we're doing custom field-based search
+                queryset = PhoneBookEntry.objects.all()
+                print(f"Reset queryset to all entries: {queryset.count()}")
+                
+                # For island + party combination, try AND logic first for precise results
+                # If no results, fall back to OR logic for broader results
+                island_term = data['island'].strip()
+                party_term = data['party'].strip()
+                
+                print(f"Searching for island term: '{island_term}' AND party term: '{party_term}'")
+                print(f"First trying AND logic for precise results...")
+                
+                # Debug: Check what exists in the database for these terms
+                print(f"Database check - Entries with island containing '{island_term}': {PhoneBookEntry.objects.filter(island__icontains=island_term).count()}")
+                print(f"Database check - Entries with party containing '{party_term}': {PhoneBookEntry.objects.filter(party__icontains=party_term).count()}")
+                
+                # Show some sample entries for debugging
+                island_entries = PhoneBookEntry.objects.filter(island__icontains=island_term)[:3]
+                party_entries = PhoneBookEntry.objects.filter(party__icontains=party_term)[:3]
+                
+                if island_entries.exists():
+                    print(f"Sample island entries for '{island_term}':")
+                    for entry in island_entries:
+                        print(f"  - {entry.name}: island='{entry.island}', party='{entry.party}'")
+                
+                if party_entries.exists():
+                    print(f"Sample party entries for '{party_term}':")
+                    for entry in party_entries:
+                        print(f"  - {entry.name}: island='{entry.island}', party='{entry.party}'")
+                
+                # First try: Use AND logic for precise results (narrow scope)
+                precise_queryset = queryset.filter(
+                    Q(island__icontains=island_term) & Q(party__icontains=party_term)
+                )
+                
+                print(f"Results after AND logic (precise): {precise_queryset.count()}")
+                
+                if precise_queryset.count() > 0:
+                    # Use the precise results
+                    queryset = precise_queryset
+                    print("Using precise AND logic results")
+                else:
+                    # No precise results, try OR logic for broader results
+                    print("No precise results found, trying OR logic for broader results...")
+                    
+                    broader_queryset = queryset.filter(
+                        Q(island__icontains=island_term) |
+                        Q(party__icontains=party_term)
+                    )
+                    
+                    print(f"Results after OR logic (broader): {broader_queryset.count()}")
+                    
+                    if broader_queryset.count() > 0:
+                        queryset = broader_queryset
+                        print("Using broader OR logic results")
+                        print("Note: These results match EITHER island OR party, not necessarily both")
+                        
+                        # Show some sample entries to understand what was found
+                        sample_entries = queryset[:3]
+                        for entry in sample_entries:
+                            print(f"Sample entry: {entry.name} - Island: {entry.island} - Party: {entry.party}")
+                    else:
+                        print("No results found with either AND or OR logic")
+                        print("This combination may not exist in the database")
+                
+            else:
+                # Individual field filters (only apply if we don't have the smart field combinations)
+                if has_name_filter:
+                    queryset = queryset.filter(name__icontains=data['name'].strip())
+                
+                if has_address_filter:
+                    queryset = queryset.filter(address__icontains=data['address'].strip())
+                
+                if has_island_filter:
+                    queryset = queryset.filter(island__icontains=data['island'].strip())
+                
+                if has_party_filter:
+                    queryset = queryset.filter(party__icontains=data['party'].strip())
+            
+            # Apply other individual field filters
             if data.get('name') and data['name'].strip():
                 queryset = queryset.filter(name__icontains=data['name'].strip())
             
@@ -526,14 +873,8 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             if data.get('nid') and data['nid'].strip():
                 queryset = queryset.filter(nid__icontains=data['nid'].strip())
             
-            if data.get('address') and data['address'].strip():
-                queryset = queryset.filter(address__icontains=data['address'].strip())
-            
             if data.get('atoll') and data['atoll'].strip():
                 queryset = queryset.filter(atoll__icontains=data['atoll'].strip())
-            
-            if data.get('island') and data['island'].strip():
-                queryset = queryset.filter(island__icontains=data['island'].strip())
             
             if data.get('party') and data['party'].strip():
                 party_filter = data['party'].strip()
@@ -583,8 +924,8 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             
             serializer = PhoneBookEntrySerializer(results, many=True)
             
-            # Deduct points for basic search (except for admin users)
-            if not (request.user.is_staff or request.user.is_superuser):
+            # Deduct points for basic search (except for admin users and anonymous users)
+            if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
                 try:
                     from dirReactFinal_scoring.utils import deduct_points_for_action, get_action_points
                     
@@ -621,7 +962,10 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             # Get points information for response
             from dirReactFinal_scoring.utils import get_action_points
             points_cost, threshold = get_action_points('basic_search')
-            points_deducted = abs(points_cost) if points_cost < 0 and not (request.user.is_staff or request.user.is_superuser) else 0
+            points_deducted = abs(points_cost) if points_cost < 0 and request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser) else 0
+            
+            # Handle anonymous users for points information
+            remaining_points = getattr(request.user, 'score', 0) if request.user.is_authenticated else 0
             
             return Response({
                 'results': serializer.data,
@@ -630,7 +974,7 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                 'page_size': page_size,
                 'total_pages': (total_count + page_size - 1) // page_size,
                 'points_deducted': points_deducted,
-                'remaining_points': request.user.score,
+                'remaining_points': remaining_points,
                 'action_cost': points_cost,
                 'threshold_required': threshold
             })
@@ -814,8 +1158,8 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             from .serializers import PhoneBookEntryWithImageSerializer
             serializer = PhoneBookEntryWithImageSerializer(results, many=True)
             
-            # Deduct points for image search (except for admin users)
-            if not (request.user.is_staff or request.user.is_superuser):
+            # Deduct points for image search (except for admin users and anonymous users)
+            if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
                 try:
                     from dirReactFinal_scoring.utils import deduct_points_for_action, get_action_points
                     
@@ -852,7 +1196,10 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             # Get points information for response
             from dirReactFinal_scoring.utils import get_action_points
             points_cost, threshold = get_action_points('image_search')
-            points_deducted = abs(points_cost) if points_cost < 0 and not (request.user.is_staff or request.user.is_superuser) else 0
+            points_deducted = abs(points_cost) if points_cost < 0 and request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser) else 0
+            
+            # Handle anonymous users for points information
+            remaining_points = getattr(request.user, 'score', 0) if request.user.is_authenticated else 0
             
             return Response({
                 'results': serializer.data,
@@ -863,7 +1210,7 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                 'pep_count': queryset.filter(pep_status='1').count(),
                 'total_with_images': queryset.count(),
                 'points_deducted': points_deducted,
-                'remaining_points': request.user.score,
+                'remaining_points': remaining_points,
                 'action_cost': points_cost,
                 'threshold_required': threshold
             })

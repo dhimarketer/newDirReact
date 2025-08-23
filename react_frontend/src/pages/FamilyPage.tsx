@@ -1,351 +1,310 @@
 // 2025-01-27: Creating FamilyPage component for Phase 2 React frontend family management
+// 2025-01-27: Fixed frontend crash by adding null checks for familyGroups, familyMembers, and pagination arrays
+// 2025-01-27: COMPLETELY REWRITTEN - Implemented search-based family discovery with auto-detection
 
 import React, { useState, useEffect } from 'react';
-import { useFamilyStore } from '../store/familyStore';
-import { FamilyGroup, FamilyMember } from '../types';
-import {
-  FamilyGroupCard,
-  FamilyMemberCard,
-  FamilySearchBar,
-  CreateFamilyGroupModal,
-  AddFamilyMemberModal,
-} from '../components/family';
+import SearchBar from '../components/directory/SearchBar';
+import SearchResults from '../components/directory/SearchResults';
+import { PhoneBookEntry, SearchFilters } from '../types/directory';
+
+interface DetectedFamily {
+  id: string;
+  address: string;
+  island: string;
+  members: PhoneBookEntry[];
+  parents: PhoneBookEntry[];
+  children: PhoneBookEntry[];
+  isCustomized: boolean;
+}
 
 const FamilyPage: React.FC = () => {
-  const {
-    familyGroups,
-    familyMembers,
-    currentFamilyGroup,
-    familyGroupsLoading,
-    familyMembersLoading,
-    familyGroupsError,
-    familyMembersError,
-    pagination,
-    fetchFamilyGroups,
-    fetchFamilyMembers,
-    createFamilyGroup,
-    updateFamilyGroup,
-    deleteFamilyGroup,
-    addFamilyMember,
-    updateFamilyMember,
-    removeFamilyMember,
-    setCurrentFamilyGroup,
-    clearErrors,
-  } = useFamilyStore();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<PhoneBookEntry[]>([]);
+  const [detectedFamilies, setDetectedFamilies] = useState<DetectedFamily[]>([]);
+  const [selectedFamily, setSelectedFamily] = useState<DetectedFamily | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showFamilyEditor, setShowFamilyEditor] = useState(false);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showMembers, setShowMembers] = useState(false);
-  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
-  const [editingFamily, setEditingFamily] = useState<FamilyGroup | null>(null);
-  const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
-
-  useEffect(() => {
-    fetchFamilyGroups();
-    clearErrors();
-  }, [fetchFamilyGroups, clearErrors]);
-
-  useEffect(() => {
-    if (currentFamilyGroup) {
-      fetchFamilyMembers(currentFamilyGroup.id);
+  // Handle search from the search bar
+  const handleSearch = async (filters: SearchFilters) => {
+    setSearchQuery(filters.query || '');
+    setIsSearching(true);
+    
+    try {
+      // Use the existing search API endpoint
+      const response = await fetch(`/api/phonebook/search/?q=${encodeURIComponent(filters.query || '')}`);
+      const data = await response.json();
+      setSearchResults(data.results || []);
+      
+      // Auto-detect families from search results
+      const families = detectFamiliesFromSearchResults(data.results || []);
+      setDetectedFamilies(families);
+    } catch (error) {
+      console.error('Search failed:', error);
+      setSearchResults([]);
+      setDetectedFamilies([]);
+    } finally {
+      setIsSearching(false);
     }
-  }, [currentFamilyGroup, fetchFamilyMembers]);
-
-  const handleCreateFamilyGroup = (familyGroup: FamilyGroup) => {
-    setShowCreateModal(false);
-    // The store will automatically update the list
   };
 
-  const handleEditFamilyGroup = (family: FamilyGroup) => {
-    setEditingFamily(family);
-    setShowCreateModal(true);
-  };
-
-  const handleDeleteFamilyGroup = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this family group? This action cannot be undone.')) {
-      const success = await deleteFamilyGroup(id);
-      if (success && currentFamilyGroup?.id === id) {
-        setCurrentFamilyGroup(null);
-        setShowMembers(false);
+  // Auto-detect families based on address and island
+  const detectFamiliesFromSearchResults = (results: PhoneBookEntry[]): DetectedFamily[] => {
+    const familyGroups = new Map<string, DetectedFamily>();
+    
+    results.forEach(entry => {
+      const key = `${entry.address || 'Unknown'}-${entry.island || 'Unknown'}`;
+      
+      if (!familyGroups.has(key)) {
+        familyGroups.set(key, {
+          id: key,
+          address: entry.address || 'Unknown',
+          island: entry.island || 'Unknown',
+          members: [],
+          parents: [],
+          children: [],
+          isCustomized: false
+        });
       }
+      
+      familyGroups.get(key)!.members.push(entry);
+    });
+    
+    // Process each family group to determine parents vs children
+    const processedFamilies: DetectedFamily[] = [];
+    
+    familyGroups.forEach(family => {
+      // Sort members by age (using DOB if available) or use a default logic
+      const sortedMembers = family.members.sort((a, b) => {
+        // If we have DOB data, calculate age and sort by age (eldest first)
+        if (a.DOB && b.DOB) {
+          const ageA = new Date().getFullYear() - new Date(a.DOB).getFullYear();
+          const ageB = new Date().getFullYear() - new Date(b.DOB).getFullYear();
+          return ageB - ageA;
+        }
+        // Otherwise, use name length as a simple heuristic (longer names might be older)
+        return (b.name?.length || 0) - (a.name?.length || 0);
+      });
+      
+      // Assign roles: first 2 members as parents, rest as children
+      const parents = sortedMembers.slice(0, Math.min(2, sortedMembers.length));
+      const children = sortedMembers.slice(Math.min(2, sortedMembers.length));
+      
+      processedFamilies.push({
+        ...family,
+        parents,
+        children
+      });
+    });
+    
+    return processedFamilies;
+  };
+
+  // Handle family customization
+  const handleCustomizeFamily = (family: DetectedFamily) => {
+    setSelectedFamily(family);
+    setShowFamilyEditor(true);
+  };
+
+  // Save customized family
+  const handleSaveFamily = async (customizedFamily: DetectedFamily) => {
+    try {
+      // Save to backend API
+      const response = await fetch('/api/family/groups/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          name: `${customizedFamily.address} Family`,
+          description: `Family from ${customizedFamily.address}, ${customizedFamily.island}`,
+          members: customizedFamily.members.map(member => ({
+            entry_id: member.pid,
+            role: customizedFamily.parents.includes(member) ? 'parent' : 'child'
+          }))
+        })
+      });
+      
+      if (response.ok) {
+        // Update local state
+        setDetectedFamilies(prev => 
+          prev.map(f => f.id === customizedFamily.id ? { ...f, isCustomized: true } : f)
+        );
+        setShowFamilyEditor(false);
+        setSelectedFamily(null);
+      }
+    } catch (error) {
+      console.error('Failed to save family:', error);
     }
   };
-
-  const handleViewMembers = (familyId: number) => {
-    const family = familyGroups.find(fg => fg.id === familyId);
-    if (family) {
-      setCurrentFamilyGroup(family);
-      setShowMembers(true);
-    }
-  };
-
-  const handleViewTree = (familyId: number) => {
-    // TODO: Implement family tree visualization
-    console.log('View family tree for:', familyId);
-  };
-
-  const handleEditMember = (member: FamilyMember) => {
-    setEditingMember(member);
-    // TODO: Implement member edit modal
-  };
-
-  const handleRemoveMember = async (memberId: number) => {
-    if (currentFamilyGroup && window.confirm('Are you sure you want to remove this member?')) {
-      await removeFamilyMember(currentFamilyGroup.id, memberId);
-    }
-  };
-
-  const handleViewProfile = (userId: number) => {
-    // TODO: Navigate to user profile
-    console.log('View profile for user:', userId);
-  };
-
-  const handleBackToFamilies = () => {
-    setCurrentFamilyGroup(null);
-    setShowMembers(false);
-    setEditingFamily(null);
-    setEditingMember(null);
-  };
-
-  const renderFamilyGroups = () => (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Family Groups</h1>
-          <p className="text-gray-600">Manage and discover family connections</p>
-        </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
-        >
-          Create Family Group
-        </button>
-      </div>
-
-      {/* Search and Filters */}
-      <FamilySearchBar showFilters={true} />
-
-      {/* Error Display */}
-      {familyGroupsError && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error</h3>
-              <div className="mt-2 text-sm text-red-700">{familyGroupsError}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Loading State */}
-      {familyGroupsLoading === 'loading' && (
-        <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      )}
-
-      {/* Family Groups Grid */}
-      {familyGroupsLoading === 'success' && familyGroups.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {familyGroups.map((familyGroup) => (
-            <FamilyGroupCard
-              key={familyGroup.id}
-              familyGroup={familyGroup}
-              onEdit={handleEditFamilyGroup}
-              onDelete={handleDeleteFamilyGroup}
-              onViewMembers={handleViewMembers}
-              onViewTree={handleViewTree}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {familyGroupsLoading === 'success' && familyGroups.length === 0 && (
-        <div className="text-center py-12">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No family groups</h3>
-          <p className="mt-1 text-sm text-gray-500">Get started by creating your first family group.</p>
-          <div className="mt-6">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Create Family Group
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Pagination */}
-      {pagination.total > 0 && (
-        <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
-          <div className="flex flex-1 justify-between sm:hidden">
-            <button
-              onClick={() => fetchFamilyGroups({ page: pagination.page - 1 })}
-              disabled={!pagination.hasPrevious}
-              className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => fetchFamilyGroups({ page: pagination.page + 1 })}
-              disabled={!pagination.hasNext}
-              className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
-          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-gray-700">
-                Showing <span className="font-medium">1</span> to{' '}
-                <span className="font-medium">{Math.min(pagination.pageSize, pagination.total)}</span> of{' '}
-                <span className="font-medium">{pagination.total}</span> results
-              </p>
-            </div>
-            <div>
-              <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                <button
-                  onClick={() => fetchFamilyGroups({ page: pagination.page - 1 })}
-                  disabled={!pagination.hasPrevious}
-                  className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => fetchFamilyGroups({ page: pagination.page + 1 })}
-                  disabled={!pagination.hasNext}
-                  className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </nav>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderFamilyMembers = () => (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <button
-            onClick={handleBackToFamilies}
-            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors duration-200 mb-2"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Families
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900">{currentFamilyGroup?.name} - Members</h1>
-          <p className="text-gray-600">Manage family group members and relationships</p>
-        </div>
-        <button
-          onClick={() => setShowAddMemberModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
-        >
-          Add Member
-        </button>
-      </div>
-
-      {/* Error Display */}
-      {familyMembersError && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error</h3>
-              <div className="mt-2 text-sm text-red-700">{familyMembersError}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Loading State */}
-      {familyMembersLoading === 'loading' && (
-        <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      )}
-
-      {/* Members Grid */}
-      {familyMembersLoading === 'success' && familyMembers.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {familyMembers.map((member) => (
-            <FamilyMemberCard
-              key={member.id}
-              member={member}
-              onEdit={handleEditMember}
-              onRemove={handleRemoveMember}
-              onViewProfile={handleViewProfile}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {familyMembersLoading === 'success' && familyMembers.length === 0 && (
-        <div className="text-center py-12">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No members yet</h3>
-          <p className="mt-1 text-sm text-gray-500">Start building your family by adding members.</p>
-          <div className="mt-6">
-            <button
-              onClick={() => setShowAddMemberModal(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Add Member
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {showMembers ? renderFamilyMembers() : renderFamilyGroups()}
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Family Discovery</h1>
+          <p className="mt-2 text-gray-600">
+            Search for people and discover family relationships automatically based on address and island.
+          </p>
+        </div>
+
+        {/* Search Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Search for People</h2>
+          <SearchBar 
+            onSearch={handleSearch}
+            onFiltersChange={setSearchFilters}
+            filters={searchFilters}
+            isLoading={isSearching}
+          />
+        </div>
+
+        {/* Search Results */}
+        {searchResults.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Search Results ({searchResults.length} people found)
+            </h2>
+            <SearchResults 
+              results={searchResults}
+              totalCount={searchResults.length}
+              currentPage={1}
+              pageSize={20}
+              onPageChange={() => {}}
+              onPageSizeChange={() => {}}
+              onExport={() => {}}
+              isLoading={isSearching}
+            />
+          </div>
+        )}
+
+        {/* Detected Families */}
+        {detectedFamilies.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Detected Families ({detectedFamilies.length} families)
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {detectedFamilies.map(family => (
+                <div key={family.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="mb-3">
+                    <h3 className="font-medium text-gray-900">
+                      {family.address || 'Unknown Address'}
+                    </h3>
+                    <p className="text-sm text-gray-600">{family.island || 'Unknown Island'}</p>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <p className="text-sm text-gray-700">
+                      <span className="font-medium">{family.members.length}</span> family members
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {family.parents.length} parents, {family.children.length} children
+                    </p>
+                  </div>
+                  
+                  <div className="mb-4">
+                                         <h4 className="text-sm font-medium text-gray-700 mb-2">Parents:</h4>
+                     <div className="space-y-1">
+                       {family.parents.map(member => (
+                         <div key={member.pid} className="text-sm text-gray-600">
+                           • {member.name}
+                         </div>
+                       ))}
+                     </div>
+                     
+                     <h4 className="text-sm font-medium text-gray-700 mb-2 mt-3">Children:</h4>
+                     <div className="space-y-1">
+                       {family.children.map(member => (
+                         <div key={member.pid} className="text-sm text-gray-600">
+                           • {member.name}
+                         </div>
+                       ))}
+                     </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleCustomizeFamily(family)}
+                      className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                      disabled={family.isCustomized}
+                    >
+                      {family.isCustomized ? 'Already Saved' : 'Customize & Save'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isSearching && searchQuery && searchResults.length === 0 && (
+          <div className="text-center py-12">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No results found</h3>
+            <p className="mt-1 text-sm text-gray-500">Try adjusting your search terms or filters.</p>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isSearching && (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-sm text-gray-600">Searching for people...</p>
+          </div>
+        )}
+
+        {/* Instructions */}
+        {!searchQuery && !isSearching && (
+          <div className="text-center py-12">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">Start discovering families</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Use the search bar above to find people. The system will automatically detect family relationships 
+              based on shared addresses and islands.
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Create/Edit Family Group Modal */}
-      <CreateFamilyGroupModal
-        isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setEditingFamily(null);
-        }}
-        onSuccess={handleCreateFamilyGroup}
-      />
-
-      {/* Add Family Member Modal */}
-      <AddFamilyMemberModal
-        isOpen={showAddMemberModal}
-        onClose={() => setShowAddMemberModal(false)}
-        familyId={currentFamilyGroup?.id || 0}
-        onSuccess={(member) => {
-          // The store will automatically update the members list
-          console.log('Member added:', member);
-        }}
-      />
+      {/* Family Editor Modal - TODO: Implement this component */}
+      {showFamilyEditor && selectedFamily && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Customize Family: {selectedFamily.address}, {selectedFamily.island}
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Review and customize the detected family relationships before saving.
+            </p>
+            
+            {/* TODO: Add family editor interface here */}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowFamilyEditor(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleSaveFamily(selectedFamily)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Save Family
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

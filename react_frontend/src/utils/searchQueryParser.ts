@@ -4,8 +4,11 @@
 // 2025-01-27: Fixed comma logic - each comma indicates a new field, not adding to same field
 // 2025-01-27: Added field priority order and age search support with > operator
 // 2025-01-27: Added wildcard capability for each search term
+// 2025-01-27: Enhanced address and island detection for better smart search
+// 2025-01-27: COMPLETELY REWRITTEN with probability-based field detection for optimal accuracy
 
 import { SearchFilters } from '../types/directory';
+import islandService from '../services/islandService';
 
 export interface ParsedQuery {
   query: string;
@@ -14,20 +17,25 @@ export interface ParsedQuery {
   searchTerms: string[];
 }
 
+export interface FieldProbability {
+  field: keyof SearchFilters;
+  probability: number;
+  reason: string;
+}
+
 /**
- * Parse a smart search query and extract meaningful filters
- * Field priority order: name → island → address → party → number (contact/nid)
- * Age search: >30 means people older than 30 years (year-only calculation)
- * Wildcards: * or % can be used in any search term for partial matches
+ * Parse a smart search query and extract meaningful filters using probability-based field detection
+ * Each term is analyzed individually and assigned to the field with the highest probability
  * 
  * Examples:
+ * - "habaruge, hithadhoo" -> address: "habaruge", island: "hithadhoo"
  * - "ali*, male, hulhumale, MDP" -> name: "ali*", island: "male", address: "hulhumale", party: "MDP"
  * - "ali, hee*, >30" -> name: "ali", profession: "hee*", min_age: 30
  * - "j*n, >25, MDP" -> name: "j*n", min_age: 25, party: "MDP"
  * - "ali%" -> name: "ali*" (wildcard)
  * - "1234567" -> contact: "1234567" (numeric)
  */
-export const parseSmartQuery = (rawQuery: string): ParsedQuery => {
+export const parseSmartQuery = async (rawQuery: string): Promise<ParsedQuery> => {
   const query = rawQuery.trim();
   if (!query) {
     return {
@@ -49,9 +57,10 @@ export const parseSmartQuery = (rawQuery: string): ParsedQuery => {
   let hasWildcards = false;
   let usedFields = new Set<string>(); // Track which fields we've already used
 
-  terms.forEach((term, index) => {
+  for (let index = 0; index < terms.length; index++) {
+    const term = terms[index];
     const cleanTerm = term.trim();
-    if (!cleanTerm) return;
+    if (!cleanTerm) continue;
 
     // Check for age search with > operator
     if (cleanTerm.startsWith('>')) {
@@ -59,7 +68,7 @@ export const parseSmartQuery = (rawQuery: string): ParsedQuery => {
       if (/^\d+$/.test(ageValue) && !usedFields.has('min_age')) {
         filters.min_age = parseInt(ageValue);
         usedFields.add('min_age');
-        return;
+        continue;
       }
     }
 
@@ -70,16 +79,19 @@ export const parseSmartQuery = (rawQuery: string): ParsedQuery => {
       // Convert % to * for consistency
       const wildcardTerm = cleanTerm.replace(/%/g, '*');
       
-      // Try to determine the field type for wildcard, following priority order
-      const fieldType = analyzeTermWithPriority(wildcardTerm, usedFields);
-      if (fieldType && !usedFields.has(fieldType)) {
-        (filters as any)[fieldType] = wildcardTerm;
-        usedFields.add(fieldType);
+      // Use probability-based detection for wildcard terms
+      const fieldProbabilities = await calculateFieldProbabilities(wildcardTerm);
+      const bestField = getBestAvailableField(fieldProbabilities, usedFields);
+      
+      if (bestField && !usedFields.has(bestField.field)) {
+        (filters as any)[bestField.field] = wildcardTerm;
+        usedFields.add(bestField.field);
+        console.log(`Wildcard term "${wildcardTerm}" assigned to ${bestField.field} (${bestField.probability}% - ${bestField.reason})`);
       } else {
         // Default to general query with wildcard
         filters.query = wildcardTerm;
       }
-      return;
+      continue;
     }
 
     // Check for specific field indicators
@@ -98,22 +110,24 @@ export const parseSmartQuery = (rawQuery: string): ParsedQuery => {
             (filters as any)[fieldKey] = value;
           }
           usedFields.add(fieldKey);
-          return;
+          continue;
         }
       }
     }
 
-    // Analyze the term following the priority order: name → island → address → party → number
-    const fieldType = analyzeTermWithPriority(cleanTerm, usedFields);
+    // Use probability-based field detection for the term
+    const fieldProbabilities = await calculateFieldProbabilities(cleanTerm);
+    const bestField = getBestAvailableField(fieldProbabilities, usedFields);
     
-    if (fieldType && !usedFields.has(fieldType)) {
-      (filters as any)[fieldType] = cleanTerm;
-      usedFields.add(fieldType);
+    if (bestField && !usedFields.has(bestField.field)) {
+      (filters as any)[bestField.field] = cleanTerm;
+      usedFields.add(bestField.field);
+      console.log(`Term "${cleanTerm}" assigned to ${bestField.field} (${bestField.probability}% - ${bestField.reason})`);
     } else {
       // If we can't determine a field or field already used, add to search terms
       searchTerms.push(cleanTerm);
     }
-  });
+  }
 
   // If we have specific filters, don't use the general query
   // If we only have search terms, combine them into the general query
@@ -133,92 +147,180 @@ export const parseSmartQuery = (rawQuery: string): ParsedQuery => {
 };
 
 /**
- * Analyze a term following the priority order: name → island → address → party → number
- * Avoids fields that have already been used
+ * Calculate probability scores for each field for a given term
+ * Now async to support database lookups for islands and atolls
  */
-const analyzeTermWithPriority = (term: string, usedFields: Set<string>): string | null => {
+const calculateFieldProbabilities = async (term: string): Promise<FieldProbability[]> => {
+  const probabilities: FieldProbability[] = [];
   const cleanTerm = term.toLowerCase();
   
-  // Priority 1: Check for names (if name field not used)
-  if (isLikelyName(term) && !usedFields.has('name')) {
-    return 'name';
-  }
+  console.log(`🔍 Analyzing term: "${term}" (clean: "${cleanTerm}")`);
   
-  // Priority 2: Check for Maldivian islands (if island field not used)
-  if (isMaldivianIsland(cleanTerm) && !usedFields.has('island')) {
-    return 'island';
-  }
-  
-  // Priority 3: Check for address-like terms (if address field not used)
-  if (isLikelyAddress(cleanTerm) && !usedFields.has('address')) {
-    return 'address';
-  }
-  
-  // Priority 4: Check for political parties (if party field not used)
-  if (isPoliticalParty(cleanTerm) && !usedFields.has('party')) {
-    return 'party';
-  }
-  
-  // Priority 5: Check for numeric patterns (contact/nid) (if not used)
+  // Check for numeric patterns (contact/nid)
   if (/^\d+$/.test(term)) {
-    if (term.length === 7 && !usedFields.has('contact')) {
-      return 'contact'; // 7 digits likely phone number
-    } else if (term.length <= 10 && !usedFields.has('nid')) {
-      return 'nid'; // Shorter numbers likely NID
+    if (term.length === 7) {
+      probabilities.push({
+        field: 'contact',
+        probability: 95,
+        reason: '7-digit phone number pattern'
+      });
+      console.log(`   📱 Contact: 95% - 7-digit phone number`);
+    } else if (term.length <= 10) {
+      probabilities.push({
+        field: 'nid',
+        probability: 85,
+        reason: 'Numeric ID pattern'
+      });
+      console.log(`   🆔 NID: 85% - Numeric ID pattern`);
     }
   }
   
-  // Additional checks for other fields (if not used)
-  
-  // Check for Maldivian atolls (if atoll field not used)
-  if (isMaldivianAtoll(cleanTerm) && !usedFields.has('atoll')) {
-    return 'atoll';
+  // Check for political parties
+  if (isPoliticalParty(cleanTerm)) {
+    probabilities.push({
+      field: 'party',
+      probability: 95,
+      reason: 'Known political party'
+    });
+    console.log(`   🏛️ Party: 95% - Known political party`);
   }
   
-  // Check for gender codes (actual database values) - only if NOT "male"
-  if (isGenderCode(cleanTerm) && !usedFields.has('gender') && cleanTerm !== 'male') {
-    return 'gender';
+  // Check for gender codes
+  if (isGenderCode(cleanTerm)) {
+    probabilities.push({
+      field: 'gender',
+      probability: 90,
+      reason: 'Gender code (M, F)'
+    });
+    console.log(`   👤 Gender: 90% - Gender code (M, F)`);
   }
   
-  // Check for common professions (if profession field not used)
-  if (isCommonProfession(cleanTerm) && !usedFields.has('profession')) {
-    return 'profession';
+  // Check for Maldivian islands (async database lookup)
+  try {
+    const isIsland = await isMaldivianIsland(cleanTerm);
+    if (isIsland) {
+      // Give higher probability for well-known islands
+      let islandProbability = 95;
+      let reason = 'Known Maldivian island';
+      
+      // Special handling for very common islands
+      if (['male', 'hulhumale', 'addu', 'gan', 'fuamulah'].includes(cleanTerm)) {
+        islandProbability = 98;
+        reason = 'Major Maldivian island/atoll capital';
+      }
+      
+      probabilities.push({
+        field: 'island',
+        probability: islandProbability,
+        reason: reason
+      });
+      console.log(`   🏝️ Island: ${islandProbability}% - ${reason}`);
+    }
+  } catch (error) {
+    console.warn('Island check failed:', error);
   }
   
-  // Default to null - no field determined
+  // Check for address patterns (including "ge" suffix) - check before atoll to prioritize "ge" suffix
+  const addressProbability = getAddressProbability(cleanTerm);
+  if (addressProbability > 0) {
+    probabilities.push({
+      field: 'address',
+      probability: addressProbability,
+      reason: addressProbability >= 90 ? 'Clear address pattern (ge suffix)' : 'Address pattern detected'
+    });
+    console.log(`   🏠 Address: ${addressProbability}% - ${addressProbability >= 90 ? 'Clear address pattern (ge suffix)' : 'Address pattern detected'}`);
+  }
+  
+  // Check for Maldivian atolls (async database lookup, after island and address to avoid conflicts)
+  try {
+    const isAtoll = await isMaldivianAtoll(cleanTerm);
+    if (isAtoll) {
+      // Only add atoll if it's not already detected as an island or address
+      const hasHigherPriority = probabilities.some(p => p.field === 'island' || p.field === 'address');
+      if (!hasHigherPriority) {
+        probabilities.push({
+          field: 'atoll',
+          probability: 90,
+          reason: 'Known Maldivian atoll'
+        });
+        console.log(`   🗺️ Atoll: 90% - Known Maldivian atoll`);
+      } else {
+        console.log(`   ⚠️ Atoll: Skipped - already detected as island or address`);
+      }
+    }
+  } catch (error) {
+    console.warn('Atoll check failed:', error);
+  }
+  
+  // Check for professions
+  if (isCommonProfession(cleanTerm)) {
+    probabilities.push({
+      field: 'profession',
+      probability: 85,
+      reason: 'Common profession'
+    });
+    console.log(`   💼 Profession: 85% - Common profession`);
+  }
+  
+  // Check for names (if no other high-probability matches)
+  if (isLikelyName(term)) {
+    probabilities.push({
+      field: 'name',
+      probability: 70,
+      reason: 'Likely name pattern'
+    });
+    console.log(`   👤 Name: 70% - Likely name pattern`);
+  }
+  
+  // Sort by probability (highest first)
+  const sortedProbabilities = probabilities.sort((a, b) => b.probability - a.probability);
+  
+  console.log(`   📊 Final probabilities for "${term}":`);
+  sortedProbabilities.forEach(prob => {
+    console.log(`      ${prob.field}: ${prob.probability}% - ${prob.reason}`);
+  });
+  
+  return sortedProbabilities;
+};
+
+/**
+ * Get the best available field from probability list
+ */
+const getBestAvailableField = (probabilities: FieldProbability[], usedFields: Set<string>): FieldProbability | null => {
+  for (const prob of probabilities) {
+    if (!usedFields.has(prob.field)) {
+      return prob;
+    }
+  }
   return null;
 };
 
 /**
  * Check if a term is a Maldivian atoll
+ * Now uses database lookup instead of hardcoded lists
  */
-const isMaldivianAtoll = (term: string): boolean => {
-  const atolls = [
-    'male', 'male\'', 'male\' atoll', // Male' (capital atoll)
-    'addu', 'addu atoll', 'seenu', 'seenu atoll',
-    'fuamulah', 'fuamulah atoll', 'gnaviyani', 'gnaviyani atoll',
-    'gan', 'gan atoll', 'laamu', 'laamu atoll',
-    'fuvahmulah', 'fuvahmulah atoll', 'gnyaviyani', 'gnyaviyani atoll',
-    'thinadhoo', 'vaadhoo', 'keyodhoo', 'maradhoo', 'feydhoo', 'hithadhoo',
-    'kudahuvadhoo', 'kulhudhuffushi', 'naifaru', 'dhidhoo',
-    'hulhumale', 'viligili', 'hulhule', 'villingili'
-  ];
-  return atolls.includes(term);
+const isMaldivianAtoll = async (term: string): Promise<boolean> => {
+  try {
+    return await islandService.isKnownAtoll(term);
+  } catch (error) {
+    console.warn('Error checking atoll in database, falling back to basic check:', error);
+    // Fallback: basic atoll-like patterns
+    return term.length >= 3 && /^[a-zA-Z\s]+$/.test(term);
+  }
 };
 
 /**
  * Check if a term is a Maldivian island
+ * Now uses database lookup instead of hardcoded lists
  */
-const isMaldivianIsland = (term: string): boolean => {
-  const islands = [
-    'male', 'male\'', // Male' (capital island)
-    'addu', 'fuamulah', 'gan', 'fuvahmulah', 'thinadhoo',
-    'vaadhoo', 'keyodhoo', 'maradhoo', 'feydhoo', 'hithadhoo',
-    'kudahuvadhoo', 'kulhudhuffushi', 'naifaru', 'dhidhoo',
-    'hulhumale', 'viligili', 'hulhule', 'villingili',
-    'hithadhoo', 'kudahuvadhoo', 'kulhudhuffushi', 'naifaru'
-  ];
-  return islands.includes(term);
+const isMaldivianIsland = async (term: string): Promise<boolean> => {
+  try {
+    return await islandService.isKnownIsland(term);
+  } catch (error) {
+    console.warn('Error checking island in database, falling back to basic check:', error);
+    // Fallback: basic island-like patterns
+    return term.length >= 3 && /^[a-zA-Z\s]+$/.test(term);
+  }
 };
 
 /**
@@ -332,10 +434,37 @@ const isLikelyAddress = (term: string): boolean => {
     return true;
   }
   
-  // Check for Maldivian address patterns
+  // Enhanced Maldivian address patterns with "ge" suffix handling
   const maldivianAddressPatterns = [
-    // "ge" suffix (common in Maldivian addresses)
-    /ge$/i,
+    // "ge" suffix (common in Maldivian addresses) - with or without space
+    /ge$/i,                    // ends with "ge" (e.g., "habaruge")
+    /\sge$/i,                  // ends with " ge" (e.g., "habaru ge")
+    /ge\s/i,                   // starts with "ge " (e.g., "ge habaru")
+    /\sge\s/i,                 // contains " ge " (e.g., "some ge place")
+    // "maa" suffix (common in Maldivian addresses)
+    /maa$/i,
+    // "villa" suffix (common in Maldivian addresses)
+    /villa$/i,
+    // "house" suffix (common in Maldivian addresses)
+    /house$/i,
+    // "flat" suffix (common in Maldivian addresses)
+    /flat$/i,
+    // "room" suffix (common in Maldivian addresses)
+    /room$/i,
+    // "floor" suffix (common in Maldivian addresses)
+    /floor$/i,
+    // "block" suffix (common in Maldivian addresses)
+    /block$/i,
+    // "area" suffix (common in Maldivian addresses)
+    /area$/i,
+    // "zone" suffix (common in Maldivian addresses)
+    /zone$/i,
+    // "district" suffix (common in Maldivian addresses)
+    /district$/i,
+    // "ward" suffix (common in Maldivian addresses)
+    /ward$/i,
+    // "sector" suffix (common in Maldivian addresses)
+    /sector$/i,
     // Wildcard patterns that could be addresses
     /^[*%][a-zA-Z]+$/i,  // *ge, %ge, etc.
     /^[a-zA-Z]+[*%]$/i,  // ge*, ge%, etc.
@@ -343,6 +472,12 @@ const isLikelyAddress = (term: string): boolean => {
   ];
   
   if (maldivianAddressPatterns.some(pattern => pattern.test(term))) {
+    return true;
+  }
+  
+  // Special handling for "ge" suffix patterns (very common in Maldivian addresses)
+  const cleanTerm = term.toLowerCase();
+  if (cleanTerm.endsWith('ge') || cleanTerm.includes(' ge')) {
     return true;
   }
   
@@ -355,10 +490,12 @@ const isLikelyAddress = (term: string): boolean => {
     }
   }
   
-  // Check for common address components (ge, maa, etc.)
+  // Enhanced common address components for Maldivian context
   const commonAddressComponents = [
     'ge', 'maa', 'villa', 'house', 'flat', 'room', 'floor',
-    'block', 'area', 'zone', 'district', 'ward', 'sector'
+    'block', 'area', 'zone', 'district', 'ward', 'sector',
+    'street', 'road', 'avenue', 'lane', 'drive', 'place', 'court',
+    'building', 'apartment', 'habaruge'
   ];
   
   if (commonAddressComponents.includes(term.toLowerCase())) {
@@ -373,7 +510,43 @@ const isLikelyAddress = (term: string): boolean => {
     }
   }
   
+  // Check for terms that look like building names or locations
+  if (term.length >= 3 && /^[A-Z][a-z]+/.test(term)) {
+    // Capitalized terms that could be building names
+    if (!isCommonWord(term.toLowerCase()) && !isLikelyName(term)) {
+      return true;
+    }
+  }
+  
   return false;
+};
+
+/**
+ * Enhanced address probability calculation for "ge" suffix patterns
+ */
+const getAddressProbability = (term: string): number => {
+  const cleanTerm = term.toLowerCase();
+  
+  // Highest probability for clear "ge" suffix patterns
+  if (cleanTerm.endsWith('ge')) {
+    return 95; // Very high probability for "habaruge", "hulhumale", etc.
+  }
+  
+  if (cleanTerm.includes(' ge')) {
+    return 90; // High probability for "habaru ge", "hulhumale ge", etc.
+  }
+  
+  // High probability for known address components
+  if (['ge', 'maa', 'villa', 'house', 'flat', 'room', 'floor', 'block', 'area', 'zone', 'district', 'ward', 'sector'].includes(cleanTerm)) {
+    return 85;
+  }
+  
+  // Medium probability for other address patterns
+  if (isLikelyAddress(cleanTerm)) {
+    return 80;
+  }
+  
+  return 0; // Not an address
 };
 
 /**
@@ -406,4 +579,39 @@ export const formatParsedQuery = (parsed: ParsedQuery): string => {
   if (parsed.filters.query) parts.push(`General: ${parsed.filters.query}`);
   
   return parts.join(', ');
+};
+
+/**
+ * Test function to demonstrate probability-based field detection
+ * This can be used for debugging and testing the parser
+ */
+export const testFieldDetection = async (query: string): Promise<void> => {
+  console.log(`\n🔍 Testing field detection for: "${query}"`);
+  
+  const terms = query.split(',').map(term => term.trim()).filter(term => term.length > 0);
+  
+  for (let index = 0; index < terms.length; index++) {
+    const term = terms[index];
+    console.log(`\n📝 Term ${index + 1}: "${term}"`);
+    const probabilities = await calculateFieldProbabilities(term);
+    
+    if (probabilities.length === 0) {
+      console.log(`   ❌ No field detected`);
+    } else {
+      console.log(`   ✅ Field probabilities:`);
+      probabilities.forEach(prob => {
+        console.log(`      ${prob.field}: ${prob.probability}% - ${prob.reason}`);
+      });
+      
+      const bestField = probabilities[0];
+      console.log(`   🎯 Best field: ${bestField.field} (${bestField.probability}%)`);
+    }
+  }
+  
+  // Test full parsing
+  console.log(`\n🔧 Full parsing result:`);
+  const parsed = await parseSmartQuery(query);
+  console.log(`   Filters:`, parsed.filters);
+  console.log(`   Search terms:`, parsed.searchTerms);
+  console.log(`   Has wildcards:`, parsed.hasWildcards);
 };

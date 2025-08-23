@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, UserPermission, EventLog, RewardSetting
+from .models import User, UserPermission, EventLog, RewardSetting, Island
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
@@ -45,3 +45,26 @@ class RewardSettingAdmin(admin.ModelAdmin):
     list_filter = ['is_active']
     search_fields = ['action', 'description']
     list_editable = ['points', 'is_active']
+
+@admin.register(Island)
+class IslandAdmin(admin.ModelAdmin):
+    list_display = ['name', 'atoll', 'island_type', 'is_active', 'created_at']
+    list_filter = ['island_type', 'atoll', 'is_active']
+    search_fields = ['name', 'atoll']
+    ordering = ['name']
+    list_per_page = 50
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'atoll', 'island_type')
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ('created_at', 'updated_at')

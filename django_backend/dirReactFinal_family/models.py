@@ -10,6 +10,7 @@ class FamilyGroup(models.Model):
     """
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
+    is_public = models.BooleanField(default=False, help_text="Whether this family group is visible to all users")
     created_by = models.ForeignKey('dirReactFinal_core.User', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

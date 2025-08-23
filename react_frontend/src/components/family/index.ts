@@ -10,3 +10,4 @@ export { default as AddFamilyMemberModal } from './AddFamilyMemberModal';
 export { default as FamilySearchBar } from './FamilySearchBar';
 export { default as FamilyFilters } from './FamilyFilters';
 export { default as FamilyPagination } from './FamilyPagination';
+export { default as FamilyModal } from './FamilyModal';

@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuth } from '../../store/authStore';
 import { getUserType, getVisibleFields } from '../../utils/searchFieldUtils';
+import FamilyModal from '../family/FamilyModal';
 
 interface SearchResultsProps {
   results: PhoneBookEntry[];
@@ -33,6 +34,11 @@ const SearchResults: React.FC<SearchResultsProps> = ({
 }) => {
   const { user } = useAuth();
   const { adminSearchFieldSettings, fetchAdminSearchFieldSettings } = useSettingsStore();
+  
+  // Family modal state
+  const [familyModalOpen, setFamilyModalOpen] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState('');
+  const [selectedIsland, setSelectedIsland] = useState('');
   
   const totalPages = Math.ceil(totalCount / pageSize);
   const userType = getUserType(user!);
@@ -87,6 +93,14 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     return contact;
   };
 
+  // Handle address click to show family modal
+  const handleAddressClick = (address: string, island: string) => {
+    console.log('Address clicked:', { address, island }); // 2025-01-27: Debug logging for address click
+    setSelectedAddress(address);
+    setSelectedIsland(island);
+    setFamilyModalOpen(true);
+  };
+
   // Get field value for display
   const getFieldValue = (entry: PhoneBookEntry, fieldName: string): string | null => {
     switch (fieldName) {
@@ -135,6 +149,19 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         <span className={`status-badge ${value.toLowerCase()}`}>
           {value}
         </span>
+      );
+    }
+
+    // Special handling for address field - make it clickable
+    if (field.field_name === 'address' && entry.island) {
+      return (
+        <button
+          onClick={() => handleAddressClick(value, entry.island || '')}
+          className="text-sm text-blue-400 hover:text-blue-300 underline cursor-pointer truncate-text"
+          title={`Click to view family at ${value}, ${entry.island}`}
+        >
+          {value}
+        </button>
       );
     }
 
@@ -287,6 +314,14 @@ const SearchResults: React.FC<SearchResultsProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Family Modal */}
+      <FamilyModal
+        isOpen={familyModalOpen}
+        onClose={() => setFamilyModalOpen(false)}
+        address={selectedAddress}
+        island={selectedIsland}
+      />
     </div>
   );
 };

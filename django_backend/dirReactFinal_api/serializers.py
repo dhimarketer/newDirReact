@@ -269,6 +269,7 @@ class SearchSerializer(serializers.Serializer):
     pep_status = serializers.CharField(max_length=20, required=False, allow_blank=True)
     page = serializers.IntegerField(required=False, default=1, min_value=1)
     page_size = serializers.IntegerField(required=False, default=20, min_value=1, max_value=100)
+    limit_results = serializers.BooleanField(required=False, default=False)  # 2025-01-27: For family searches
 
 class BulkOperationSerializer(serializers.Serializer):
     """Serializer for bulk operations"""

@@ -4,10 +4,13 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from dirReactFinal_core.views import get_islands
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('dirReactFinal_api.urls')),
+    path('api/family/', include('dirReactFinal_family.urls')),
+    path('api/islands/', get_islands, name='get_islands'),
 ]
 
 # Serve media files in development
