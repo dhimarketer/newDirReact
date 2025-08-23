@@ -13,7 +13,7 @@ import {
 import { API_CONFIG } from '../utils/constants';
 
 class DirectoryService {
-  private baseUrl = `${API_CONFIG.BASE_URL}/phonebook`;
+  private baseUrl = `/phonebook`;
 
   /**
    * Search phonebook entries with filters
@@ -44,7 +44,7 @@ class DirectoryService {
    */
   async getSearchSuggestions(query: string, limit: number = 5): Promise<SearchSuggestion[]> {
     try {
-      const response = await apiService.get<SearchSuggestion[]>(`${this.baseUrl}/`, {
+      const response = await apiService.get<{results: SearchSuggestion[]}>(`${this.baseUrl}/`, {
         params: {
           search: query,
           page_size: limit
@@ -62,7 +62,7 @@ class DirectoryService {
    */
   async getDirectoryStats(): Promise<DirectoryStats> {
     try {
-      const response = await apiService.get<DirectoryStats>(`${API_CONFIG.BASE_URL}/analytics/directory_stats/`);
+      const response = await apiService.get<DirectoryStats>(`/analytics/directory_stats/`);
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to get directory stats');

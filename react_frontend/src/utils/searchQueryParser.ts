@@ -195,11 +195,22 @@ const calculateFieldProbabilities = async (term: string): Promise<FieldProbabili
     console.log(`   👤 Gender: 90% - Gender code (M, F)`);
   }
   
-  // Check for Maldivian islands (async database lookup)
+  // Check for address patterns FIRST (including "ge" suffix) - prioritize over island detection for "ge" terms
+  const addressProbability = getAddressProbability(cleanTerm);
+  if (addressProbability > 0) {
+    probabilities.push({
+      field: 'address',
+      probability: addressProbability,
+      reason: addressProbability >= 90 ? 'Clear address pattern (ge suffix)' : 'Address pattern detected'
+    });
+    console.log(`   🏠 Address: ${addressProbability}% - ${addressProbability >= 90 ? 'Clear address pattern (ge suffix)' : 'Address pattern detected'}`);
+  }
+  
+  // Check for Maldivian islands (async database lookup) - ONLY if not already identified as address
   try {
     const isIsland = await isMaldivianIsland(cleanTerm);
     if (isIsland) {
-      // Give higher probability for well-known islands
+      // Give higher probability for well-known islands, but lower than address for "ge" suffix terms
       let islandProbability = 95;
       let reason = 'Known Maldivian island';
       
@@ -207,6 +218,12 @@ const calculateFieldProbabilities = async (term: string): Promise<FieldProbabili
       if (['male', 'hulhumale', 'addu', 'gan', 'fuamulah'].includes(cleanTerm)) {
         islandProbability = 98;
         reason = 'Major Maldivian island/atoll capital';
+      }
+      
+      // Reduce island probability if it's also detected as address (especially for "ge" suffix)
+      if (addressProbability >= 90) {
+        islandProbability = 85; // Lower than address probability
+        reason = 'Known Maldivian island (but likely address due to ge suffix)';
       }
       
       probabilities.push({
@@ -218,17 +235,6 @@ const calculateFieldProbabilities = async (term: string): Promise<FieldProbabili
     }
   } catch (error) {
     console.warn('Island check failed:', error);
-  }
-  
-  // Check for address patterns (including "ge" suffix) - check before atoll to prioritize "ge" suffix
-  const addressProbability = getAddressProbability(cleanTerm);
-  if (addressProbability > 0) {
-    probabilities.push({
-      field: 'address',
-      probability: addressProbability,
-      reason: addressProbability >= 90 ? 'Clear address pattern (ge suffix)' : 'Address pattern detected'
-    });
-    console.log(`   🏠 Address: ${addressProbability}% - ${addressProbability >= 90 ? 'Clear address pattern (ge suffix)' : 'Address pattern detected'}`);
   }
   
   // Check for Maldivian atolls (async database lookup, after island and address to avoid conflicts)
@@ -304,8 +310,22 @@ const isMaldivianAtoll = async (term: string): Promise<boolean> => {
     return await islandService.isKnownAtoll(term);
   } catch (error) {
     console.warn('Error checking atoll in database, falling back to basic check:', error);
-    // Fallback: basic atoll-like patterns
-    return term.length >= 3 && /^[a-zA-Z\s]+$/.test(term);
+    // Fallback: only match terms that look like actual Maldivian atolls (not names)
+    const cleanTerm = term.toLowerCase();
+    
+    // Don't treat short names as atolls
+    if (cleanTerm.length < 4) {
+      return false;
+    }
+    
+    // Use a conservative fallback list of actual Maldivian atolls
+    const commonAtolls = [
+      'haa alifu', 'haa dhaalu', 'shaviyani', 'noonu', 'raa', 'baa', 'lhaviyani',
+      'kaafu', 'alifu alifu', 'alifu dhaalu', 'vaavu', 'meemu', 'faafu', 'dhaalu',
+      'thaa', 'laamu', 'gaafu alifu', 'gaafu dhaalu', 'fuvahmulah', 'addu'
+    ];
+    
+    return commonAtolls.includes(cleanTerm);
   }
 };
 
@@ -318,8 +338,22 @@ const isMaldivianIsland = async (term: string): Promise<boolean> => {
     return await islandService.isKnownIsland(term);
   } catch (error) {
     console.warn('Error checking island in database, falling back to basic check:', error);
-    // Fallback: basic island-like patterns
-    return term.length >= 3 && /^[a-zA-Z\s]+$/.test(term);
+    // Fallback: only match terms that look like Maldivian islands (not addresses with "ge" suffix)
+    const cleanTerm = term.toLowerCase();
+    
+    // Don't treat "ge" suffix terms as islands (they're addresses)
+    if (cleanTerm.endsWith('ge')) {
+      return false;
+    }
+    
+    // Use a more conservative fallback list of common Maldivian islands
+    const commonIslands = [
+      'male', 'hulhumale', 'addu', 'gan', 'fuamulah', 'hithadhoo', 'thinadhoo',
+      'vaadhoo', 'keyodhoo', 'maradhoo', 'feydhoo', 'kudahuvadhoo', 'kulhudhuffushi',
+      'naifaru', 'dhidhoo', 'viligili', 'hulhule', 'villingili'
+    ];
+    
+    return commonIslands.includes(cleanTerm);
   }
 };
 

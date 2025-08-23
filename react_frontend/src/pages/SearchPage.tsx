@@ -77,17 +77,46 @@ const SearchPage: React.FC = () => {
     setCurrentPage(1);
     setFilters(searchFilters);
     
-    // Clean filters to avoid conflicts - if query is set, don't send conflicting individual field filters
+    // Clean filters to avoid conflicts - but preserve explicitly parsed field filters
     const cleanFilters = { ...searchFilters };
+    
+    // 2025-01-27: Fixed filter cleaning logic to preserve parsed field filters
+    // When we have parsed filters (address, island, party, etc.), keep them
+    // Only remove individual field filters if they exactly match the query field
     if (cleanFilters.query && cleanFilters.query.trim()) {
-      // Remove individual field filters that might conflict with the general query
-      // Only keep filters that are explicitly set and different from the query
-      if (cleanFilters.name === cleanFilters.query) delete cleanFilters.name;
-      if (cleanFilters.contact === cleanFilters.query) delete cleanFilters.contact;
-      if (cleanFilters.nid === cleanFilters.query) delete cleanFilters.nid;
-      if (cleanFilters.address === cleanFilters.query) delete cleanFilters.address;
-      if (cleanFilters.party === cleanFilters.query) delete cleanFilters.party;
-      if (cleanFilters.profession === cleanFilters.query) delete cleanFilters.profession;
+      // Check if we have parsed field filters that should be preserved
+      const hasParsedFilters = cleanFilters.address || cleanFilters.island || 
+                              cleanFilters.party || cleanFilters.name || 
+                              cleanFilters.profession || cleanFilters.contact || 
+                              cleanFilters.nid || cleanFilters.atoll || 
+                              cleanFilters.gender || cleanFilters.remark || 
+                              cleanFilters.pep_status;
+      
+      if (hasParsedFilters) {
+        // We have parsed field filters, so this is a smart search
+        // Keep all the parsed filters and remove only the general query
+        // This ensures "habaruge, hithadhoo" works as address+island search
+        console.log('Smart search detected - preserving parsed field filters:', {
+          address: cleanFilters.address,
+          island: cleanFilters.island,
+          party: cleanFilters.party,
+          name: cleanFilters.name,
+          profession: cleanFilters.profession
+        });
+        
+        // Remove the general query field since we're using specific field filters
+        delete cleanFilters.query;
+      } else {
+        // No parsed filters, this is a general search
+        // Remove individual field filters that might conflict with the general query
+        // Only keep filters that are explicitly set and different from the query
+        if (cleanFilters.name === cleanFilters.query) delete cleanFilters.name;
+        if (cleanFilters.contact === cleanFilters.query) delete cleanFilters.contact;
+        if (cleanFilters.nid === cleanFilters.query) delete cleanFilters.nid;
+        if (cleanFilters.address === cleanFilters.query) delete cleanFilters.address;
+        if (cleanFilters.party === cleanFilters.query) delete cleanFilters.party;
+        if (cleanFilters.profession === cleanFilters.query) delete cleanFilters.profession;
+      }
     }
     
     const searchParams: SearchParams = { ...cleanFilters, page: 1, page_size: pageSize };

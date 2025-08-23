@@ -472,94 +472,28 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             data = serializer.validated_data
             queryset = PhoneBookEntry.objects.all()
             
+            # 2025-01-27: Fixed search logic to prioritize specific field filters over general query field
             # Check if we have specific address and island filters (smart search case)
             has_address_filter = data.get('address') and data['address'].strip()
             has_island_filter = data.get('island') and data['island'].strip()
             has_party_filter = data.get('party') and data['party'].strip()
             has_query = data.get('query') and data['query'].strip()
             has_name_filter = data.get('name') and data['name'].strip()
+            has_contact_filter = data.get('contact') and data['contact'].strip()
+            has_nid_filter = data.get('nid') and data['nid'].strip()
+            has_atoll_filter = data.get('atoll') and data['atoll'].strip()
+            has_profession_filter = data.get('profession') and data['profession'].strip()
+            has_gender_filter = data.get('gender') and data['gender'].strip()
+            has_remark_filter = data.get('remark') and data['remark'].strip()
+            has_pep_status_filter = data.get('pep_status') and data['pep_status'].strip()
+            has_min_age_filter = data.get('min_age') and data['min_age'] > 0
+            has_max_age_filter = data.get('max_age') and data['max_age'] > 0
             is_family_search = data.get('limit_results', False)  # Flag for family searches
             
             print(f"Search analysis - Address: {has_address_filter}, Island: {has_island_filter}, Query: {has_query}, Family search: {is_family_search}")
             
-            # Smart search logic - analyze query and apply to appropriate fields
-            if has_query:
-                query = data['query'].strip()
-                print(f"Smart search query: '{query}'")
-                
-                # Enhanced smart search logic for better field detection
-                if query.isdigit():
-                    # Numeric query - likely phone number or NID
-                    if len(query) >= 7:
-                        # 7+ digits - likely phone number
-                        print(f"Query '{query}' appears to be a phone number")
-                        queryset = queryset.filter(contact__icontains=query)
-                    else:
-                        # Shorter numeric - could be NID or phone number
-                        print(f"Query '{query}' is numeric - searching in contact and NID fields")
-                        queryset = queryset.filter(
-                            Q(contact__icontains=query) |
-                            Q(nid__icontains=query)
-                        )
-                elif query.upper() in ['AP', 'MDP', 'PPM', 'JP', 'MNP', 'ADH', 'PJP']:
-                    # Political party abbreviation
-                    print(f"Query '{query}' appears to be a political party")
-                    queryset = queryset.filter(party__icontains=query)
-                elif query.upper() in ['MALE', 'FEMALE', 'M', 'F']:
-                    # Gender
-                    print(f"Query '{query}' appears to be gender")
-                    queryset = queryset.filter(gender__icontains=query)
-                elif len(query) <= 3 and query.upper() in ['M', 'F', 'S', 'N', 'L', 'B', 'AA', 'ADH', 'HDH', 'TH', 'V', 'HA', 'R']:
-                    # Atoll abbreviation
-                    print(f"Query '{query}' appears to be an atoll code")
-                    queryset = queryset.filter(atoll__icontains=query)
-                else:
-                    # Enhanced text query analysis for better field detection
-                    print(f"Query '{query}' appears to be text - analyzing for specific field types")
-                    
-                    # Check if query looks like an address (contains common address indicators)
-                    address_indicators = ['ge', 'maa', 'villa', 'house', 'flat', 'room', 'floor', 'block', 'area', 'zone', 'district', 'ward', 'sector', 'street', 'road', 'avenue', 'lane', 'drive', 'place', 'court', 'building', 'apartment', 'habaruge']
-                    is_likely_address = any(indicator in query.lower() for indicator in address_indicators)
-                    
-                    # Special handling for "ge" suffix patterns (very common in Maldivian addresses)
-                    if not is_likely_address:
-                        # Check if query ends with "ge" or contains " ge" (with space)
-                        if query.lower().endswith('ge') or ' ge' in query.lower():
-                            is_likely_address = True
-                            print(f"Query '{query}' detected as address due to 'ge' suffix pattern")
-                    
-                    # Check if query looks like an island name (common Maldivian island patterns)
-                    island_indicators = ['male', 'addu', 'fuamulah', 'gan', 'fuvahmulah', 'thinadhoo', 'vaadhoo', 'keyodhoo', 'maradhoo', 'feydhoo', 'hithadhoo', 'kudahuvadhoo', 'kulhudhuffushi', 'naifaru', 'dhidhoo', 'hulhumale', 'viligili', 'hulhule', 'villingili']
-                    is_likely_island = any(island in query.lower() for island in island_indicators)
-                    
-                    # Check if query looks like a profession
-                    profession_indicators = ['teacher', 'doctor', 'engineer', 'lawyer', 'business', 'fisherman', 'farmer', 'student', 'retired', 'unemployed', 'government', 'private', 'self-employed', 'nurse', 'accountant', 'manager', 'driver', 'cook', 'cleaner', 'security']
-                    is_likely_profession = any(prof in query.lower() for prof in profession_indicators)
-                    
-                    # Apply smart field-specific search based on analysis
-                    if is_likely_address:
-                        print(f"Query '{query}' detected as address - searching in address field")
-                        queryset = queryset.filter(address__icontains=query)
-                    elif is_likely_island:
-                        print(f"Query '{query}' detected as island - searching in island field")
-                        queryset = queryset.filter(island__icontains=query)
-                    elif is_likely_profession:
-                        print(f"Query '{query}' detected as profession - searching in profession field")
-                        queryset = queryset.filter(profession__icontains=query)
-                    else:
-                        # Default to comprehensive search across multiple fields
-                        print(f"Query '{query}' - performing comprehensive search across name, address, island, profession, remark")
-                        queryset = queryset.filter(
-                            Q(name__icontains=query) |
-                            Q(address__icontains=query) |
-                            Q(island__icontains=query) |
-                            Q(profession__icontains=query) |
-                            Q(remark__icontains=query)
-                        )
-                
-                print(f"Results after smart query: {queryset.count()}")
-            
-            # Handle the case where we have both address and island filters (smart search case)
+            # PRIORITY: Handle specific field filters FIRST (address+island, address+party, etc.)
+            # This ensures that when users search with specific fields, they get precise results
             if has_address_filter and has_island_filter:
                 print(f"Smart search case: Address='{data['address']}', Island='{data['island']}'")
                 
@@ -702,14 +636,8 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                         queryset = broader_queryset
                         print("Using broader OR logic results")
                         print("Note: These results match EITHER address OR party, not necessarily both")
-                        
-                        # Show some sample entries to understand what was found
-                        sample_entries = queryset[:3]
-                        for entry in sample_entries:
-                            print(f"Sample entry: {entry.name} - Address: {entry.address} - Party: {entry.party}")
                     else:
                         print("No results found with either AND or OR logic")
-                        print("This combination may not exist in the database")
             
             # Handle the case where we have both name and party filters (smart search case)
             elif has_name_filter and has_party_filter:
@@ -730,20 +658,6 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                 # Debug: Check what exists in the database for these terms
                 print(f"Database check - Entries with name containing '{name_term}': {PhoneBookEntry.objects.filter(name__icontains=name_term).count()}")
                 print(f"Database check - Entries with party containing '{party_term}': {PhoneBookEntry.objects.filter(party__icontains=party_term).count()}")
-                
-                # Show some sample entries for debugging
-                name_entries = PhoneBookEntry.objects.filter(name__icontains=name_term)[:3]
-                party_entries = PhoneBookEntry.objects.filter(party__icontains=party_term)[:3]
-                
-                if name_entries.exists():
-                    print(f"Sample name entries for '{name_term}':")
-                    for entry in name_entries:
-                        print(f"  - {entry.name}: party='{entry.party}', address='{entry.address}'")
-                
-                if party_entries.exists():
-                    print(f"Sample party entries for '{party_term}':")
-                    for entry in party_entries:
-                        print(f"  - {entry.name}: party='{entry.party}', address='{entry.address}'")
                 
                 # First try: Use AND logic for precise results (narrow scope)
                 precise_queryset = queryset.filter(
@@ -771,14 +685,8 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                         queryset = broader_queryset
                         print("Using broader OR logic results")
                         print("Note: These results match EITHER name OR party, not necessarily both")
-                        
-                        # Show some sample entries to understand what was found
-                        sample_entries = queryset[:3]
-                        for entry in sample_entries:
-                            print(f"Sample entry: {entry.name} - Party: {entry.party} - Address: {entry.address}")
                     else:
                         print("No results found with either AND or OR logic")
-                        print("This combination may not exist in the database")
             
             # Handle the case where we have both island and party filters (smart search case)
             elif has_island_filter and has_party_filter:
@@ -799,20 +707,6 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                 # Debug: Check what exists in the database for these terms
                 print(f"Database check - Entries with island containing '{island_term}': {PhoneBookEntry.objects.filter(island__icontains=island_term).count()}")
                 print(f"Database check - Entries with party containing '{party_term}': {PhoneBookEntry.objects.filter(party__icontains=party_term).count()}")
-                
-                # Show some sample entries for debugging
-                island_entries = PhoneBookEntry.objects.filter(island__icontains=island_term)[:3]
-                party_entries = PhoneBookEntry.objects.filter(party__icontains=party_term)[:3]
-                
-                if island_entries.exists():
-                    print(f"Sample island entries for '{island_term}':")
-                    for entry in island_entries:
-                        print(f"  - {entry.name}: island='{entry.island}', party='{entry.party}'")
-                
-                if party_entries.exists():
-                    print(f"Sample party entries for '{party_term}':")
-                    for entry in party_entries:
-                        print(f"  - {entry.name}: island='{entry.island}', party='{entry.party}'")
                 
                 # First try: Use AND logic for precise results (narrow scope)
                 precise_queryset = queryset.filter(
@@ -840,74 +734,150 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                         queryset = broader_queryset
                         print("Using broader OR logic results")
                         print("Note: These results match EITHER island OR party, not necessarily both")
-                        
-                        # Show some sample entries to understand what was found
-                        sample_entries = queryset[:3]
-                        for entry in sample_entries:
-                            print(f"Sample entry: {entry.name} - Island: {entry.island} - Party: {entry.party}")
                     else:
                         print("No results found with either AND or OR logic")
-                        print("This combination may not exist in the database")
+            
+            # ONLY process general query if we don't have specific field filters
+            # This ensures that specific field searches take priority over general query searches
+            elif has_query:
+                query = data['query'].strip()
+                print(f"General query search (no specific field filters): '{query}'")
                 
+                # Enhanced smart search logic for better field detection
+                if query.isdigit():
+                    # Numeric query - likely phone number or NID
+                    if len(query) >= 7:
+                        # 7+ digits - likely phone number
+                        print(f"Query '{query}' appears to be a phone number")
+                        queryset = queryset.filter(contact__icontains=query)
+                    else:
+                        # Shorter numeric - could be NID or phone number
+                        print(f"Query '{query}' is numeric - searching in contact and NID fields")
+                        queryset = queryset.filter(
+                            Q(contact__icontains=query) |
+                            Q(nid__icontains=query)
+                        )
+                elif query.upper() in ['AP', 'MDP', 'PPM', 'JP', 'MNP', 'ADH', 'PJP']:
+                    # Political party abbreviation
+                    print(f"Query '{query}' appears to be a political party")
+                    queryset = queryset.filter(party__icontains=query)
+                elif query.upper() in ['MALE', 'FEMALE', 'M', 'F']:
+                    # Gender
+                    print(f"Query '{query}' appears to be gender")
+                    queryset = queryset.filter(gender__icontains=query)
+                elif len(query) <= 3 and query.upper() in ['M', 'F', 'S', 'N', 'L', 'B', 'AA', 'ADH', 'HDH', 'TH', 'V', 'HA', 'R']:
+                    # Atoll abbreviation
+                    print(f"Query '{query}' appears to be an atoll code")
+                    queryset = queryset.filter(atoll__icontains=query)
+                else:
+                    # Enhanced text query analysis for better field detection
+                    print(f"Query '{query}' appears to be text - analyzing for specific field types")
+                    
+                    # Check if query looks like an address (contains common address indicators)
+                    address_indicators = ['ge', 'maa', 'villa', 'house', 'flat', 'room', 'floor', 'block', 'area', 'zone', 'district', 'ward', 'sector', 'street', 'road', 'avenue', 'lane', 'drive', 'place', 'court', 'building', 'apartment', 'habaruge']
+                    is_likely_address = any(indicator in query.lower() for indicator in address_indicators)
+                    
+                    # Special handling for "ge" suffix patterns (very common in Maldivian addresses)
+                    if not is_likely_address:
+                        # Check if query ends with "ge" or contains " ge" (with space)
+                        if query.lower().endswith('ge') or ' ge' in query.lower():
+                            is_likely_address = True
+                            print(f"Query '{query}' detected as address due to 'ge' suffix pattern")
+                    
+                    # Check if query looks like an island name (common Maldivian island patterns)
+                    island_indicators = ['male', 'addu', 'fuamulah', 'gan', 'fuvahmulah', 'thinadhoo', 'vaadhoo', 'keyodhoo', 'maradhoo', 'feydhoo', 'hithadhoo', 'kudahuvadhoo', 'kulhudhuffushi', 'naifaru', 'dhidhoo', 'hulhumale', 'viligili', 'hulhule', 'villingili']
+                    is_likely_island = any(island in query.lower() for island in island_indicators)
+                    
+                    # Check if query looks like a profession
+                    profession_indicators = ['teacher', 'doctor', 'engineer', 'lawyer', 'business', 'fisherman', 'farmer', 'student', 'retired', 'unemployed', 'government', 'private', 'self-employed', 'nurse', 'accountant', 'manager', 'driver', 'cook', 'cleaner', 'security']
+                    is_likely_profession = any(prof in query.lower() for prof in profession_indicators)
+                    
+                    # Apply smart field-specific search based on analysis
+                    if is_likely_address:
+                        print(f"Query '{query}' detected as address - searching in address field")
+                        queryset = queryset.filter(address__icontains=query)
+                    elif is_likely_island:
+                        print(f"Query '{query}' detected as island - searching in island field")
+                        queryset = queryset.filter(island__icontains=query)
+                    elif is_likely_profession:
+                        print(f"Query '{query}' detected as profession - searching in profession field")
+                        queryset = queryset.filter(profession__icontains=query)
+                    else:
+                        # Default to comprehensive search across multiple fields
+                        print(f"Query '{query}' - performing comprehensive search across name, address, island, profession, remark")
+                        queryset = queryset.filter(
+                            Q(name__icontains=query) |
+                            Q(address__icontains=query) |
+                            Q(island__icontains=query) |
+                            Q(profession__icontains=query) |
+                            Q(remark__icontains=query)
+                        )
+                
+                print(f"Results after general query search: {queryset.count()}")
+            
+            # Handle individual field filters if no combinations were processed
             else:
-                # Individual field filters (only apply if we don't have the smart field combinations)
+                print("Processing individual field filters...")
+                
                 if has_name_filter:
-                    queryset = queryset.filter(name__icontains=data['name'].strip())
+                    print(f"Filtering by name: '{data['name']}'")
+                    queryset = queryset.filter(name__icontains=data['name'])
+                
+                if has_contact_filter:
+                    print(f"Filtering by contact: '{data['contact']}'")
+                    queryset = queryset.filter(contact__icontains=data['contact'])
+                
+                if has_nid_filter:
+                    print(f"Filtering by NID: '{data['nid']}'")
+                    queryset = queryset.filter(nid__icontains=data['nid'])
                 
                 if has_address_filter:
-                    queryset = queryset.filter(address__icontains=data['address'].strip())
+                    print(f"Filtering by address: '{data['address']}'")
+                    queryset = queryset.filter(address__icontains=data['address'])
+                
+                if has_atoll_filter:
+                    print(f"Filtering by atoll: '{data['atoll']}'")
+                    queryset = queryset.filter(atoll__icontains=data['atoll'])
                 
                 if has_island_filter:
-                    queryset = queryset.filter(island__icontains=data['island'].strip())
+                    print(f"Filtering by island: '{data['island']}'")
+                    queryset = queryset.filter(island__icontains=data['island'])
                 
                 if has_party_filter:
-                    queryset = queryset.filter(party__icontains=data['party'].strip())
-            
-            # Apply other individual field filters
-            if data.get('name') and data['name'].strip():
-                queryset = queryset.filter(name__icontains=data['name'].strip())
-            
-            if data.get('contact') and data['contact'].strip():
-                queryset = queryset.filter(contact__icontains=data['contact'].strip())
-            
-            if data.get('nid') and data['nid'].strip():
-                queryset = queryset.filter(nid__icontains=data['nid'].strip())
-            
-            if data.get('atoll') and data['atoll'].strip():
-                queryset = queryset.filter(atoll__icontains=data['atoll'].strip())
-            
-            if data.get('party') and data['party'].strip():
-                party_filter = data['party'].strip()
-                print(f"Party filter: '{party_filter}'")
-                party_filtered = queryset.filter(party__icontains=party_filter)
-                print(f"Results after party filter '{party_filter}': {party_filtered.count()}")
-                queryset = party_filtered
-            
-            if data.get('profession') and data['profession'].strip():
-                queryset = queryset.filter(profession__icontains=data['profession'].strip())
-            
-            if data.get('gender') and data['gender'].strip():
-                queryset = queryset.filter(gender__icontains=data['gender'].strip())
-            
-            if data.get('remark') and data['remark'].strip():
-                queryset = queryset.filter(remark__icontains=data['remark'].strip())
-            
-            if data.get('pep_status') and data['pep_status'].strip():
-                queryset = queryset.filter(pep_status=data['pep_status'].strip())
-            
-            # Age filtering
-            if data.get('min_age') or data.get('max_age'):
-                queryset = queryset.exclude(DOB__isnull=True)
-                if data.get('min_age') and data['min_age'] > 0:
-                    # Calculate max DOB for minimum age
-                    from datetime import datetime, timedelta
-                    max_dob = datetime.now() - timedelta(days=data['min_age'] * 365)
-                    queryset = queryset.filter(DOB__lte=max_dob.strftime('%d/%m/%Y'))
+                    print(f"Filtering by party: '{data['party']}'")
+                    queryset = queryset.filter(party__icontains=data['party'])
                 
-                if data.get('max_age') and data['max_age'] > 0:
-                    # Calculate min DOB for maximum age
-                    min_dob = datetime.now() - timedelta(days=data['max_age'] * 365)
-                    queryset = queryset.filter(DOB__gte=min_dob.strftime('%d/%m/%Y'))
+                if has_profession_filter:
+                    print(f"Filtering by profession: '{data['profession']}'")
+                    queryset = queryset.filter(profession__icontains=data['profession'])
+                
+                if has_gender_filter:
+                    print(f"Filtering by gender: '{data['gender']}'")
+                    queryset = queryset.filter(gender__icontains=data['gender'])
+                
+                if has_remark_filter:
+                    print(f"Filtering by remark: '{data['remark']}'")
+                    queryset = queryset.filter(remark__icontains=data['remark'])
+                
+                if has_pep_status_filter:
+                    print(f"Filtering by PEP status: '{data['pep_status']}'")
+                    queryset = queryset.filter(pep_status__icontains=data['pep_status'])
+                
+                if has_min_age_filter:
+                    print(f"Filtering by minimum age: {data['min_age']}")
+                    # Convert DOB to age for filtering
+                    from datetime import datetime, timedelta
+                    cutoff_date = datetime.now() - timedelta(days=data['min_age'] * 365.25)
+                    queryset = queryset.filter(DOB__lte=cutoff_date.strftime('%d/%m/%Y'))
+                
+                if has_max_age_filter:
+                    print(f"Filtering by maximum age: {data['max_age']}")
+                    # Convert DOB to age for filtering
+                    from datetime import datetime, timedelta
+                    cutoff_date = datetime.now() - timedelta(days=data['max_age'] * 365.25)
+                    queryset = queryset.filter(DOB__gte=cutoff_date.strftime('%d/%m/%Y'))
+                
+                print(f"Results after individual field filters: {queryset.count()}")
             
             # Pagination
             page = data.get('page', 1)

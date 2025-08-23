@@ -71,30 +71,115 @@ const FamilyPage: React.FC = () => {
       familyGroups.get(key)!.members.push(entry);
     });
     
-    // Process each family group to determine parents vs children
+    // Process each family group to determine parents vs children using proper logic
     const processedFamilies: DetectedFamily[] = [];
     
     familyGroups.forEach(family => {
-      // Sort members by age (using DOB if available) or use a default logic
-      const sortedMembers = family.members.sort((a, b) => {
-        // If we have DOB data, calculate age and sort by age (eldest first)
-        if (a.DOB && b.DOB) {
-          const ageA = new Date().getFullYear() - new Date(a.DOB).getFullYear();
-          const ageB = new Date().getFullYear() - new Date(b.DOB).getFullYear();
-          return ageB - ageA;
+      // Helper function to calculate age from DOB
+      const calculateAge = (dob?: string): number | null => {
+        if (!dob) return null;
+        try {
+          const birthDate = new Date(dob);
+          if (isNaN(birthDate.getTime())) return null;
+          const currentYear = new Date().getFullYear();
+          const birthYear = birthDate.getFullYear();
+          return currentYear - birthYear;
+        } catch {
+          return null;
         }
-        // Otherwise, use name length as a simple heuristic (longer names might be older)
-        return (b.name?.length || 0) - (a.name?.length || 0);
+      };
+      
+      // Separate members with and without age
+      const membersWithAge = family.members.filter(member => calculateAge(member.DOB) !== null);
+      const membersWithoutAge = family.members.filter(member => calculateAge(member.DOB) === null);
+      
+      // Sort members with age by age (eldest first)
+      const sortedMembersWithAge = membersWithAge.sort((a, b) => {
+        const ageA = calculateAge(a.DOB)!;
+        const ageB = calculateAge(b.DOB)!;
+        return ageB - ageA;
       });
       
-      // Assign roles: first 2 members as parents, rest as children
-      const parents = sortedMembers.slice(0, Math.min(2, sortedMembers.length));
-      const children = sortedMembers.slice(Math.min(2, sortedMembers.length));
+      // Identify potential parents and children based on age differences
+      const potentialParents: PhoneBookEntry[] = [];
+      const children: PhoneBookEntry[] = [];
+      
+      // Start with the eldest member as a potential parent
+      if (sortedMembersWithAge.length > 0) {
+        const eldest = sortedMembersWithAge[0];
+        const eldestAge = calculateAge(eldest.DOB)!;
+        
+        // Check if other members could be children of the eldest
+        for (let i = 1; i < sortedMembersWithAge.length; i++) {
+          const member = sortedMembersWithAge[i];
+          const memberAge = calculateAge(member.DOB)!;
+          const ageDifference = eldestAge - memberAge;
+          
+          // If age difference is at least 10 years, consider eldest as parent
+          if (ageDifference >= 10) {
+            if (potentialParents.length === 0) {
+              potentialParents.push(eldest);
+            }
+            children.push(member);
+          } else {
+            // Age difference is less than 10 years - could be siblings
+            // Don't assign as parent, add to children
+            children.push(member);
+          }
+        }
+        
+        // If no children were found with proper age difference, eldest might not be a parent
+        if (children.length === 0) {
+          children.push(eldest);
+        }
+      }
+      
+      // Check if we can identify a second parent (but single parent families are also valid)
+      if (potentialParents.length > 0 && children.length > 0) {
+        // Look for a second potential parent among remaining members
+        const remainingMembers = sortedMembersWithAge.filter(member => 
+          !potentialParents.includes(member) && !children.includes(member)
+        );
+        
+        for (const member of remainingMembers) {
+          const memberAge = calculateAge(member.DOB)!;
+          let canBeParent = true;
+          
+          // Check if this member can be a parent to all children
+          for (const child of children) {
+            const childAge = calculateAge(child.DOB)!;
+            const ageDifference = memberAge - childAge;
+            
+            // If age difference is less than 10 years, can't be a parent
+            if (ageDifference < 10) {
+              canBeParent = false;
+              break;
+            }
+          }
+          
+          if (canBeParent && potentialParents.length < 2) {
+            potentialParents.push(member);
+          } else {
+            children.push(member);
+          }
+        }
+      }
+      
+      // Single parent families are valid - we don't need to force a second parent
+      // The logic above will naturally handle cases where only one parent is identified
+      
+      // Add members without age to children (can't determine their role)
+      children.push(...membersWithoutAge);
+      
+      // If we still don't have any parents identified, all members go to children
+      if (potentialParents.length === 0) {
+        children.push(...sortedMembersWithAge);
+      }
       
       processedFamilies.push({
         ...family,
-        parents,
-        children
+        parents: potentialParents,
+        children: children
       });
     });
     
