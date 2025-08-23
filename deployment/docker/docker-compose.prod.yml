@@ -1,0 +1,280 @@
+# 2025-01-27: Production Docker Compose configuration for dirReactFinal
+# Complete production stack with Django backend, React frontend, PostgreSQL, Redis, and Nginx
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: dirReactFinal_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dirReactFinal_prod
+      POSTGRES_USER: dirReactFinal_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_secure_password_here}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+      - ./postgres/backups:/backups
+    ports:
+      - "5432:5432"
+    networks:
+      - dirReactFinal_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dirReactFinal_user -d dirReactFinal_prod"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: dirReactFinal_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-your_redis_password}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - dirReactFinal_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Django Backend
+  django_backend:
+    build:
+      context: ../../django_backend
+      dockerfile: Dockerfile.prod
+    container_name: dirReactFinal_django
+    restart: unless-stopped
+    environment:
+      - DJANGO_SETTINGS_MODULE=dirfinal.settings
+      - DJANGO_ENV=production
+      - DATABASE_URL=postgresql://dirReactFinal_user:${POSTGRES_PASSWORD:-your_secure_password_here}@postgres:5432/dirReactFinal_prod
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - SECRET_KEY=${DJANGO_SECRET_KEY}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,dirfinal.com}
+      - DEBUG=False
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-https://dirfinal.com,https://www.dirfinal.com}
+      - STATIC_URL=/static/
+      - MEDIA_URL=/media/
+      - STATIC_ROOT=/app/staticfiles
+      - MEDIA_ROOT=/app/media
+      - LOG_LEVEL=INFO
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
+    volumes:
+      - django_static:/app/staticfiles
+      - django_media:/app/media
+      - django_logs:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - dirReactFinal_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    command: >
+      sh -c "python manage.py collectstatic --noinput &&
+             python manage.py migrate &&
+             gunicorn dirfinal.wsgi:application --bind 0.0.0.0:8000 --workers 4 --worker-class gevent --worker-connections 1000 --max-requests 1000 --max-requests-jitter 100 --timeout 30 --keep-alive 2 --preload"
+
+  # React Frontend
+  react_frontend:
+    build:
+      context: ../../react_frontend
+      dockerfile: Dockerfile.prod
+    container_name: dirReactFinal_react
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-https://api.dirfinal.com}
+      - REACT_APP_APP_NAME=dirFinal
+      - REACT_APP_VERSION=${REACT_APP_VERSION:-1.0.0}
+    volumes:
+      - react_build:/app/build
+    networks:
+      - dirReactFinal_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Apache Web Server
+  apache:
+    image: httpd:2.4-alpine
+    container_name: dirReactFinal_apache
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./apache/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+      - ./apache/conf.d:/usr/local/apache2/conf/extra:ro
+      - ./apache/ssl:/usr/local/apache2/ssl:ro
+      - django_static:/var/www/static:ro
+      - django_media:/var/www/media:ro
+      - react_build:/var/www/frontend:ro
+      - apache_logs:/usr/local/apache2/logs
+    depends_on:
+      - django_backend
+      - react_frontend
+    networks:
+      - dirReactFinal_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker for Background Tasks
+  celery_worker:
+    build:
+      context: ../../django_backend
+      dockerfile: Dockerfile.prod
+    container_name: dirReactFinal_celery_worker
+    restart: unless-stopped
+    environment:
+      - DJANGO_SETTINGS_MODULE=dirfinal.settings
+      - DJANGO_ENV=production
+      - DATABASE_URL=postgresql://dirReactFinal_user:${POSTGRES_PASSWORD:-your_secure_password_here}@postgres:5432/dirReactFinal_prod
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - C_FORCE_ROOT=true
+    volumes:
+      - django_media:/app/media
+      - django_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - dirReactFinal_network
+    command: celery -A dirfinal worker --loglevel=info --concurrency=4 --max-tasks-per-child=1000
+
+  # Celery Beat for Scheduled Tasks
+  celery_beat:
+    build:
+      context: ../../django_backend
+      dockerfile: Dockerfile.prod
+    container_name: dirReactFinal_celery_beat
+    restart: unless-stopped
+    environment:
+      - DJANGO_SETTINGS_MODULE=dirfinal.settings
+      - DJANGO_ENV=production
+      - DATABASE_URL=postgresql://dirReactFinal_user:${POSTGRES_PASSWORD:-your_secure_password_here}@postgres:5432/dirReactFinal_prod
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+    volumes:
+      - django_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - dirReactFinal_network
+    command: celery -A dirfinal beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
+  # Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: dirReactFinal_prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - dirReactFinal_network
+
+  # Monitoring - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: dirReactFinal_grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - dirReactFinal_network
+
+  # Backup Service
+  backup_service:
+    image: postgres:15-alpine
+    container_name: dirReactFinal_backup
+    restart: "no"
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-your_secure_password_here}
+    volumes:
+      - ./backup:/backup
+      - postgres_data:/var/lib/postgresql/data:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dirReactFinal_network
+    command: >
+      sh -c "
+        pg_dump -h postgres -U dirReactFinal_user -d dirReactFinal_prod > /backup/backup_$$(date +%Y%m%d_%H%M%S).sql &&
+        echo 'Backup completed successfully'"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  django_static:
+    driver: local
+  django_media:
+    driver: local
+  django_logs:
+    driver: local
+  react_build:
+    driver: local
+  apache_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  dirReactFinal_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

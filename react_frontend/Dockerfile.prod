@@ -1,0 +1,54 @@
+# 2025-01-27: Production Dockerfile for dirReactFinal React frontend
+# Multi-stage build with Nginx for production deployment
+
+# Stage 1: Build stage
+FROM node:18-alpine as builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Stage 2: Production stage with Apache
+FROM httpd:2.4-alpine
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Copy custom Apache configuration
+COPY apache.conf /usr/local/apache2/conf/httpd.conf
+
+# Copy built application from builder stage
+COPY --from=builder /app/dist /usr/local/apache2/htdocs
+
+# Create non-root user
+RUN addgroup -g 1001 -S apache && \
+    adduser -S -D -H -u 1001 -h /var/cache/apache -s /sbin/nologin -G apache -g apache apache
+
+# Set ownership
+RUN chown -R apache:apache /usr/local/apache2/htdocs && \
+    chown -R apache:apache /usr/local/apache2/logs && \
+    chown -R apache:apache /usr/local/apache2/conf
+
+# Switch to non-root user
+USER apache
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/ || exit 1
+
+# Start Apache
+CMD ["httpd-foreground"]

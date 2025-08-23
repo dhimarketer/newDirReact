@@ -1,0 +1,53 @@
+[2025-01-27 15:30] | project root | Cold start. Awaiting task. | todo
+[2025-01-27 15:35] | react_frontend/src/pages/AdminImageSearchPage.tsx:1 | Created new admin image search page for viewing all users with images as tiles | ok
+[2025-01-27 15:36] | react_frontend/src/router.tsx:25 | Added AdminImageSearchPage route with admin protection | ok
+[2025-01-27 15:37] | react_frontend/src/pages/AdminPage.tsx:1 | Updated AdminPage to include navigation to admin image search and other admin functions | ok
+[2025-01-27 15:38] | react_frontend/src/components/layout/Sidebar.tsx:65 | Added admin image search to sidebar admin navigation | ok
+[2025-01-27 15:45] | react_frontend/src/components/settings/PointsSystemSettings.tsx:1 | Created points system settings component for admin configuration | ok
+[2025-01-27 15:46] | react_frontend/src/pages/SettingsPage.tsx:1 | Added PointsSystemSettings to settings page | ok
+[2025-01-27 15:47] | react_frontend/src/pages/PremiumImageSearchPage.tsx:1 | Updated PremiumImageSearchPage to check points instead of user type | ok
+[2025-01-27 15:48] | react_frontend/src/pages/AdminImageSearchPage.tsx:1 | Updated AdminImageSearchPage to check both admin status and points | ok
+[2025-01-27 15:49] | react_frontend/src/components/layout/Header.tsx:1 | Updated Header to show image search based on points instead of premium status | ok
+[2025-01-27 15:50] | react_frontend/src/components/layout/Sidebar.tsx:1 | Updated Sidebar to show image search based on points instead of premium user type | ok
+[2025-01-27 15:51] | react_frontend/src/pages/SearchPage.tsx:1 | Updated SearchPage to show image search link based on points | ok
+[2025-01-27 15:52] | react_frontend/src/components/common/FloatingActionButton.tsx:1 | Updated FloatingActionButton to show image search based on points | ok
+[2025-01-27 15:53] | react_frontend/src/components/common/Breadcrumb.tsx:1 | Updated Breadcrumb to handle new image search naming | ok
+[2025-01-27 15:54] | react_frontend/src/components/common/UserPointsDisplay.tsx:1 | Created UserPointsDisplay component for header | ok
+[2025-01-27 15:55] | react_frontend/src/components/layout/Header.tsx:1 | Added UserPointsDisplay to header and fixed linter errors | ok
+[2025-01-27 16:00] | react_frontend/src/utils/searchFieldUtils.ts:1 | Created utility functions for search field visibility based on admin settings | ok
+[2025-01-27 16:01] | react_frontend/src/components/directory/SearchResults.tsx:1 | Updated SearchResults to use search field visibility settings and display fields separately | ok
+[2025-01-27 16:02] | react_frontend/src/index.css:1 | Updated CSS to handle dynamic columns from search field visibility settings | ok
+[2025-01-27 16:05] | react_frontend/src/components/directory/SearchResults.tsx:1 | Fixed address field mapping and removed selector checkboxes from search results | ok
+[2025-01-27 16:06] | react_frontend/src/index.css:1 | Removed checkbox-related CSS styles that are no longer needed | ok
+[2025-01-27 16:10] | react_frontend/src/components/directory/SearchBar.tsx:1 | Added collapse button for advanced search filters to improve UI cleanliness | ok
+[2025-01-27 16:15] | react_frontend/src/utils/searchQueryParser.ts:1 | Created smart query parser for intelligent search with Maldivian geography context | ok
+[2025-01-27 16:16] | react_frontend/src/components/directory/SearchBar.tsx:1 | Integrated smart query parser for intelligent search functionality with real-time field detection | ok
+[2025-01-27 16:20] | react_frontend/src/utils/searchQueryParser.ts:1 | Fixed gender detection to use actual database values (M, F) instead of full words | ok
+[2025-01-27 16:25] | react_frontend/src/utils/searchQueryParser.ts:1 | Fixed comma logic - each comma indicates new field, male always geography not gender | ok
+[2025-01-27 16:30] | react_frontend/src/utils/searchQueryParser.ts:1 | Added field priority order (name, island, address, party, number) and age search with > operator | ok
+[2025-01-27 16:35] | react_frontend/src/utils/searchQueryParser.ts:1 | Added wildcard capability for each search term (* or % for partial matches) | ok
+[2025-01-27 16:40] | react_frontend/src/utils/searchQueryParser.ts:1 | Fixed address detection for Maldivian patterns including "ge" suffix and wildcard patterns | ok
+[2025-01-27 16:45] | django_backend/media/contact_photos/ | Investigated image search functionality - created media directory structure for local development | ok
+[2025-01-27 16:50] | django_backend/dirReactFinal_api/views.py:447 | Fixed premium_image_search to filter entries with image_status flag instead of Image model relationship | ok
+[2025-01-27 16:51] | django_backend/dirReactFinal_api/serializers.py:120 | Updated PhoneBookEntryWithImageSerializer to use image_status field for image URLs and filenames | ok
+[2025-01-27 16:52] | django_backend/dirReactFinal_api/views.py:447 | Image search now returns 1834 entries with images using image_status flag | ok
+[2025-01-27 16:55] | django_backend/dirReactFinal_api/views.py:447 | Fixed admin access to image search - admin users can now access regardless of user_type | ok
+[2025-01-27 17:00] | react_frontend/src/pages/PremiumImageSearchPage.tsx:270 | Added debugging for image rendering issue - images loading but not visible due to CSS/styling | ok
+[2025-01-27 17:05] | django_backend/dirReactFinal_api/serializers.py:120 | Fixed image URLs to return absolute paths pointing to Django backend (localhost:8000) | ok
+[2025-01-27 17:10] | react_frontend/vite.config.js:15 | Added proxy configuration for /media and /api to work in both development and production | ok
+[2025-01-27 17:15] | react_frontend/src/utils/constants.ts:7 | Fixed double /api/api/ URL issue by removing /api prefix from BASE_URL | ok
+[2025-01-27 17:20] | react_frontend/vite.config.js:15 | Fixed proxy configuration to use specific paths instead of generic /api rule | ok
+[2025-01-27 17:25] | django_backend/dirReactFinal_api/views.py:447 | Implemented points deduction system - image search costs 5 points, basic search costs 1 point | ok
+[2025-01-27 17:30] | django_backend/dirReactFinal_scoring/utils.py:1 | Created dynamic points management system that reads from database instead of hardcoded values | ok
+[2025-01-27 17:35] | django_backend/dirReactFinal_api/views.py:120 | Added password change and score donation endpoints to UserProfileView with proper validation and logging | ok
+[2025-01-27 17:36] | django_backend/dirReactFinal_core/models.py:80 | Added password_change event type to EventLog model for tracking password changes | ok
+[2025-01-27 17:37] | react_frontend/src/services/profile.ts:1 | Created profile service for handling profile-related API calls including password change and score donation | ok
+[2025-01-27 17:38] | react_frontend/src/pages/ProfilePage.tsx:1 | Enhanced ProfilePage with comprehensive profile editing, password change, and score donation features with tabbed interface | ok
+[2025-01-27 17:45] | react_frontend/src/pages/AdminUserManagementPage.tsx:1 | Created comprehensive admin user management page with CRUD operations, user type management, score updates, and password changes | ok
+[2025-01-27 17:46] | react_frontend/src/router.tsx:25 | Added AdminUserManagementPage route with admin protection | ok
+[2025-01-27 17:47] | django_backend/dirReactFinal_api/views.py:329 | Added admin password change endpoint to UserViewSet | ok
+[2025-01-27 17:48] | react_frontend/vite.config.js:15 | Fixed API proxy configuration to properly route /api requests to Django backend | ok
+[2025-01-27 17:49] | react_frontend/src/pages/AdminPage.tsx:120 | Updated AdminPage quick stats to include links to user management and other admin functions | ok
+[2025-01-27 17:55] | react_frontend/src/components/common/ProtectedRoute.tsx:32 | Fixed admin access check to include user_type === 'admin' in addition to is_staff and is_superuser | ok
+[2025-01-27 17:56] | react_frontend/src/pages/AdminUserManagementPage.tsx:1 | Added comprehensive debugging and logging to troubleshoot button functionality issues | ok
+[2025-01-27 18:00] | react_frontend/src/pages/AdminUserManagementPage.tsx:1 | FIXED: Removed debugging code and identified root cause - buttons work but user must be logged in as admin | ok
