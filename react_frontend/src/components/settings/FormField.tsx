@@ -1,4 +1,5 @@
-// 2025-01-27: Creating FormField component for Phase 2 React frontend
+// 2025-01-27: Creating flexible form field component for settings
+// 2025-01-27: Refactored to use Pico.css for lightweight, responsive, and professional styling
 
 import React from 'react';
 
@@ -7,12 +8,12 @@ interface FormFieldProps {
   name: string;
   type?: 'text' | 'email' | 'password' | 'select' | 'textarea' | 'checkbox' | 'radio';
   value: string | number | boolean;
-  onChange: (value: any) => void;
+  onChange: (value: string | number | boolean) => void;
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
   error?: string;
-  options?: Array<{ value: string | number; label: string }>;
+  options?: Array<{ value: string; label: string }>;
   className?: string;
 }
 
@@ -23,11 +24,11 @@ const FormField: React.FC<FormFieldProps> = ({
   value,
   onChange,
   placeholder,
-  required = false,
-  disabled = false,
+  required,
+  disabled,
   error,
   options = [],
-  className = '',
+  className = ''
 }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     if (type === 'checkbox') {
@@ -47,7 +48,8 @@ const FormField: React.FC<FormFieldProps> = ({
             value={value as string}
             onChange={handleChange}
             disabled={disabled}
-            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md disabled:bg-gray-50 disabled:text-gray-500"
+            className="form-input"
+            required={required}
           >
             {options.map((option) => (
               <option key={option.value} value={option.value}>
@@ -67,8 +69,8 @@ const FormField: React.FC<FormFieldProps> = ({
             placeholder={placeholder}
             required={required}
             disabled={disabled}
-            rows={3}
-            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+            rows={4}
+            className="form-input"
           />
         );
 
@@ -124,7 +126,7 @@ const FormField: React.FC<FormFieldProps> = ({
             placeholder={placeholder}
             required={required}
             disabled={disabled}
-            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+            className="form-input"
           />
         );
     }
@@ -132,7 +134,7 @@ const FormField: React.FC<FormFieldProps> = ({
 
   if (type === 'checkbox') {
     return (
-      <div className={className}>
+      <div className={`form-group ${className}`}>
         {renderField()}
         {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
       </div>
@@ -140,8 +142,8 @@ const FormField: React.FC<FormFieldProps> = ({
   }
 
   return (
-    <div className={className}>
-      <label htmlFor={name} className="block text-sm font-medium text-gray-700">
+    <div className={`form-group ${className}`}>
+      <label htmlFor={name} className="form-label">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>

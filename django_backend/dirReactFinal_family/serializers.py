@@ -19,7 +19,7 @@ class FamilyGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = FamilyGroup
         fields = [
-            'id', 'name', 'description', 'created_by', 'created_at', 
+            'id', 'name', 'description', 'address', 'island', 'created_by', 'created_at', 
             'updated_at', 'member_count'
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
@@ -144,7 +144,7 @@ class FamilyGroupCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating family groups"""
     class Meta:
         model = FamilyGroup
-        fields = ['name', 'description']
+        fields = ['name', 'description', 'address', 'island']
     
     def create(self, validated_data):
         """Create a new family group"""

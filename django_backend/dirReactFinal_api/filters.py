@@ -7,6 +7,7 @@ from dirReactFinal_directory.models import PhoneBookEntry
 from dirReactFinal_core.models import User, EventLog
 from dirReactFinal_family.models import FamilyGroup
 from dirReactFinal_moderation.models import PendingChange
+from dirReactFinal_api.utils import create_wildcard_query
 
 class PhoneBookEntryFilter(django_filters.FilterSet):
     """Advanced filter for phonebook entries"""
@@ -85,13 +86,15 @@ class PhoneBookEntryFilter(django_filters.FilterSet):
     def search_filter(self, queryset, name, value):
         """Custom search filter across multiple fields"""
         if value:
+            # Use wildcard-aware queries for comprehensive search
+            name_query = create_wildcard_query('name', value)
+            contact_query = create_wildcard_query('contact', value)
+            nid_query = create_wildcard_query('nid', value)
+            address_query = create_wildcard_query('address', value)
+            profession_query = create_wildcard_query('profession', value)
+            email_query = create_wildcard_query('email', value)
             return queryset.filter(
-                Q(name__icontains=value) |
-                Q(contact__icontains=value) |
-                Q(nid__icontains=value) |
-                Q(address__icontains=value) |
-                Q(profession__icontains=value) |
-                Q(email__icontains=value)
+                name_query | contact_query | nid_query | address_query | profession_query | email_query
             )
         return queryset
     
@@ -151,11 +154,13 @@ class UserFilter(django_filters.FilterSet):
     def search_filter(self, queryset, name, value):
         """Custom search filter for users"""
         if value:
+            # Use wildcard-aware queries for comprehensive search
+            username_query = create_wildcard_query('username', value)
+            email_query = create_wildcard_query('email', value)
+            first_name_query = create_wildcard_query('first_name', value)
+            last_name_query = create_wildcard_query('last_name', value)
             return queryset.filter(
-                Q(username__icontains=value) |
-                Q(email__icontains=value) |
-                Q(first_name__icontains=value) |
-                Q(last_name__icontains=value)
+                username_query | email_query | first_name_query | last_name_query
             )
         return queryset
 
@@ -179,9 +184,11 @@ class FamilyGroupFilter(django_filters.FilterSet):
     def search_filter(self, queryset, name, value):
         """Custom search filter for family groups"""
         if value:
+            # Use wildcard-aware queries for comprehensive search
+            name_query = create_wildcard_query('name', value)
+            description_query = create_wildcard_query('description', value)
             return queryset.filter(
-                Q(name__icontains=value) |
-                Q(description__icontains=value)
+                name_query | description_query
             )
         return queryset
 
@@ -255,24 +262,29 @@ class AdvancedSearchFilter:
         queryset = PhoneBookEntry.objects.all()
         
         if query:
+            # Use wildcard-aware queries for comprehensive search
+            name_query = create_wildcard_query('name', query)
+            contact_query = create_wildcard_query('contact', query)
+            nid_query = create_wildcard_query('nid', query)
+            address_query = create_wildcard_query('address', query)
+            profession_query = create_wildcard_query('profession', query)
             queryset = queryset.filter(
-                Q(name__icontains=query) |
-                Q(contact__icontains=query) |
-                Q(nid__icontains=query) |
-                Q(address__icontains=query) |
-                Q(profession__icontains=query)
+                name_query | contact_query | nid_query | address_query | profession_query
             )
         
         if filters:
             # Apply additional filters
             if filters.get('atoll'):
-                queryset = queryset.filter(atoll__icontains=filters['atoll'])
+                atoll_query = create_wildcard_query('atoll', filters['atoll'])
+                queryset = queryset.filter(atoll_query)
             
             if filters.get('island'):
-                queryset = queryset.filter(island__icontains=filters['island'])
+                island_query = create_wildcard_query('island', filters['island'])
+                queryset = queryset.filter(island_query)
             
             if filters.get('profession'):
-                queryset = queryset.filter(profession__icontains=filters['profession'])
+                profession_query = create_wildcard_query('profession', filters['profession'])
+                queryset = queryset.filter(profession_query)
             
             if filters.get('gender'):
                 queryset = queryset.filter(gender=filters['gender'])

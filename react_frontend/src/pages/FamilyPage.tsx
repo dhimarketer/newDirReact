@@ -104,6 +104,8 @@ const FamilyPage: React.FC = () => {
       const potentialParents: PhoneBookEntry[] = [];
       const children: PhoneBookEntry[] = [];
       
+      // 2025-01-27: Fixed family detection logic to properly identify both parents and treat people without ages as children
+      
       // Start with the eldest member as a potential parent
       if (sortedMembersWithAge.length > 0) {
         const eldest = sortedMembersWithAge[0];
@@ -115,15 +117,15 @@ const FamilyPage: React.FC = () => {
           const memberAge = calculateAge(member.DOB)!;
           const ageDifference = eldestAge - memberAge;
           
-          // If age difference is at least 10 years, consider eldest as parent
-          if (ageDifference >= 10) {
+          // If age difference is at least 15 years, consider eldest as parent
+          if (ageDifference >= 15) {
             if (potentialParents.length === 0) {
               potentialParents.push(eldest);
             }
             children.push(member);
           } else {
-            // Age difference is less than 10 years - could be siblings
-            // Don't assign as parent, add to children
+            // Age difference is less than 15 years - could be siblings or co-parents
+            // Don't assign as parent yet, add to children temporarily
             children.push(member);
           }
         }
@@ -150,8 +152,8 @@ const FamilyPage: React.FC = () => {
             const childAge = calculateAge(child.DOB)!;
             const ageDifference = memberAge - childAge;
             
-            // If age difference is less than 10 years, can't be a parent
-            if (ageDifference < 10) {
+            // If age difference is less than 15 years, can't be a parent
+            if (ageDifference < 15) {
               canBeParent = false;
               break;
             }
@@ -165,10 +167,27 @@ const FamilyPage: React.FC = () => {
         }
       }
       
+      // Third pass: if we still don't have 2 parents, look for co-parents among children
+      if (potentialParents.length === 1 && children.length > 0) {
+        const potentialCoParent = children.find(child => {
+          const childAge = calculateAge(child.DOB)!;
+          const parentAge = calculateAge(potentialParents[0].DOB)!;
+          const ageDifference = Math.abs(parentAge - childAge);
+          
+          // If age difference is small (likely co-parents), promote to parent
+          return ageDifference <= 5;
+        });
+        
+        if (potentialCoParent) {
+          potentialParents.push(potentialCoParent);
+          children.splice(children.indexOf(potentialCoParent), 1);
+        }
+      }
+      
       // Single parent families are valid - we don't need to force a second parent
       // The logic above will naturally handle cases where only one parent is identified
       
-      // Add members without age to children (can't determine their role)
+      // Add members without age to children (as per user requirement)
       children.push(...membersWithoutAge);
       
       // If we still don't have any parents identified, all members go to children

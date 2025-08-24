@@ -1,7 +1,8 @@
 // 2025-01-27: Creating home page service to fetch real statistics from Django API
+// 2025-01-27: Fixed API endpoint construction and data structure to prevent double /api/ issue
+// 2025-01-27: Updated interface to match actual Django analytics endpoint response
 
 import apiService from './api';
-import { API_CONFIG } from '../utils/constants';
 
 export interface HomePageStats {
   overview: {
@@ -31,15 +32,13 @@ export interface HomePageStats {
 }
 
 class HomePageService {
-  private baseUrl = `${API_CONFIG.BASE_URL}/analytics`;
-
   /**
    * Get home page statistics
    */
   async getHomePageStats(): Promise<HomePageStats> {
     try {
-      console.log('HomePageService: Making API call to:', `${this.baseUrl}/`);
-      const response = await apiService.get<HomePageStats>(`${this.baseUrl}/`);
+      console.log('HomePageService: Making API call to: /analytics/');
+      const response = await apiService.get<HomePageStats>('/analytics/');
       console.log('HomePageService: API response received:', response);
       return response.data;
     } catch (error: any) {
@@ -74,7 +73,7 @@ class HomePageService {
    */
   async getDirectoryStats(): Promise<any> {
     try {
-      const response = await apiService.get(`${this.baseUrl}/directory_stats/`);
+      const response = await apiService.get('/analytics/directory_stats/');
       return response.data;
     } catch (error: any) {
       console.error('Failed to fetch directory stats:', error);

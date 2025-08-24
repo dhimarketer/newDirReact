@@ -1,13 +1,14 @@
 // 2025-01-27: Search bar component for directory with autocomplete suggestions
-// 2025-01-27: Added collapse button for advanced search filters
+// 2025-01-27: Added collapse button for advanced search filters to improve UI cleanliness
 // 2025-01-27: Integrated smart query parser for intelligent search
+// 2025-01-27: Simplified styling to use consistent Tailwind utilities and prevent CSS conflicts
+// 2025-01-27: COMPLETELY SIMPLIFIED - Google-like minimal interface for better UX
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SearchFilters } from '../../types/directory';
 import { directoryService } from '../../services/directoryService';
 import { SEARCH } from '../../utils/constants';
 import { toast } from 'react-hot-toast';
-import { ChevronDown, ChevronUp } from 'lucide-react';
 import { parseSmartQuery, formatParsedQuery } from '../../utils/searchQueryParser';
 
 interface SearchBarProps {
@@ -36,7 +37,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
   }>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [parsedQueryInfo, setParsedQueryInfo] = useState<string>('');
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -162,19 +162,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
     }
   };
 
-  // Handle filter changes
-  const handleFilterChange = (key: keyof SearchFilters, value: string | number | undefined) => {
-    // Ensure we don't send empty strings or undefined values
-    const cleanValue = value === '' || value === undefined ? undefined : value;
-    const newFilters = { ...filters, [key]: cleanValue };
-    onFiltersChange(newFilters);
-  };
-
-  // Toggle advanced filters visibility
-  const toggleAdvancedFilters = () => {
-    setShowAdvancedFilters(!showAdvancedFilters);
-  };
-
   // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -197,322 +184,93 @@ const SearchBar: React.FC<SearchBarProps> = ({
   }, []);
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      {/* Main Search Form */}
-      <form onSubmit={handleSearch} className="mb-6">
+    <div className="w-full">
+      {/* Main Search Form - Ultra-clean Google-style */}
+      <form onSubmit={handleSearch}>
         <div className="search-bar-container">
-          <div className="flex items-center space-x-2">
-            <div className="flex-1 relative">
+          <div className="flex flex-col items-center space-y-6">
+            <div className="w-full max-w-2xl relative">
               <input
                 type="text"
                 value={query}
                 onChange={handleQueryChange}
-                placeholder="Smart search: ali, heena, male (name, name, atoll) or ali% (wildcard) or name:ali (specific field)"
-                className="search-input"
+                placeholder="Search directory..."
+                className="search-input w-full text-lg px-6 py-4 border border-blue-300 rounded-full focus:border-blue-500 focus:outline-none bg-white shadow-sm hover:shadow-md transition-all duration-200 text-blue-800"
                 disabled={isLoading}
+                title="Smart Search: Use commas for structured queries, wildcards, or field-specific searches"
+                aria-label="Search directory entries"
               />
-              <div className="search-icon">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
+
               
-              {/* Parsed Query Info */}
-              {parsedQueryInfo && (
-                <div className="absolute top-full left-0 right-0 mt-1 p-2 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-700 z-10">
-                  <strong>Detected fields:</strong> {parsedQueryInfo}
-                </div>
-              )}
-              
-              {/* Search Suggestions */}
-              {showSuggestions && suggestions.length > 0 && (
-                <div 
-                  ref={suggestionsRef}
-                  className="search-suggestions"
-                  style={{ marginTop: parsedQueryInfo ? '40px' : '0' }}
+              {/* Clear search button when there's text */}
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery('');
+                    const newFilters = { ...filters, query: '' };
+                    onFiltersChange(newFilters);
+                    setShowSuggestions(false);
+                    setSuggestions([]);
+                    setParsedQueryInfo('');
+                  }}
+                  className="absolute right-5 top-1/2 transform -translate-y-1/2 text-blue-400 hover:text-blue-600 p-1 rounded-full hover:bg-blue-100 transition-all duration-200"
+                  title="Clear search"
+                  aria-label="Clear search"
                 >
-                  {suggestions.map((suggestion) => (
-                    <div
-                      key={suggestion.pid}
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="suggestion-item"
-                    >
-                      <div className="font-medium text-gray-900">{suggestion.name}</div>
-                      <div className="text-sm text-gray-600">
-                        {suggestion.contact}
-                        {suggestion.nid && ` • NID: ${suggestion.nid}`}
-                        {suggestion.atoll && ` • ${suggestion.atoll}`}
-                        {suggestion.island && ` • ${suggestion.island}`}
-                        {suggestion.profession && ` • ${suggestion.profession}`}
-                        {suggestion.party && ` • ${suggestion.party}`}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                  ×
+                </button>
               )}
               
-              {/* Loading indicator for suggestions */}
-              {isLoadingSuggestions && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <div className="loading-spinner"></div>
-                </div>
-              )}
+
             </div>
             
-            <button
-              type="submit"
-              disabled={isLoading || !query.trim()}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              style={{ display: 'block' }}
-              title={`Query: "${query}", Loading: ${isLoading}, Disabled: ${isLoading || !query.trim()}`}
-            >
-              {isLoading ? (
-                <span className="flex items-center">
-                  <div className="loading-spinner mr-2"></div>
-                  Searching...
-                </span>
-              ) : (
-                'Search'
-              )}
-            </button>
-          </div>
-        </div>
-      </form>
-
-      {/* Smart Search Examples */}
-      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-        <div className="text-sm text-gray-600">
-          <strong>Smart Search Examples:</strong>
-          <ul className="mt-1 space-y-1 text-xs">
-            <li>• <code>hulhumale, male</code> → Address: hulhumale, Island: male</li>
-            <li>• <code>ali, heena, male</code> → Name: ali, Name: heena, Island: male</li>
-            <li>• <code>ali%</code> → Wildcard search for names starting with "ali"</li>
-            <li>• <code>name:ali, atoll:male</code> → Specific field search</li>
-            <li>• <code>1234567</code> → Contact number search</li>
-            <li>• <code>MDP</code> → Political party search</li>
-            <li>• <code>M</code> → Gender: M (male)</li>
-            <li>• <code>F</code> → Gender: F (female)</li>
-            <li>• <code>hulhumale ge</code> → Address search (detects "ge" suffix)</li>
-            <li>• <code>male villa</code> → Address search (detects "villa" suffix)</li>
-          </ul>
-        </div>
-      </div>
-
-      {/* Advanced Filters Toggle Button */}
-      <div className="mb-4">
-        <button
-          type="button"
-          onClick={toggleAdvancedFilters}
-          className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-        >
-          <span>Advanced Filters</span>
-          {showAdvancedFilters ? (
-            <ChevronUp className="h-4 w-4" />
-          ) : (
-            <ChevronDown className="h-4 w-4" />
-          )}
-        </button>
-      </div>
-
-      {/* Advanced Filters - Collapsible */}
-      {showAdvancedFilters && (
-        <div className="bg-gray-50 rounded-lg p-4 mb-6 border border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Advanced Search Options</h3>
-          <div className="advanced-filters">
-            {/* Name Filter */}
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input
-                type="text"
-                value={filters.name || ''}
-                onChange={(e) => handleFilterChange('name', e.target.value || undefined)}
-                placeholder="Enter name"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Contact Number Filter */}
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
-              <input
-                type="text"
-                value={filters.contact || ''}
-                onChange={(e) => handleFilterChange('contact', e.target.value || undefined)}
-                placeholder="Enter contact number"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* National ID Filter */}
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">National ID</label>
-              <input
-                type="text"
-                value={filters.nid || ''}
-                onChange={(e) => handleFilterChange('nid', e.target.value || undefined)}
-                placeholder="Enter NID"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Island Filter */}
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Island</label>
-              <input
-                type="text"
-                value={filters.island || ''}
-                onChange={(e) => handleFilterChange('island', e.target.value || undefined)}
-                placeholder="Enter island"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Address Filter */}
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-              <input
-                type="text"
-                value={filters.address || ''}
-                onChange={(e) => handleFilterChange('address', e.target.value || undefined)}
-                placeholder="Enter address"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Party (Political Affiliation) Filter */}
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Party</label>
-              <input
-                type="text"
-                value={filters.party || ''}
-                onChange={(e) => handleFilterChange('party', e.target.value || undefined)}
-                placeholder="Enter political party"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Profession Filter */}
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Profession</label>
-              <input
-                type="text"
-                value={filters.profession || ''}
-                onChange={(e) => handleFilterChange('profession', e.target.value || undefined)}
-                placeholder="Enter profession"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Age Range Filters */}
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Min Age</label>
-              <input
-                type="number"
-                min="0"
-                max="120"
-                value={filters.min_age || ''}
-                onChange={(e) => handleFilterChange('min_age', e.target.value ? parseInt(e.target.value) : undefined)}
-                placeholder="Min age"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max Age</label>
-              <input
-                type="number"
-                min="0"
-                max="120"
-                value={filters.max_age || ''}
-                onChange={(e) => handleFilterChange('max_age', e.target.value ? parseInt(e.target.value) : undefined)}
-                placeholder="Max age"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Gender Filter */}
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-              <select
-                value={filters.gender || ''}
-                onChange={(e) => handleFilterChange('gender', e.target.value || undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            {/* Google-style search buttons */}
+            <div className="flex space-x-4">
+              <button
+                type="submit"
+                disabled={isLoading || !query.trim()}
+                className="px-8 py-3 bg-blue-500 text-white text-base font-medium rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
-                <option value="">All</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
-            </div>
-
-            {/* PEP Status Filter */}
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">PEP Status</label>
-              <select
-                value={filters.pep_status || ''}
-                onChange={(e) => handleFilterChange('pep_status', e.target.value || undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All</option>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
-
-            {/* Remarks Filter */}
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
-              <input
-                type="text"
-                value={filters.remark || ''}
-                onChange={(e) => handleFilterChange('remark', e.target.value || undefined)}
-                placeholder="Search in remarks"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Atoll Filter */}
-            <div className="filter-group">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Atoll</label>
-              <input
-                type="text"
-                value={filters.atoll || ''}
-                onChange={(e) => handleFilterChange('atoll', e.target.value || undefined)}
-                placeholder="Enter atoll"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
+                {isLoading ? 'Searching...' : 'Search'}
+              </button>
             </div>
           </div>
           
-          {/* Advanced Search Button */}
-          <div className="mt-4 flex justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                // Clean the filters to remove empty values
-                const cleanFilters = Object.fromEntries(
-                  Object.entries(filters).filter(([_, value]) => 
-                    value !== '' && value !== undefined && value !== null
-                  )
-                );
-                
-                // Check if any advanced filters are set
-                const hasAdvancedFilters = Object.keys(cleanFilters).length > 0;
-                
-                if (hasAdvancedFilters) {
-                  console.log('Sending clean filters:', cleanFilters);
-                  onSearch(cleanFilters);
-                } else {
-                  toast.error('Please set at least one search criteria');
-                }
-              }}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
+          {/* Parsed Query Info - Subtle display */}
+          {parsedQueryInfo && (
+            <div className="w-full max-w-2xl mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 text-center">
+              <strong>Smart search detected:</strong> {parsedQueryInfo}
+            </div>
+          )}
+          
+          {/* Search Suggestions - Better positioning */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div 
+              ref={suggestionsRef}
+              className="w-full max-w-2xl mt-4 bg-white border border-blue-200 rounded-lg shadow-lg overflow-hidden"
             >
-              Search with Filters
-            </button>
-          </div>
+              {suggestions.map((suggestion) => (
+                <div
+                  key={suggestion.pid}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-blue-100 last:border-b-0 transition-colors"
+                >
+                  <div className="font-medium text-blue-800">{suggestion.name}</div>
+                  <div className="text-sm text-blue-600">
+                    {suggestion.contact}
+                    {suggestion.nid && ` • NID: ${suggestion.nid}`}
+                    {suggestion.atoll && ` • ${suggestion.atoll}`}
+                    {suggestion.island && ` • ${suggestion.island}`}
+                    {suggestion.profession && ` • ${suggestion.profession}`}
+                    {suggestion.party && ` • ${suggestion.party}`}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </form>
     </div>
   );
 };

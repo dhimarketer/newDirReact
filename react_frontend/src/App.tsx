@@ -1,4 +1,5 @@
 // 2025-01-27: Creating main App component for Phase 2 React frontend
+// 2025-01-27: Refactored to use Pico.css for lightweight, responsive, and professional styling
 
 import { BrowserRouter as Router } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -25,7 +26,7 @@ function App() {
       <Router>
         <AuthProvider>
           <AuthInitializer />
-          <div className="min-h-screen bg-gray-50">
+          <div className="app-container">
             <AppRoutes />
             <Toaster
               position="top-right"

@@ -1,4 +1,5 @@
 // 2025-01-27: Implementing functional SearchPage with SearchBar and SearchResults components
+// 2025-01-27: COMPLETELY SIMPLIFIED - Google-like minimal interface for better UX
 
 import React, { useState, useEffect } from 'react';
 import SearchBar from '../components/directory/SearchBar';
@@ -8,7 +9,6 @@ import { directoryService } from '../services/directoryService';
 import { useAuth } from '../store/authStore';
 import { toast } from 'react-hot-toast';
 import { Link } from 'react-router-dom';
-import { Image } from 'lucide-react';
 
 const SearchPage: React.FC = () => {
   const { user } = useAuth();
@@ -163,66 +163,79 @@ const SearchPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Search Directory</h1>
-        <p className="text-gray-600">
-          Search through the phone directory with advanced filters and real-time suggestions.
-        </p>
-        
-        {/* Image Search Link - for users with sufficient points */}
-        {user && user.score >= 10 && (
-          <div className="mt-4">
-            <Link
-              to="/premium-image-search"
-              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-sm font-medium rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg"
-            >
-              <Image className="w-4 h-4 mr-2" />
-              Image Search
-              <span className="ml-2 bg-white bg-opacity-20 px-2 py-1 rounded text-xs">
-                {user.score} pts
-              </span>
-            </Link>
-            <p className="text-xs text-gray-500 mt-2">
-              Visual search with images. Costs 10 points per search.
-            </p>
+    <div className="min-h-screen bg-white">
+      {/* Google-style search header */}
+      <div className="flex justify-end p-4">
+        {user && (
+          <div className="flex items-center space-x-4 text-sm text-blue-600">
+            <Link to="/profile" className="hover:text-blue-800">Profile</Link>
+            <Link to="/settings" className="hover:text-blue-800">Settings</Link>
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <SearchBar
-          onSearch={handleSearch}
-          onFiltersChange={handleFiltersChange}
-          filters={filters}
-          isLoading={isLoading}
-        />
+      {/* Main search area - Google style */}
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+        {/* Logo/Title */}
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-bold text-blue-600 mb-2">Directory Search</h1>
+          <p className="text-blue-500">Find people, places, and information</p>
+        </div>
+
+        {/* Search bar */}
+        <div className="w-full max-w-2xl mb-8">
+          <SearchBar
+            onSearch={handleSearch}
+            onFiltersChange={handleFiltersChange}
+            filters={filters}
+            isLoading={isLoading}
+          />
+        </div>
+
+        {/* Simple search tips */}
+        <div className="text-center text-sm text-blue-400 max-w-md">
+          <p>Try searching for names, addresses, islands, or contact numbers</p>
+        </div>
       </div>
 
+      {/* Search results - only show when there are results */}
       {searchResults.length > 0 || isLoading ? (
-        <SearchResults
-          results={searchResults}
-          totalCount={totalCount}
-          currentPage={currentPage}
-          pageSize={pageSize}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          onExport={handleExport}
-          isLoading={isLoading}
-        />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+          <SearchResults
+            results={searchResults}
+            totalCount={totalCount}
+            currentPage={currentPage}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            onExport={handleExport}
+            isLoading={isLoading}
+          />
+        </div>
       ) : filters.query && !isLoading ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
-          <div className="text-gray-400 mb-4">
-            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No results found</h3>
-          <p className="text-gray-600">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+                  <div className="bg-blue-50 rounded-lg shadow-sm border border-blue-200 p-6 text-center">
+          <h3 className="text-lg font-medium text-blue-800 mb-2">No results found</h3>
+          <p className="text-blue-600">
             Try adjusting your search criteria or filters to find what you're looking for.
           </p>
         </div>
+        </div>
       ) : null}
+
+      {/* Premium features - very subtle at bottom */}
+      {user && user.score && user.score >= 10 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+          <div className="text-center">
+            <Link
+              to="/premium-image-search"
+              className="inline-flex items-center px-4 py-2 text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              Image Search ({user.score} pts)
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

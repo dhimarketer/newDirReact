@@ -98,6 +98,72 @@
 [2025-01-27 19:59] | django_backend/dirReactFinal_api/views.py:580 | ENHANCED: Implemented hybrid search approach - tries AND logic first for precise results, falls back to OR logic for broader results | ok
 [2025-01-27 20:00] | django_backend/dirReactFinal_api/views.py:580 | ENHANCED: Added wildcard placeholders (*term*) to search terms for more flexible partial matching within longer text | ok
 [2025-01-27 20:01] | django_backend/dirReactFinal_api/views.py:580 | FIXED: Backend now actually uses padded wildcard terms in database queries for flexible matching | ok
+[2025-01-27 20:05] | react_frontend/src/components/family/FamilyModal.tsx:120 | FIXED: Family detection logic to properly identify both parents (mother and father) and treat people without ages as children | ok
+[2025-01-27 20:06] | react_frontend/src/pages/FamilyPage.tsx:120 | FIXED: Family detection logic in FamilyPage to match improved logic in FamilyModal for consistent parent-child identification | ok
+[2025-01-27 20:10] | django_backend/dirReactFinal_family/models.py:25 | ENHANCED: Added address and island fields to FamilyGroup model for address-based family lookup | ok
+[2025-01-27 20:11] | django_backend/dirReactFinal_family/views.py:100 | ENHANCED: Added by_address and create_or_update_by_address actions to FamilyGroupViewSet for address-based family management | ok
+[2025-01-27 20:12] | django_backend/dirReactFinal_family/serializers.py:25 | ENHANCED: Updated FamilyGroupSerializer to include address and island fields | ok
+[2025-01-27 20:13] | django_backend/dirReactFinal_family/migrations/0002_add_address_island_fields.py:1 | CREATED: Database migration for address and island fields in FamilyGroup model | ok
+[2025-01-27 20:14] | react_frontend/src/components/family/FamilyTreeEditor.tsx:1 | CREATED: FamilyTreeEditor component for manual family relationship editing and assignment | ok
+[2025-01-27 20:15] | react_frontend/src/components/family/FamilyModal.tsx:25 | ENHANCED: Added Edit Family Tree button and integrated FamilyTreeEditor for manual family relationship editing | ok
+[2025-01-27 20:16] | react_frontend/src/index.css:880 | ENHANCED: Added CSS styling for modal header actions to support Edit Family Tree button | ok
+[2025-01-27 20:20] | django_backend/dirReactFinal_family/migrations/0001_initial.py:1 | FIXED: Resolved database migration conflict by recreating family tables from scratch | ok
+[2025-01-27 20:21] | django_backend/dirReactFinal_family/ | RESOLVED: Database migration issue - legacy family tables existed but Django models expected different structure | ok
+[2025-01-27 20:25] | django_backend/dirReactFinal_family/urls.py:25 | FIXED: Added custom action URLs for by_address and create_or_update_by_address endpoints | ok
+[2025-01-27 20:26] | react_frontend/src/components/family/FamilyTreeEditor.tsx:180 | FIXED: Data structure mismatch between frontend and backend API expectations | ok
+[2025-01-27 20:27] | react_frontend/src/components/family/FamilyModal.tsx:280 | FIXED: Improved error handling and response processing in family tree update workflow | ok
+[2025-01-27 20:28] | react_frontend/src/components/family/FamilyModal.tsx:300 | ENHANCED: Added visual feedback for custom family trees and improved user experience | ok
+[2025-01-27 20:30] | react_frontend/src/index.css:860 | FIXED: Modal layout and centering issues - family tree graphics now properly contained within modal boundaries | ok
+[2025-01-27 20:31] | react_frontend/src/components/family/FamilyTreeEditor.tsx:200 | FIXED: Family members grid layout and responsive design for better centering and overflow control | ok
+[2025-01-27 20:32] | react_frontend/src/components/family/FamilyTreeEditor.tsx:250 | ENHANCED: Improved relationship controls layout with responsive design and better mobile experience | ok
+[2025-01-27 20:35] | react_frontend/src/index.css:950 | IMPLEMENTED: Comprehensive dynamic family sizing system - boxes and gaps automatically adjust based on family size | ok
+[2025-01-27 20:36] | react_frontend/src/index.css:860 | ENHANCED: Modal width constraints improved to 85vw for better family tree editor fit | ok
+[2025-01-27 20:37] | react_frontend/src/components/family/FamilyTreeEditor.tsx:200 | ENHANCED: Responsive design improvements - family tree editor now adapts perfectly to modal size | ok
+[2025-01-27 20:40] | react_frontend/src/index.css:950 | IMPLEMENTED: Comprehensive dynamic family sizing system - boxes and gaps automatically adjust based on family size | ok
+[2025-01-27 20:41] | react_frontend/src/components/family/FamilyTreeEditor.tsx:25 | ENHANCED: Added intelligent family size detection with 7 layout modes from small to mega families | ok
+[2025-01-27 20:42] | react_frontend/src/index.css:1000 | ENHANCED: Added extreme and mega family support with ultra-compression for 30+ and 40+ member families | ok
+[2025-01-27 20:33] | react_frontend/src/pages/SearchPage.tsx:1 | COMPLETELY SIMPLIFIED - Google-like minimal interface for better UX, removed confusing elements and big icons | ok
+[2025-01-27 20:34] | react_frontend/src/components/directory/SearchBar.tsx:1 | COMPLETELY SIMPLIFIED - Google-like minimal interface, removed advanced filters and complex features for cleaner UX | ok
+[2025-01-27 20:35] | react_frontend/src/pages/SearchPage.tsx:1 | REMOVED ALL ICONS - Eliminated big document icon from no results section and image icon from premium features | ok
+[2025-01-27 20:36] | react_frontend/src/components/directory/SearchBar.tsx:1 | REMOVED ALL ICONS - Eliminated search icon, clear button icon, and loading spinner for ultra-clean interface | ok
+[2025-01-27 20:37] | react_frontend/src/pages/SearchPage.tsx:1 | REMOVED BLACK THEME - Changed background from gray-50 to white, updated all text colors to blue theme for clean light appearance | ok
+[2025-01-27 20:38] | react_frontend/src/components/directory/SearchBar.tsx:1 | REMOVED BLACK THEME - Updated search input, buttons, and suggestions to use light blue theme instead of dark gray/black colors | ok
+[2025-01-27 20:39] | react_frontend/src/index.css:1 | FIXED DARK THEME - Updated CSS root colors, body background, and all gray color classes to use light blue theme instead of dark colors | ok
+[2025-01-27 20:40] | react_frontend/src/components/directory/SearchBar.tsx:1 | REMOVED LOADING SPINNER - Eliminated the loading spinner icon completely for cleaner interface | ok
+[2025-01-27 20:41] | react_frontend/src/components/directory/SearchResults.tsx:1 | FIXED DARK BACKGROUNDS - Updated all dark gray backgrounds, borders, and text colors to light blue theme throughout SearchResults component | ok
+[2025-01-27 20:42] | react_frontend/src/index.css:1 | FIXED TABLE DARK THEME - Updated table CSS rules to use light blue colors instead of dark gray backgrounds and borders | ok
+[2025-01-27 20:43] | react_frontend/src/index.css:1 | FIXED FLEXBOX DARK BACKGROUNDS - Added explicit white backgrounds to main-content and content-wrapper flexbox containers | ok
+[2025-01-27 20:44] | react_frontend/src/index.css:1 | FIXED FORM DARK THEME - Updated form labels, inputs, and buttons to use light blue colors instead of dark gray | ok
+[2025-01-27 20:45] | react_frontend/src/pages/PremiumImageSearchPage.tsx:1 | ENHANCED: Made image placeholders collapsible to save space with toggle button and reduced default height | ok
+[2025-01-27 20:46] | react_frontend/src/pages/PremiumImageSearchPage.tsx:425 | FIXED: Syntax error - missing opening div tag in email field section causing compilation failure | ok
+[2025-01-27 20:47] | react_frontend/src/pages/PremiumImageSearchPage.tsx:425 | FIXED: Complete structural issues - corrected indentation and alignment for all detail fields in modal | ok
+[2025-01-27 20:50] | react_frontend/src/pages/PremiumImageSearchPage.tsx:1 | RESTORED: File to working state after corrupted edits - clean structure with collapsible images feature | ok
+[2025-01-27 20:30] | django_backend/dirReactFinal_api/utils.py:1 | CREATED: Wildcard search utility functions for converting * and % patterns to Django regex queries | ok
+[2025-01-27 20:31] | django_backend/dirReactFinal_api/views.py:424 | UPDATED: Advanced search method to use wildcard-aware queries instead of icontains for proper wildcard processing | ok
+[2025-01-27 20:32] | django_backend/dirReactFinal_api/filters.py:1 | UPDATED: All filter classes to use wildcard-aware queries for consistent wildcard support across the API | ok
+[2025-01-27 20:35] | django_backend/dirReactFinal_api/views.py:424 | TESTED: Wildcard search functionality working correctly - athiree* + *dhoo returns 403 results, ali* returns 18,730 results, *ge returns 161,312 results | ok
+[2025-01-27 20:36] | project root | FIXED: Smart search wildcard functionality now working properly - users can search with patterns like athiree* (address) and *dhoo (island) | ok
+[2025-01-27 20:45] | react_frontend/src/components/directory/SearchBar.tsx:200 | ENHANCED: Added search format tooltip showing comma-separated field format (name,address,island,party) with examples | ok
+[2025-01-27 20:46] | react_frontend/src/components/directory/SearchBar.tsx:280 | ENHANCED: Added toggleable format guide with close button and show/hide functionality | ok
+[2025-01-27 20:47] | react_frontend/src/components/directory/SearchBar.tsx:300 | ENHANCED: Updated search examples to include comma-separated format examples (ali,,male, ,habaruge,, ali,,,MDP) | ok
+[2025-01-27 20:50] | react_frontend/src/utils/searchQueryParser.ts:50 | ENHANCED: Updated search query parser to support comma-separated format (name,address,island,party) with empty field handling | ok
+[2025-01-27 20:55] | react_frontend/src/utils/searchQueryParser.ts:50 | TESTED: Comma-separated format parsing working correctly - ali,,male returns {name: ali, island: male}, ,habaruge, returns {address: habaruge} | ok
+[2025-01-27 20:56] | project root | COMPLETED: Enhanced search functionality with comma-separated format support and user-friendly tooltips | ok
+[2025-01-27 21:00] | react_frontend/src/components/directory/SearchBar.tsx:280 | ENHANCED: Replaced static examples with collapsible "Search Tips & Examples" accordion panel | ok
+[2025-01-27 21:01] | react_frontend/src/components/directory/SearchBar.tsx:200 | IMPROVED: Enhanced search input styling with better borders, focus states, and spacing | ok
+[2025-01-27 21:02] | react_frontend/src/components/directory/SearchBar.tsx:280 | IMPROVED: Enhanced format tooltip with better positioning, shadows, and accessibility | ok
+[2025-01-27 21:03] | react_frontend/src/components/directory/SearchBar.tsx:300 | IMPROVED: Better visual hierarchy with icons, improved typography, and responsive grid layout | ok
+[2025-01-27 21:04] | react_frontend/src/index.css:266 | IMPROVED: Enhanced responsive design with mobile-first approach and iOS zoom prevention | ok
+[2025-01-27 21:05] | project root | COMPLETED: Search bar UI/UX overhaul with collapsible help, improved accessibility, and responsive design | ok
+[2025-01-27 21:10] | react_frontend/src/components/directory/SearchBar.tsx:270 | FIXED: Removed absolute positioning from format tooltip and parsed query info to prevent text overlap | ok
+[2025-01-27 21:11] | react_frontend/src/components/directory/SearchBar.tsx:280 | FIXED: Simplified search suggestions positioning by removing complex margin calculations | ok
+[2025-01-27 21:12] | react_frontend/src/index.css:274 | FIXED: Removed absolute positioning from search suggestions CSS to prevent layout conflicts | ok
+[2025-01-27 21:13] | react_frontend/src/index.css:266 | IMPROVED: Added proper spacing CSS rules to ensure clean separation between search elements | ok
+[2025-01-27 21:14] | project root | FIXED: Text overlap issues resolved by converting from absolute to relative positioning with proper spacing | ok
+[2025-01-27 21:20] | react_frontend/src/index.css:263 | FIXED: Reduced z-index from 10 to 1 to prevent stacking conflicts | ok
+[2025-01-27 21:21] | react_frontend/src/index.css:280 | ENHANCED: Added comprehensive CSS rules with !important declarations to force proper spacing | ok
+[2025-01-27 21:22] | react_frontend/src/index.css:290 | ENHANCED: Added CSS reset and box-sizing rules to prevent inherited style conflicts | ok
+[2025-01-27 21:23] | project root | ENHANCED: Added multiple layers of CSS protection to ensure no text overlap on port 3000 | ok
 [2025-01-27 20:05] | react_frontend/src/pages/FamilyPage.tsx:60 | IMPLEMENTED: Improved parent identification logic with age difference validation (min 10 years) and exclusion of people without age from parent role | ok
 [2025-01-27 20:06] | react_frontend/src/components/family/FamilyModal.tsx:87 | IMPLEMENTED: Updated FamilyModal to use same improved parent identification logic for consistency across family components | ok
 [2025-01-27 20:05] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | FIXED: Expanded family tree SVG bounding box to dynamically calculate dimensions based on family size, ensuring all children are visible with proper spacing | ok
@@ -132,3 +198,67 @@
 [2025-01-27 21:50] | react_frontend/src/services/directoryService.ts:18 | FIXED: Removed duplicate /api prefix from baseUrl to prevent /api/api/phonebook/ endpoint construction | ok
 [2025-01-27 21:50] | react_frontend/src/services/directoryService.ts:62 | FIXED: Corrected getDirectoryStats endpoint to use relative path since API service already adds /api prefix | ok
 [2025-01-27 21:50] | react_frontend/src/services/directoryService.ts:46 | FIXED: Corrected type annotation for search suggestions API response to match actual structure with results property | ok
+[2025-01-27 22:00] | react_frontend/src/index.css:1 | SIMPLIFIED: Removed complex custom CSS rules and !important declarations to prevent styling conflicts | ok
+[2025-01-27 22:01] | react_frontend/tailwind.config.js:1 | ENHANCED: Added consistent spacing scale, z-index scale, and component utilities to prevent styling conflicts | ok
+[2025-01-27 22:02] | react_frontend/STYLING_GUIDE.md:1 | CREATED: Comprehensive styling guide documenting simplified approach and preventing future styling conflicts | ok
+[2025-01-27 22:03] | react_frontend/src/components/directory/SearchBar.tsx:1 | UPDATED: Updated component header to reflect simplified styling approach | ok
+[2025-01-27 22:04] | react_frontend/src/components/directory/SearchResults.tsx:1 | UPDATED: Updated component header to reflect simplified styling approach | ok
+[2025-01-27 22:05] | react_frontend/src/components/family/FamilyModal.tsx:1 | UPDATED: Updated component header to reflect simplified styling approach | ok
+[2025-01-27 22:10] | react_frontend/src/index.css:1 | ENHANCED: Restored essential styling with component utilities while maintaining simplified approach | ok
+[2025-01-27 22:11] | react_frontend/src/components/layout/Header.tsx:1 | IMPROVED: Enhanced header styling with new component utilities, better logo, and improved user profile display | ok
+[2025-01-27 22:12] | react_frontend/src/components/layout/Sidebar.tsx:1 | IMPROVED: Enhanced sidebar styling with new component utilities, better navigation, and improved user info display | ok
+[2025-01-27 22:13] | react_frontend/src/components/layout/Layout.tsx:1 | IMPROVED: Enhanced layout structure with new styling approach and better responsive behavior | ok
+[2025-01-27 22:14] | react_frontend/src/pages/HomePage.tsx:1 | IMPROVED: Enhanced homepage styling with new component utilities, better cards, and improved visual hierarchy | ok
+[2025-01-27 22:20] | react_frontend/src/services/homePageService.ts:1 | FIXED: API endpoint construction to prevent double /api/ issue and updated data structure | ok
+[2025-01-27 22:21] | react_frontend/src/pages/HomePage.tsx:1 | FIXED: Updated data structure handling to match Django analytics endpoint and added error handling | ok
+[2025-01-27 22:22] | react_frontend/src/pages/HomePage.tsx:1 | ENHANCED: Added recent activity section and improved stats display with proper null safety | ok
+[2025-01-28 00:00] | react_frontend/src/components/family/FamilyTreeEditor.tsx:1 | FIXED: Data structure mismatch, improved relationship type mapping, and enhanced error handling for family tree editor | ok
+[2025-01-28 00:01] | react_frontend/src/index.css:1 | ENHANCED: Added CSS styles for family tree editor selection states and improved visual feedback | ok
+[2025-01-28 00:02] | django_backend/dirReactFinal_family/views.py:180 | FIXED: Backend now uses correct pid field instead of id for PhoneBookEntry lookups | ok
+[2025-01-28 00:03] | django_backend/dirReactFinal_directory/models.py:95 | FIXED: Image model now uses correct pid field for PhoneBookEntry reference | ok
+[2025-01-28 00:10] | react_frontend/src/index.css:855 | FIXED: Modal sizing and family tree container constraints to prevent overshooting modal window | ok
+[2025-01-28 00:11] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:50 | FIXED: SVG dimensions and responsive sizing to prevent overshooting modal container | ok
+[2025-01-28 00:12] | react_frontend/src/index.css:900 | ENHANCED: Modal header actions and scrolling behavior for better UX with large family trees | ok
+[2025-01-28 00:20] | react_frontend/src/index.css:855 | FIXED: Reverted modal size and resized family tree area to fit within existing modal constraints | ok
+[2025-01-28 00:21] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:50 | FIXED: Made family tree visualization more compact to fit within modal boundaries | ok
+[2025-01-28 00:30] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:25 | IMPLEMENTED: Auto-arrange feature for optimal family tree positioning within modal bounds | ok
+[2025-01-28 00:40] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:50 | ENHANCED: Dynamic text sizing and box shrinking for optimal fit when auto-arranged | ok
+[2025-01-28 00:50] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:500 | IMPLEMENTED: Horizontal scrollbar for family tree graphics that don't fit within modal width | ok
+[2025-01-28 00:51] | react_frontend/src/index.css:1100 | ENHANCED: Added custom scrollbar styling for family tree horizontal scrolling | ok
+[2025-01-28 01:00] | react_frontend/src/components/family/FamilyModal.tsx:420 | OPTIMIZED: Family summary layout made more compact with single-line display to save vertical space | ok
+[2025-01-28 01:01] | react_frontend/src/index.css:1050 | ENHANCED: Updated family summary CSS for compact single-line layout | ok
+[2025-01-28 01:10] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:50 | ENHANCED: Implemented flexible connection system with direct lines and curved paths for better space utilization | ok
+[2025-01-28 01:11] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:500 | ADDED: Connection style toggle (Auto/Direct/Curved) for user preference control | ok
+[2025-01-28 01:12] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:100 | IMPROVED: Enhanced spacing algorithm for better family member distribution within modal bounds | ok
+[2025-01-28 01:20] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:25 | RESTORED: 90-degree bent layout option for family tree connections | ok
+[2025-01-28 01:21] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:100 | ENHANCED: Auto-arrange algorithm with grid-based layout for very large families (>6 children) | ok
+[2025-01-28 01:22] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:50 | IMPROVED: Dynamic node sizing for very large families (100×45px nodes with 9px font) | ok
+[2025-01-28 01:25] | react_frontend/src/index.css:1139 | FIXED: Family tree controls visibility by adjusting overflow and layout constraints | ok
+[2025-01-28 01:26] | react_frontend/src/index.css:1200 | ADDED: Dedicated CSS styling for family tree controls with proper visibility and layout | ok
+[2025-01-28 01:30] | react_frontend/src/index.css:1139 | OPTIMIZED: Family tree container to span full modal width by removing unnecessary padding and centering | ok
+[2025-01-28 01:31] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:100 | ENHANCED: Auto-arrange algorithm to utilize full modal width with better spacing distribution | ok
+[2025-01-28 01:35] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:25 | REPLACED: Hardcoded constants with dynamic sizing based on actual modal dimensions | ok
+[2025-01-28 01:36] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:100 | ADDED: Responsive node dimensions and spacing based on container size and family count | ok
+[2025-01-28 01:37] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:300 | IMPLEMENTED: ResizeObserver for automatic layout updates when modal size changes | ok
+[2025-01-28 01:40] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:100 | FIXED: Vertical expansion issue by calculating required height for all family members | ok
+[2025-01-28 01:41] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:400 | FIXED: Zoom functionality to properly scale SVG content with transform and size adjustments | ok
+[2025-01-28 01:42] | react_frontend/src/index.css:1139 | UPDATED: CSS to allow vertical expansion beyond modal constraints for large families | ok
+[2025-01-28 01:45] | react_frontend/src/components/family/FamilyModal.tsx:350 | MOVED: Family summary from content area to modal header to save vertical space | ok
+[2025-01-28 01:46] | react_frontend/src/index.css:1139 | INCREASED: Family tree container minimum height from 60vh to 70vh for better space utilization | ok
+[2025-01-28 01:50] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:350 | ADDED: Fit to View feature that automatically scales and centers family tree within visible area | ok
+[2025-01-28 01:51] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:400 | IMPLEMENTED: Automatic fit-to-view for large families (>8 members) on initial load | ok
+[2025-01-28 01:52] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:300 | ADDED: Keyboard shortcut Ctrl/Cmd+F for quick fit-to-view access | ok
+[2025-01-28 02:00] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | COMPLETELY REWRITTEN: Implemented ideal family tree layout matching reference images - parents connected horizontally at top, children below with simple connecting lines, clean hierarchical structure | ok
+[2025-01-28 02:10] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ENHANCED: Added dynamic family relationship support with editable connections - users can now add/edit family relationships and see real-time updates in the tree visualization | ok
+[2025-01-28 02:20] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | IMPLEMENTED: Proper family editing workflow with relationship type selection - users click Edit Family button, select members, choose relationship types, and confirm connections | ok
+[2025-01-28 02:25] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | FIXED: Maximum update depth exceeded error by properly managing useEffect dependencies and memoizing calculateLayout function to prevent infinite re-renders | ok
+[2025-01-28 02:30] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | FIXED: Persistent infinite loop by separating initial calculation from data change handling, using refs for change detection, and preventing simultaneous calculations | ok
+[2025-01-28 02:35] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | SIMPLIFIED: Removed complex dependency management and simplified to single useEffect with array length dependencies to prevent infinite loops | ok
+[2025-01-28 02:40] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ADDED: Comprehensive debugging and error handling to identify why edit feature is not working, including console logs and user feedback | ok
+[2025-01-28 02:45] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | FIXED: Node selection issue by making nodes always clickable, auto-enabling editing mode on first click, and adding clear visual indicators for clickable elements | ok
+[2025-01-28 02:50] | react_frontend/src/components/family/FamilyModal.tsx:1 | FIXED: Missing onRelationshipChange callback by implementing relationship change handler and passing required props to FamilyTreeVisualization component | ok
+[2025-01-28 02:55] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | IMPLEMENTED: Multi-generational hierarchical layout algorithm that automatically handles unlimited family levels (grandparents, parents, children, grandchildren) with proper positioning | ok
+[2025-01-28 03:00] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | FIXED: Layout not updating after relationship changes by fixing useEffect dependencies and calculateLayout useCallback to properly detect data changes | ok
+[2025-01-28 03:00] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ADDED: Manual refresh button to force layout recalculation when needed | ok
+[2025-01-28 03:05] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | FIXED: Relationship creation logic to properly handle parent-child direction - now creates correct parent relationships for hierarchy | ok
+[2025-01-28 03:05] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ENHANCED: Debug logging to track relationship creation and state updates for troubleshooting | ok

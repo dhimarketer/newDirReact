@@ -46,17 +46,53 @@ export const parseSmartQuery = async (rawQuery: string): Promise<ParsedQuery> =>
     };
   }
 
-  // Split by commas and clean up
+  // Split by commas and preserve empty fields for comma-separated format
   const terms = query
     .split(',')
-    .map(term => term.trim())
-    .filter(term => term.length > 0);
+    .map(term => term.trim());
 
   const filters: Partial<SearchFilters> = {} as any;
   const searchTerms: string[] = [];
   let hasWildcards = false;
   let usedFields = new Set<string>(); // Track which fields we've already used
 
+  // Check if this is a comma-separated format (4 fields: name,address,island,party)
+  const isCommaSeparatedFormat = terms.length === 4 && terms.every(term => term === '' || term.length > 0);
+  
+  if (isCommaSeparatedFormat) {
+    // Handle comma-separated format: name,address,island,party
+    const [nameTerm, addressTerm, islandTerm, partyTerm] = terms;
+    
+    console.log(`🎯 Comma-separated format detected: [${terms.map(t => `"${t}"`).join(', ')}]`);
+    
+    if (nameTerm && nameTerm.trim()) {
+      filters.name = nameTerm.trim();
+      console.log(`   👤 Name: "${nameTerm.trim()}"`);
+    }
+    if (addressTerm && addressTerm.trim()) {
+      filters.address = addressTerm.trim();
+      console.log(`   🏠 Address: "${addressTerm.trim()}"`);
+    }
+    if (islandTerm && islandTerm.trim()) {
+      filters.island = islandTerm.trim();
+      console.log(`   🏝️ Island: "${islandTerm.trim()}"`);
+    }
+    if (partyTerm && partyTerm.trim()) {
+      filters.party = partyTerm.trim();
+      console.log(`   🏛️ Party: "${partyTerm.trim()}"`);
+    }
+    
+    console.log(`   📋 Final filters:`, filters);
+    
+    return {
+      query: rawQuery,
+      filters,
+      hasWildcards: false,
+      searchTerms: []
+    };
+  }
+  
+  // Handle regular smart search format
   for (let index = 0; index < terms.length; index++) {
     const term = terms[index];
     const cleanTerm = term.trim();

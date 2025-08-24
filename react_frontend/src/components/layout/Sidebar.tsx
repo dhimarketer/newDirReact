@@ -1,4 +1,7 @@
 // 2025-01-27: Creating Sidebar component for Phase 2 React frontend
+// 2025-01-27: Updated to use new component utilities and improved styling
+// 2025-01-27: Refactored to use Pico.css for lightweight, responsive, and professional styling
+// 2025-01-27: Simplified positioning logic and improved styling
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -29,7 +32,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ mobile = false }) => {
   const { user, isLoading } = useAuth();
-  const { sidebarOpen, setSidebarOpen, setMobileMenuOpen } = useUI();
+  const { setMobileMenuOpen } = useUI();
   const location = useLocation();
 
   // Don't render navigation until user data is loaded
@@ -83,161 +86,91 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile = false }) => {
 
   if (mobile) {
     return (
-      <div className="relative flex-1 flex flex-col min-h-0 bg-white border-r border-gray-200">
-        <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
-          {/* Close button for mobile */}
-          <div className="flex items-center justify-between px-4 mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Navigation</h2>
-            <button
-              onClick={() => setMobileMenuOpen(false)}
-              className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-            >
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-2 space-y-1">
-            {navigation.map((item) => {
-              const isActive = location.pathname === item.href;
-              const isPremium = item.isPremium;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={handleNavClick}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                    isActive
-                      ? 'bg-primary-100 text-primary-900'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  } ${isPremium ? 'border-l-4 border-purple-500' : ''}`}
-                >
-                  <item.icon
-                    className={`mr-3 h-5 w-5 ${
-                      isActive ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
-                    } ${isPremium ? 'text-purple-500' : ''}`}
-                  />
-                  <span className="flex-1">{item.name}</span>
-                  {isPremium && (
-                    <Crown className="h-4 w-4 text-purple-500" />
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
+      <div className="mobile-sidebar">
+        <div className="mobile-sidebar-header">
+          <h2 className="mobile-sidebar-title">Navigation</h2>
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="mobile-sidebar-close"
+            aria-label="Close mobile menu"
+          >
+            <X className="h-6 w-6" />
+          </button>
         </div>
 
-        {/* User info */}
-        <div className="flex-shrink-0 flex border-t border-gray-200 p-4">
-          <div className="flex items-center">
-            <div className="h-8 w-8 rounded-full bg-primary-500 flex items-center justify-center">
-              <span className="text-sm font-medium text-white">
-                {user?.first_name?.[0] || user?.username?.[0] || 'U'}
-              </span>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-700">
-                {user?.first_name} {user?.last_name}
-              </p>
-              <p className="text-xs text-gray-500">{user?.email}</p>
-              {user?.user_type === 'premium' && (
-                <div className="flex items-center mt-1">
-                  <Crown className="h-3 w-3 text-purple-500 mr-1" />
-                  <span className="text-xs text-purple-600 font-medium">Premium</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <nav className="mobile-sidebar-nav">
+          {navigation.map((item) => {
+            const isActive = location.pathname === item.href;
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                onClick={handleNavClick}
+                className={`mobile-sidebar-item ${isActive ? 'active' : ''}`}
+              >
+                <item.icon
+                  className="mobile-sidebar-icon"
+                  aria-hidden="true"
+                />
+                {item.name}
+                {item.isPremium && (
+                  <Crown className="ml-auto h-4 w-4 text-yellow-500" />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     );
   }
 
   // Desktop sidebar
-  if (!sidebarOpen) {
-    return (
-      <div className="hidden lg:block w-16 bg-white border-r border-gray-200">
-        <div className="flex flex-col items-center py-4">
-          {navigation.map((item) => {
-            const isActive = location.pathname === item.href;
-            const isPremium = item.isPremium;
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`p-3 rounded-md mb-2 relative ${
-                  isActive
-                    ? 'bg-primary-100 text-primary-900'
-                    : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
-                } ${isPremium ? 'border-l-2 border-purple-500' : ''}`}
-                title={item.name}
-              >
-                <item.icon className={`h-6 w-6 ${isPremium ? 'text-purple-500' : ''}`} />
-                {isPremium && (
-                  <Crown className="absolute -top-1 -right-1 h-3 w-3 text-purple-500" />
-                )}
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="hidden lg:block w-64 bg-white border-r border-gray-200">
-      <div className="flex flex-col h-full">
-        <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
-          {/* Navigation */}
-          <nav className="flex-1 px-2 space-y-1">
-            {navigation.map((item) => {
-              const isActive = location.pathname === item.href;
-              const isPremium = item.isPremium;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                    isActive
-                      ? 'bg-primary-100 text-primary-900'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  } ${isPremium ? 'border-l-4 border-purple-500' : ''}`}
-                >
-                  <item.icon
-                    className={`mr-3 h-5 w-5 ${
-                      isActive ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
-                    } ${isPremium ? 'text-purple-500' : ''}`}
-                  />
-                  <span className="flex-1">{item.name}</span>
-                  {isPremium && (
-                    <Crown className="h-4 w-4 text-purple-500" />
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
+    <div className="desktop-sidebar">
+      {/* Logo */}
+      <div className="sidebar-logo">
+        <Link to="/" className="sidebar-logo-link">
+          <div className="sidebar-logo-icon">
+            <span className="sidebar-logo-text">DF</span>
+          </div>
+          <span className="sidebar-logo-title">dirFinal</span>
+        </Link>
+      </div>
 
-        {/* User info */}
-        <div className="flex-shrink-0 flex border-t border-gray-200 p-4">
-          <div className="flex items-center">
-            <div className="h-8 w-8 rounded-full bg-primary-500 flex items-center justify-center">
-              <span className="text-sm font-medium text-white">
-                {user?.first_name?.[0] || user?.username?.[0] || 'U'}
-              </span>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-700">
-                {user?.first_name} {user?.last_name}
-              </p>
-              <p className="text-xs text-gray-500">{user?.email}</p>
-              {user?.user_type === 'premium' && (
-                <div className="flex items-center mt-1">
-                  <Crown className="h-3 w-3 text-purple-500 mr-1" />
-                  <span className="text-xs text-purple-600 font-medium">Premium</span>
-                </div>
+      {/* Navigation */}
+      <nav className="sidebar-nav">
+        {navigation.map((item) => {
+          const isActive = location.pathname === item.href;
+          return (
+            <Link
+              key={item.name}
+              to={item.href}
+              className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+            >
+              <item.icon
+                className="sidebar-nav-icon"
+                aria-hidden="true"
+              />
+              {item.name}
+              {item.isPremium && (
+                <Crown className="ml-auto h-4 w-4 text-yellow-500" />
               )}
-            </div>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* User info at bottom */}
+      <div className="sidebar-user">
+        <div className="sidebar-user-info">
+          <div className="sidebar-user-avatar">
+            <span className="sidebar-user-initial">
+              {user.username?.charAt(0).toUpperCase()}
+            </span>
+          </div>
+          <div className="sidebar-user-details">
+            <p className="sidebar-user-name">{user.username}</p>
+            <p className="sidebar-user-email">{user.email}</p>
           </div>
         </div>
       </div>

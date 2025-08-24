@@ -422,6 +422,8 @@ class UserViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Directory Management Views
+from .utils import create_wildcard_query, process_wildcard_filters
+
 class PhoneBookEntryViewSet(viewsets.ModelViewSet):
     """Phonebook entry management viewset"""
     queryset = PhoneBookEntry.objects.all()
@@ -507,12 +509,7 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                 address_term = data['address'].strip()
                 island_term = data['island'].strip()
                 
-                # Pad terms with wildcards for more flexible matching
-                # This helps catch partial matches within longer text
-                padded_address_term = f"*{address_term}*"
-                padded_island_term = f"*{island_term}*"
-                
-                print(f"Searching for address term: '{address_term}' (padded: '{padded_address_term}') AND island term: '{island_term}' (padded: '{padded_island_term}')")
+                print(f"Searching for address term: '{address_term}' AND island term: '{island_term}'")
                 print(f"First trying AND logic for precise results...")
                 
                 # Debug: Check what exists in the database for these terms
@@ -534,17 +531,17 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                         print(f"  - {entry.name}: address='{entry.address}', island='{entry.island}'")
                 
                 # First try: Use AND logic for precise results (narrow scope)
-                # For family searches, use exact matching; otherwise use partial matching
+                # For family searches, use exact matching; otherwise use wildcard-aware matching
                 if is_family_search:
                     print("Using exact matching for family search")
                     precise_queryset = queryset.filter(
                         Q(address__iexact=address_term) & Q(island__iexact=island_term)
                     )
                 else:
-                    # Using padded terms for more flexible matching
-                    precise_queryset = queryset.filter(
-                        Q(address__icontains=address_term) & Q(island__icontains=island_term)
-                    )
+                    # Use wildcard-aware matching for flexible search
+                    address_query = create_wildcard_query('address', address_term)
+                    island_query = create_wildcard_query('island', island_term)
+                    precise_queryset = queryset.filter(address_query & island_query)
                 
                 print(f"Results after AND logic (precise): {precise_queryset.count()}")
                 
@@ -557,8 +554,7 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                     print("No precise results found, trying OR logic for broader results...")
                     
                     broader_queryset = queryset.filter(
-                        Q(address__icontains=address_term) |
-                        Q(island__icontains=island_term)
+                        address_query | island_query
                     )
                     
                     print(f"Results after OR logic (broader): {broader_queryset.count()}")
@@ -611,9 +607,9 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                         print(f"  - {entry.name}: address='{entry.address}', party='{entry.party}'")
                 
                 # First try: Use AND logic for precise results (narrow scope)
-                precise_queryset = queryset.filter(
-                    Q(address__icontains=address_term) & Q(party__icontains=party_term)
-                )
+                address_query = create_wildcard_query('address', address_term)
+                party_query = create_wildcard_query('party', party_term)
+                precise_queryset = queryset.filter(address_query & party_query)
                 
                 print(f"Results after AND logic (precise): {precise_queryset.count()}")
                 
@@ -626,8 +622,7 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                     print("No precise results found, trying OR logic for broader results...")
                     
                     broader_queryset = queryset.filter(
-                        Q(address__icontains=address_term) |
-                        Q(party__icontains=party_term)
+                        address_query | party_query
                     )
                     
                     print(f"Results after OR logic (broader): {broader_queryset.count()}")
@@ -660,9 +655,9 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                 print(f"Database check - Entries with party containing '{party_term}': {PhoneBookEntry.objects.filter(party__icontains=party_term).count()}")
                 
                 # First try: Use AND logic for precise results (narrow scope)
-                precise_queryset = queryset.filter(
-                    Q(name__icontains=name_term) & Q(party__icontains=party_term)
-                )
+                name_query = create_wildcard_query('name', name_term)
+                party_query = create_wildcard_query('party', party_term)
+                precise_queryset = queryset.filter(name_query & party_query)
                 
                 print(f"Results after AND logic (precise): {precise_queryset.count()}")
                 
@@ -675,8 +670,7 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                     print("No precise results found, trying OR logic for broader results...")
                     
                     broader_queryset = queryset.filter(
-                        Q(name__icontains=name_term) |
-                        Q(party__icontains=party_term)
+                        name_query | party_query
                     )
                     
                     print(f"Results after OR logic (broader): {broader_queryset.count()}")
@@ -709,9 +703,9 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                 print(f"Database check - Entries with party containing '{party_term}': {PhoneBookEntry.objects.filter(party__icontains=party_term).count()}")
                 
                 # First try: Use AND logic for precise results (narrow scope)
-                precise_queryset = queryset.filter(
-                    Q(island__icontains=island_term) & Q(party__icontains=party_term)
-                )
+                island_query = create_wildcard_query('island', island_term)
+                party_query = create_wildcard_query('party', party_term)
+                precise_queryset = queryset.filter(island_query & party_query)
                 
                 print(f"Results after AND logic (precise): {precise_queryset.count()}")
                 
@@ -724,8 +718,7 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                     print("No precise results found, trying OR logic for broader results...")
                     
                     broader_queryset = queryset.filter(
-                        Q(island__icontains=island_term) |
-                        Q(party__icontains=party_term)
+                        island_query | party_query
                     )
                     
                     print(f"Results after OR logic (broader): {broader_queryset.count()}")
@@ -753,22 +746,26 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                     else:
                         # Shorter numeric - could be NID or phone number
                         print(f"Query '{query}' is numeric - searching in contact and NID fields")
+                        contact_query = create_wildcard_query('contact', query)
+                        nid_query = create_wildcard_query('nid', query)
                         queryset = queryset.filter(
-                            Q(contact__icontains=query) |
-                            Q(nid__icontains=query)
+                            contact_query | nid_query
                         )
                 elif query.upper() in ['AP', 'MDP', 'PPM', 'JP', 'MNP', 'ADH', 'PJP']:
                     # Political party abbreviation
                     print(f"Query '{query}' appears to be a political party")
-                    queryset = queryset.filter(party__icontains=query)
+                    party_query = create_wildcard_query('party', query)
+                    queryset = queryset.filter(party_query)
                 elif query.upper() in ['MALE', 'FEMALE', 'M', 'F']:
                     # Gender
                     print(f"Query '{query}' appears to be gender")
-                    queryset = queryset.filter(gender__icontains=query)
+                    gender_query = create_wildcard_query('gender', query)
+                    queryset = queryset.filter(gender_query)
                 elif len(query) <= 3 and query.upper() in ['M', 'F', 'S', 'N', 'L', 'B', 'AA', 'ADH', 'HDH', 'TH', 'V', 'HA', 'R']:
                     # Atoll abbreviation
                     print(f"Query '{query}' appears to be an atoll code")
-                    queryset = queryset.filter(atoll__icontains=query)
+                    atoll_query = create_wildcard_query('atoll', query)
+                    queryset = queryset.filter(atoll_query)
                 else:
                     # Enhanced text query analysis for better field detection
                     print(f"Query '{query}' appears to be text - analyzing for specific field types")
@@ -795,22 +792,27 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                     # Apply smart field-specific search based on analysis
                     if is_likely_address:
                         print(f"Query '{query}' detected as address - searching in address field")
-                        queryset = queryset.filter(address__icontains=query)
+                        address_query = create_wildcard_query('address', query)
+                        queryset = queryset.filter(address_query)
                     elif is_likely_island:
                         print(f"Query '{query}' detected as island - searching in island field")
-                        queryset = queryset.filter(island__icontains=query)
+                        island_query = create_wildcard_query('island', query)
+                        queryset = queryset.filter(island_query)
                     elif is_likely_profession:
                         print(f"Query '{query}' detected as profession - searching in profession field")
-                        queryset = queryset.filter(profession__icontains=query)
+                        profession_query = create_wildcard_query('profession', query)
+                        queryset = queryset.filter(profession_query)
                     else:
                         # Default to comprehensive search across multiple fields
                         print(f"Query '{query}' - performing comprehensive search across name, address, island, profession, remark")
+                        # Use wildcard-aware queries for comprehensive search
+                        name_query = create_wildcard_query('name', query)
+                        address_query = create_wildcard_query('address', query)
+                        island_query = create_wildcard_query('island', query)
+                        profession_query = create_wildcard_query('profession', query)
+                        remark_query = create_wildcard_query('remark', query)
                         queryset = queryset.filter(
-                            Q(name__icontains=query) |
-                            Q(address__icontains=query) |
-                            Q(island__icontains=query) |
-                            Q(profession__icontains=query) |
-                            Q(remark__icontains=query)
+                            name_query | address_query | island_query | profession_query | remark_query
                         )
                 
                 print(f"Results after general query search: {queryset.count()}")
@@ -821,47 +823,58 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                 
                 if has_name_filter:
                     print(f"Filtering by name: '{data['name']}'")
-                    queryset = queryset.filter(name__icontains=data['name'])
+                    name_query = create_wildcard_query('name', data['name'])
+                    queryset = queryset.filter(name_query)
                 
                 if has_contact_filter:
                     print(f"Filtering by contact: '{data['contact']}'")
-                    queryset = queryset.filter(contact__icontains=data['contact'])
+                    contact_query = create_wildcard_query('contact', data['contact'])
+                    queryset = queryset.filter(contact_query)
                 
                 if has_nid_filter:
                     print(f"Filtering by NID: '{data['nid']}'")
-                    queryset = queryset.filter(nid__icontains=data['nid'])
+                    nid_query = create_wildcard_query('nid', data['nid'])
+                    queryset = queryset.filter(nid_query)
                 
                 if has_address_filter:
                     print(f"Filtering by address: '{data['address']}'")
-                    queryset = queryset.filter(address__icontains=data['address'])
+                    address_query = create_wildcard_query('address', data['address'])
+                    queryset = queryset.filter(address_query)
                 
                 if has_atoll_filter:
                     print(f"Filtering by atoll: '{data['atoll']}'")
-                    queryset = queryset.filter(atoll__icontains=data['atoll'])
+                    atoll_query = create_wildcard_query('atoll', data['atoll'])
+                    queryset = queryset.filter(atoll_query)
                 
                 if has_island_filter:
                     print(f"Filtering by island: '{data['island']}'")
-                    queryset = queryset.filter(island__icontains=data['island'])
+                    island_query = create_wildcard_query('island', data['island'])
+                    queryset = queryset.filter(island_query)
                 
                 if has_party_filter:
                     print(f"Filtering by party: '{data['party']}'")
-                    queryset = queryset.filter(party__icontains=data['party'])
+                    party_query = create_wildcard_query('party', data['party'])
+                    queryset = queryset.filter(party_query)
                 
                 if has_profession_filter:
                     print(f"Filtering by profession: '{data['profession']}'")
-                    queryset = queryset.filter(profession__icontains=data['profession'])
+                    profession_query = create_wildcard_query('profession', data['profession'])
+                    queryset = queryset.filter(profession_query)
                 
                 if has_gender_filter:
                     print(f"Filtering by gender: '{data['gender']}'")
-                    queryset = queryset.filter(gender__icontains=data['gender'])
+                    gender_query = create_wildcard_query('gender', data['gender'])
+                    queryset = queryset.filter(gender_query)
                 
                 if has_remark_filter:
                     print(f"Filtering by remark: '{data['remark']}'")
-                    queryset = queryset.filter(remark__icontains=data['remark'])
+                    remark_query = create_wildcard_query('remark', data['remark'])
+                    queryset = queryset.filter(remark_query)
                 
                 if has_pep_status_filter:
                     print(f"Filtering by PEP status: '{data['pep_status']}'")
-                    queryset = queryset.filter(pep_status__icontains=data['pep_status'])
+                    pep_status_query = create_wildcard_query('pep_status', data['pep_status'])
+                    queryset = queryset.filter(pep_status_query)
                 
                 if has_min_age_filter:
                     print(f"Filtering by minimum age: {data['min_age']}")
@@ -1086,30 +1099,36 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             
             # Apply search filters
             if query:
+                # Use wildcard-aware queries for comprehensive search
+                name_query = create_wildcard_query('name', query)
+                contact_query = create_wildcard_query('contact', query)
+                nid_query = create_wildcard_query('nid', query)
+                address_query = create_wildcard_query('address', query)
+                party_query = create_wildcard_query('party', query)
+                profession_query = create_wildcard_query('profession', query)
+                remark_query = create_wildcard_query('remark', query)
                 queryset = queryset.filter(
-                    Q(name__icontains=query) |
-                    Q(contact__icontains=query) |
-                    Q(nid__icontains=query) |
-                    Q(address__icontains=query) |
-                    Q(party__icontains=query) |
-                    Q(profession__icontains=query) |
-                    Q(remark__icontains=query)
+                    name_query | contact_query | nid_query | address_query | party_query | profession_query | remark_query
                 )
             
             if atoll:
-                queryset = queryset.filter(atoll__icontains=atoll)
+                atoll_query = create_wildcard_query('atoll', atoll)
+                queryset = queryset.filter(atoll_query)
             
             if island:
-                queryset = queryset.filter(island__icontains=island)
+                island_query = create_wildcard_query('island', island)
+                queryset = queryset.filter(island_query)
             
             if party:
                 print(f"Filtering by party: '{party}'")
-                party_filtered = queryset.filter(party__icontains=party)
+                party_query = create_wildcard_query('party', party)
+                party_filtered = queryset.filter(party_query)
                 print(f"Entries with party '{party}': {party_filtered.count()}")
                 queryset = party_filtered
             
             if profession:
-                queryset = queryset.filter(profession__icontains=profession)
+                profession_query = create_wildcard_query('profession', profession)
+                queryset = queryset.filter(profession_query)
             
             # Pagination
             page = int(request.query_params.get('page', 1))

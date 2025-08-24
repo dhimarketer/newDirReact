@@ -10,6 +10,9 @@ class FamilyGroup(models.Model):
     """
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
+    # 2025-01-27: Added address and island fields to link family groups to specific locations
+    address = models.CharField(max_length=255, null=True, blank=True, help_text="Address where this family lives")
+    island = models.CharField(max_length=255, null=True, blank=True, help_text="Island where this family lives")
     is_public = models.BooleanField(default=False, help_text="Whether this family group is visible to all users")
     created_by = models.ForeignKey('dirReactFinal_core.User', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -19,6 +22,8 @@ class FamilyGroup(models.Model):
         db_table = 'family_groups'
         verbose_name = 'Family Group'
         verbose_name_plural = 'Family Groups'
+        # 2025-01-27: Added unique constraint for address+island combination to prevent duplicates
+        unique_together = [['address', 'island']]
     
     def __str__(self):
         return self.name
@@ -26,6 +31,14 @@ class FamilyGroup(models.Model):
     def get_member_count(self):
         """Get the number of members in this family group"""
         return self.members.count()
+    
+    @classmethod
+    def get_by_address(cls, address, island):
+        """Get family group by address and island"""
+        try:
+            return cls.objects.get(address=address, island=island)
+        except cls.DoesNotExist:
+            return None
 
 class FamilyRelationship(models.Model):
     """

@@ -16,6 +16,7 @@ from .serializers import (
     FamilyGroupDetailSerializer,
     FamilyMemberDetailSerializer
 )
+from dirReactFinal_directory.models import PhoneBookEntry
 
 User = get_user_model()
 
@@ -113,6 +114,112 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
         }
         
         return Response(stats)
+    
+    @action(detail=False, methods=['get'])
+    def by_address(self, request):
+        """Get family group by address and island"""
+        address = request.query_params.get('address')
+        island = request.query_params.get('island')
+        
+        if not address or not island:
+            return Response(
+                {'error': 'Both address and island parameters are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            family_group = FamilyGroup.get_by_address(address, island)
+            if family_group:
+                serializer = self.get_serializer(family_group)
+                return Response(serializer.data)
+            else:
+                return Response({'error': 'No family group found for this address'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'])
+    def create_or_update_by_address(self, request):
+        """Create or update family group by address and island"""
+        address = request.data.get('address')
+        island = request.data.get('island')
+        members = request.data.get('members', [])
+        relationships = request.data.get('relationships', [])
+        
+        if not address or not island:
+            return Response(
+                {'error': 'Both address and island are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Try to get existing family group
+            family_group = FamilyGroup.get_by_address(address, island)
+            
+            if family_group:
+                # Update existing family group
+                if family_group.created_by != request.user and not request.user.is_staff:
+                    return Response(
+                        {'error': 'Only the creator or admins can update this family group'}, 
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+                
+                # Update members and relationships
+                family_group.members.all().delete()
+                family_group.relationships.all().delete()
+            else:
+                # Create new family group
+                family_group = FamilyGroup.objects.create(
+                    name=f"Family at {address}",
+                    description=f"Family from {address}, {island}",
+                    address=address,
+                    island=island,
+                    created_by=request.user
+                )
+            
+            # Add members
+            for member_data in members:
+                entry_id = member_data.get('entry_id')
+                role = member_data.get('role', 'member')
+                
+                if entry_id:
+                    try:
+                        # 2025-01-28: Fixed to use pid field instead of id for PhoneBookEntry
+                        entry = PhoneBookEntry.objects.get(pid=entry_id)
+                        FamilyMember.objects.create(
+                            entry=entry,
+                            family_group=family_group,
+                            role_in_family=role
+                        )
+                    except PhoneBookEntry.DoesNotExist:
+                        continue
+            
+            # Add relationships
+            for rel_data in relationships:
+                person1_id = rel_data.get('person1_id')
+                person2_id = rel_data.get('person2_id')
+                rel_type = rel_data.get('relationship_type')
+                notes = rel_data.get('notes', '')
+                
+                if person1_id and person2_id and rel_type:
+                    try:
+                        # 2025-01-28: Fixed to use pid field instead of id for PhoneBookEntry
+                        person1 = PhoneBookEntry.objects.get(pid=person1_id)
+                        person2 = PhoneBookEntry.objects.get(pid=person2_id)
+                        FamilyRelationship.objects.create(
+                            person1=person1,
+                            person2=person2,
+                            relationship_type=rel_type,
+                            notes=notes,
+                            family_group=family_group
+                        )
+                    except PhoneBookEntry.DoesNotExist:
+                        continue
+            
+            serializer = self.get_serializer(family_group)
+            return Response(serializer.data, status=status.HTTP_200_OK if family_group else status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class FamilyMemberViewSet(viewsets.ModelViewSet):
     """

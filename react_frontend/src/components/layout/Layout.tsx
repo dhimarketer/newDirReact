@@ -1,4 +1,7 @@
 // 2025-01-27: Creating simplified Layout component to reduce errors
+// 2025-01-27: Updated to use new styling approach and improved layout structure
+// 2025-01-27: Refactored to use Pico.css for lightweight, responsive, and professional styling
+// 2025-01-27: Fixed sidebar positioning and layout overlap issues
 
 import React from 'react';
 import { Outlet } from 'react-router-dom';
@@ -13,7 +16,7 @@ const Layout: React.FC = () => {
   const { sidebarOpen } = useUI();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="app-container">
       {/* Header */}
       <Header />
       
@@ -21,22 +24,26 @@ const Layout: React.FC = () => {
       <MobileMenu />
       
       {/* Main Content with Sidebar */}
-      <div className="flex">
+      <div className="layout-container">
         {/* Sidebar */}
-        <Sidebar />
+        <aside className={`sidebar-container ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+          <Sidebar />
+        </aside>
         
         {/* Main Content Area */}
-        <div className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'}`}>
-          <main className="p-4">
+        <main className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+          <div className="content-wrapper">
             {/* Breadcrumb Navigation */}
-            <div className="mb-4">
+            <nav className="mb-3" aria-label="Breadcrumb">
               <Breadcrumb />
-            </div>
+            </nav>
             
             {/* Page Content */}
-            <Outlet />
-          </main>
-        </div>
+            <article className="fade-in">
+              <Outlet />
+            </article>
+          </div>
+        </main>
       </div>
       
       {/* Floating Action Button for Mobile */}

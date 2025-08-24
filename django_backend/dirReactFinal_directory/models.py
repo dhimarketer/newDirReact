@@ -91,7 +91,7 @@ class Image(models.Model):
         verbose_name_plural = 'Contact Images'
     
     def __str__(self):
-        return f"Image for entry {self.entry.id}"
+        return f"Image for entry {self.entry.pid}"
     
     def delete(self, *args, **kwargs):
         """Override delete to remove image file from storage"""

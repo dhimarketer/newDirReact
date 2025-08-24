@@ -23,6 +23,10 @@ urlpatterns = [
     
     # Include the nested router URLs
     path('', include(family_groups_router.urls)),
+    
+    # 2025-01-27: Added custom actions for address-based family lookup and updates
+    path('groups/by_address/', FamilyGroupViewSet.as_view({'get': 'by_address'}), name='family-by-address'),
+    path('groups/create_or_update_by_address/', FamilyGroupViewSet.as_view({'post': 'create_or_update_by_address'}), name='family-create-or-update-by-address'),
 ]
 
 # The resulting URL patterns will be:
