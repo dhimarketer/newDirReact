@@ -1,12 +1,16 @@
 // 2025-01-27: Family modal component for showing family relationships when clicking on addresses
 // 2025-01-27: Refactored to use Pico.css for lightweight, responsive, and professional styling
 // 2025-01-27: Fixed styling issues to ensure graphics display properly
+// 2025-01-28: ENHANCED: Added multi-generational family tree support by fetching existing relationships
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { PhoneBookEntry } from '../../types/directory';
 import FamilyTreeVisualization from './FamilyTreeVisualization';
 import FamilyTreeEditor from './FamilyTreeEditor';
+import { STORAGE_KEYS } from '../../utils/constants';
+import { useAuthStore } from '../../store/authStore';
+import { familyService } from '../../services/familyService';
 
 interface FamilyModalProps {
   isOpen: boolean;
@@ -21,23 +25,88 @@ interface FamilyMember {
   relationship?: string;
 }
 
+// 2025-01-28: Added interface for family relationships to match backend structure
+interface FamilyRelationship {
+  id: number;
+  person1: number; // pid of first person
+  person2: number; // pid of second person
+  relationship_type: 'parent' | 'child' | 'spouse' | 'sibling' | 'grandparent' | 'grandchild' | 'aunt_uncle' | 'niece_nephew' | 'cousin' | 'other';
+  notes?: string;
+  is_active: boolean;
+}
+
 const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, island }) => {
+  const { user } = useAuthStore();
+  
+  // 2025-01-28: DEBUG: Log initial state
+  console.log('FamilyModal initial render:', { 
+    user, 
+    userType: user?.user_type,
+    isStaff: user?.is_staff,
+    isSuperuser: user?.is_superuser
+  });
+  
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
-  const [familyRelationships, setFamilyRelationships] = useState<any[]>([]);
+  const [familyRelationships, setFamilyRelationships] = useState<FamilyRelationship[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingRelationships, setIsLoadingRelationships] = useState(false); // 2025-01-28: Added loading state for relationships
   const [error, setError] = useState<string | null>(null);
   // 2025-01-27: Added state for family tree editor functionality
   const [showFamilyTreeEditor, setShowFamilyTreeEditor] = useState(false);
   const [hasCustomFamily, setHasCustomFamily] = useState(false);
+  const [familyGroupId, setFamilyGroupId] = useState<number | null>(null);
+  
+  // Check if user is admin
+  const isAdmin = user?.is_staff || user?.is_superuser || user?.user_type === 'admin';
+  
+  // 2025-01-28: DEBUG: Log user and admin status
+  console.log('FamilyModal user debug:', { 
+    user, 
+    isAdmin, 
+    is_staff: user?.is_staff, 
+    is_superuser: user?.is_superuser, 
+    user_type: user?.user_type 
+  });
+  
+  // 2025-01-28: Wait for user data to be loaded before showing admin features
+  const isUserLoaded = !!user;
 
   useEffect(() => {
     console.log('FamilyModal useEffect:', { isOpen, address, island });
     if (isOpen && address && island) {
       fetchFamilyMembers();
-      // 2025-01-27: Check for existing custom family data
+      // 2025-01-28: ENHANCED: Check for existing custom family data and load relationships
+      console.log('Calling checkForCustomFamily...');
       checkForCustomFamily();
     }
   }, [isOpen, address, island]);
+
+  // 2025-01-28: DEBUG: Monitor relationships state changes
+  useEffect(() => {
+    console.log('FamilyModal relationships state changed:', {
+      relationshipsCount: familyRelationships.length,
+      relationships: familyRelationships,
+      isLoadingRelationships,
+      hasCustomFamily,
+      familyGroupId
+    });
+  }, [familyRelationships, isLoadingRelationships, hasCustomFamily, familyGroupId]);
+  
+  // 2025-01-28: DEBUG: Monitor hasCustomFamily state changes specifically
+  useEffect(() => {
+    console.log('FamilyModal hasCustomFamily state changed:', hasCustomFamily);
+  }, [hasCustomFamily]);
+  
+  // 2025-01-28: DEBUG: Monitor user state changes
+  useEffect(() => {
+    console.log('FamilyModal user state changed:', { 
+      user, 
+      isAdmin, 
+      is_staff: user?.is_staff, 
+      is_superuser: user?.is_superuser, 
+      user_type: user?.user_type 
+    });
+  }, [user, isAdmin]);
 
   const fetchFamilyMembers = async () => {
     setIsLoading(true);
@@ -229,7 +298,7 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)}`
         },
         body: JSON.stringify({
           name: `${address} Family`,
@@ -251,27 +320,267 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
     }
   };
 
-  // 2025-01-28: Handle family relationship changes
-  const handleRelationshipChange = async (relationships: any[]) => {
+  // 2025-01-28: ENHANCED: Function to save relationships to a family group
+  const saveRelationshipsToFamilyGroup = async (familyGroupId: number, relationships: FamilyRelationship[]) => {
     try {
-      console.log('Family relationships changed:', relationships);
+      console.log('Saving relationships to family group:', familyGroupId, relationships);
       
-      // 2025-01-28: Update local state with new relationships
-      setFamilyRelationships(relationships);
+      const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
       
-      // 2025-01-28: Force a re-render by updating state
-      console.log('Updated familyRelationships state:', relationships);
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       
-      // 2025-01-28: For now, just log the changes
-      // TODO: Implement actual relationship saving to backend
-      console.log('New relationships to save:', relationships);
+      // 2025-01-28: Save each relationship using the correct nested endpoint
+      for (const rel of relationships) {
+        console.log('Saving relationship:', rel);
+        
+        // 2025-01-28: Use the correct nested endpoint for family relationships
+        // 2025-01-28: FIXED: Backend automatically sets family_group from URL parameter, don't send in body
+        const response = await fetch(`/api/family/groups/${familyGroupId}/relationships/`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            person1: rel.person1,
+            person2: rel.person2,
+            relationship_type: rel.relationship_type,
+            notes: rel.notes || '',
+            is_active: rel.is_active
+          })
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to save relationship:', rel, response.status, errorText);
+          throw new Error(`Failed to save relationship: ${response.status} ${errorText}`);
+        } else {
+          console.log('Relationship saved successfully:', rel);
+        }
+      }
       
-      // 2025-01-28: Show success message
-      alert('Family relationships updated successfully! (Note: Changes are currently logged but not saved to database)');
+      console.log('All relationships saved successfully');
+    } catch (error) {
+      console.error('Error saving relationships:', error);
+      throw error;
+    }
+  };
+
+  // 2025-01-28: ENHANCED: Function to fetch existing family relationships
+  const fetchFamilyRelationships = async (familyGroupId: number) => {
+    try {
+      console.log('Fetching family relationships for group:', familyGroupId);
+      setIsLoadingRelationships(true); // 2025-01-28: Set loading state
+      
+      const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`/api/family/groups/${familyGroupId}/relationships/`, {
+        headers
+      });
+      
+      if (response.ok) {
+        const relationshipsData = await response.json();
+        console.log('Fetched family relationships:', relationshipsData);
+        
+        // 2025-01-28: Transform backend data to match frontend interface
+        // 2025-01-28: FIXED: Handle paginated response structure - use results array
+        const relationshipsArray = relationshipsData.results || relationshipsData;
+        console.log('Raw relationships data:', relationshipsData);
+        console.log('Relationships array to process:', relationshipsArray);
+        
+        const transformedRelationships: FamilyRelationship[] = relationshipsArray.map((rel: any) => ({
+          id: rel.id,
+          person1: rel.person1,
+          person2: rel.person2,
+          relationship_type: rel.relationship_type,
+          notes: rel.notes,
+          is_active: rel.is_active
+        }));
+        
+        console.log('Transformed relationships:', transformedRelationships);
+        console.log('Relationship validation:', transformedRelationships.map(r => ({
+          id: r.id,
+          person1: r.person1,
+          person2: r.person2,
+          type: r.relationship_type,
+          active: r.is_active,
+          valid: r.id && r.person1 && r.person2 && r.relationship_type
+        })));
+        
+        setFamilyRelationships(transformedRelationships);
+      } else {
+        console.log('Failed to fetch relationships:', response.status);
+        setFamilyRelationships([]);
+      }
+    } catch (error) {
+      console.error('Error fetching family relationships:', error);
+      setFamilyRelationships([]);
+    } finally {
+      setIsLoadingRelationships(false); // 2025-01-28: Clear loading state
+    }
+  };
+
+  // 2025-01-28: ENHANCED: Function to handle relationship changes from FamilyTreeVisualization
+  // 2025-01-28: FIXED: Added backend refresh after saving to ensure SVG updates properly
+  // 2025-01-28: CRITICAL: Now saves both family members and relationships to ensure complete family persistence
+  const handleRelationshipChange = async (newRelationships: FamilyRelationship[]) => {
+    console.log('Relationship change requested:', newRelationships);
+    
+    // 2025-01-28: DEBUG: Check token state before and after relationship change
+    const tokenBefore = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    console.log('Token state before relationship change:', {
+      exists: !!tokenBefore,
+      length: tokenBefore?.length,
+      preview: tokenBefore ? `${tokenBefore.substring(0, 20)}...` : 'none'
+    });
+    
+    try {
+      // 2025-01-28: Update local state immediately for responsive UI
+      setFamilyRelationships(newRelationships);
+      
+      // 2025-01-28: If we have a family group, update the backend
+      if (hasCustomFamily) {
+        console.log('Updating existing family group with new relationships');
+        
+        try {
+          // 2025-01-28: Update the existing family group with both members and relationships
+          if (familyGroupId) {
+            const response = await fetch('/api/family/groups/create_or_update_by_address/', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)}`
+              },
+              body: JSON.stringify({
+                address: address,
+                island: island,
+                members: familyMembers.map(member => ({
+                  entry_id: member.entry.pid,
+                  role: member.role
+                })),
+                relationships: newRelationships.map(rel => ({
+                  person1_id: rel.person1,
+                  person2_id: rel.person2,
+                  relationship_type: rel.relationship_type,
+                  notes: rel.notes || ''
+                }))
+              })
+            });
+            
+            if (response.ok) {
+              console.log('Family group updated successfully with members and relationships');
+              
+              // 2025-01-28: CRITICAL: Refresh relationships from backend to ensure state consistency
+              console.log('Refreshing relationships from backend after save...');
+              await fetchFamilyRelationships(familyGroupId);
+              
+              alert('Family relationships updated and saved successfully!');
+            } else {
+              const errorData = await response.json();
+              throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+            }
+          } else {
+            console.error('No family group ID available');
+            alert('Error: Family group ID not found. Changes will not be persisted.');
+          }
+        } catch (error) {
+          console.error('Failed to save relationships to existing family group:', error);
+          alert('Failed to save relationships. Changes will not be persisted.');
+        }
+      } else {
+        console.log('No existing family group - creating one to persist relationships');
+        
+        // 2025-01-28: Create a new family group to persist the relationships
+        try {
+          const response = await fetch('/api/family/groups/create_or_update_by_address/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)}`
+            },
+            body: JSON.stringify({
+              address: address,
+              island: island,
+              members: familyMembers.map(member => ({
+                entry_id: member.entry.pid,
+                role: member.role
+              })),
+              relationships: newRelationships.map(rel => ({
+                person1_id: rel.person1,
+                person2_id: rel.person2,
+                relationship_type: rel.relationship_type,
+                notes: rel.notes || ''
+              }))
+            })
+          });
+          
+          if (response.ok) {
+            const familyGroup = await response.json();
+            console.log('Family group created successfully:', familyGroup);
+            setHasCustomFamily(true);
+            setFamilyGroupId(familyGroup.id); // 2025-01-28: Store the new family group ID
+            
+            // 2025-01-28: CRITICAL: Refresh relationships from backend to ensure state consistency
+            console.log('Refreshing relationships from backend after creating new family group...');
+            await fetchFamilyRelationships(familyGroup.id);
+            
+            // 2025-01-28: CRITICAL: Ensure relationships are still set after saving
+            console.log('After saving relationships, current familyRelationships state:', familyRelationships);
+            console.log('Re-asserting relationships to prevent loss:', newRelationships);
+            setFamilyRelationships(newRelationships);
+            
+            alert('Family group created and relationships saved successfully!');
+          } else {
+            console.error('Failed to create family group:', response.status);
+            alert('Failed to create family group. Relationships will not be persisted.');
+          }
+        } catch (error) {
+          console.error('Error creating family group:', error);
+          alert('Error creating family group. Relationships will not be persisted.');
+        }
+      }
+      
+      // 2025-01-28: DEBUG: Check token state after relationship change
+      const tokenAfter = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      console.log('Token state after relationship change:', {
+        exists: !!tokenAfter,
+        length: tokenAfter?.length,
+        preview: tokenAfter ? `${tokenAfter.substring(0, 20)}...` : 'none',
+        changed: tokenBefore !== tokenAfter
+      });
+      
+      // 2025-01-28: DEBUG: Test API call immediately after relationship change
+      if (tokenAfter) {
+        console.log('Testing API call immediately after relationship change...');
+        try {
+          const testResponse = await fetch('/api/family/groups/by_address/?address=test&island=test', {
+            headers: {
+              'Authorization': `Bearer ${tokenAfter}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          console.log('Test API call result:', {
+            status: testResponse.status,
+            ok: testResponse.ok,
+            statusText: testResponse.statusText
+          });
+        } catch (testError) {
+          console.error('Test API call failed:', testError);
+        }
+      }
       
     } catch (error) {
-      console.error('Error updating family relationships:', error);
-      alert(`Error updating family relationships: ${error}`);
+      console.error('Error updating relationships:', error);
+      alert('Error updating family relationships. Please try again.');
     }
   };
 
@@ -284,7 +593,7 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)}`
         },
         body: JSON.stringify({
           address: address,
@@ -318,38 +627,85 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
     }
   };
 
-  // 2025-01-27: Added function to check for existing custom family data
+  // 2025-01-28: ENHANCED: Function to check for existing custom family data and load relationships
   const checkForCustomFamily = async () => {
     try {
       console.log('Checking for existing custom family at:', address, island);
       
-      const token = localStorage.getItem('token');
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json'
-      };
+      const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      console.log('Authentication check - Token exists:', !!token, 'Token length:', token?.length);
       
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      // 2025-01-28: Only check for custom family if user is authenticated
+      if (!token) {
+        console.log('User not authenticated, skipping custom family check - will use basic family detection');
+        setHasCustomFamily(false);
+        return;
       }
       
-      const response = await fetch(`/api/family/groups/by_address/?address=${encodeURIComponent(address)}&island=${encodeURIComponent(island)}`, {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+      
+      // 2025-01-28: Fix URL encoding issue - the island has a space that needs proper encoding
+      const apiUrl = `/api/family/groups/by_address/?address=${encodeURIComponent(address)}&island=${encodeURIComponent(island)}`;
+      console.log('Making API request to:', apiUrl);
+      console.log('Request headers:', headers);
+      console.log('Raw address:', address, 'Raw island:', island);
+      console.log('Encoded address:', encodeURIComponent(address), 'Encoded island:', encodeURIComponent(island));
+      
+      const response = await fetch(apiUrl, {
         headers
       });
+      
+      console.log('API response status:', response.status);
+      console.log('API response headers:', Object.fromEntries(response.headers.entries()));
+      
+      // 2025-01-28: DEBUG: If we get a 401, let's see the full response
+      if (response.status === 401) {
+        try {
+          const errorData = await response.text();
+          console.log('401 Error response body:', errorData);
+          
+          // 2025-01-28: Check if token is still valid by testing a simple endpoint
+          console.log('Testing token validity with simple endpoint...');
+          const testResponse = await fetch('/api/family/groups/', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          console.log('Token validity test result:', {
+            status: testResponse.status,
+            ok: testResponse.ok
+          });
+        } catch (error) {
+          console.error('Error reading 401 response:', error);
+        }
+      }
       
       if (response.ok) {
         const familyData = await response.json();
         console.log('Found existing custom family:', familyData);
         setHasCustomFamily(true);
+        console.log('2025-01-28: DEBUG: Set hasCustomFamily to true');
+        setFamilyGroupId(familyData.id); // 2025-01-28: Store the family group ID
         
-        // If we have custom family data, we should load it instead of auto-detecting
-        // For now, just mark that we have custom data
-        console.log('Custom family exists, will show updated relationships when available');
+        // 2025-01-28: ENHANCED: Load existing family relationships for multi-generational display
+        if (familyData.id) {
+          console.log('Loading existing family relationships for group:', familyData.id);
+          await fetchFamilyRelationships(familyData.id);
+        }
+        
+        console.log('Custom family exists with relationships loaded');
       } else if (response.status === 404) {
         console.log('No existing custom family found, will use auto-detection');
         setHasCustomFamily(false);
       } else if (response.status === 401) {
-        console.log('User not authenticated, cannot check for custom family');
+        console.log('Token expired or invalid, cannot check for custom family');
         setHasCustomFamily(false);
+        // 2025-01-28: Clear invalid token
+        localStorage.removeItem('token');
       } else {
         console.log('Error checking for custom family:', response.status);
         setHasCustomFamily(false);
@@ -357,6 +713,34 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
     } catch (error) {
       console.log('Error checking for custom family:', error);
       setHasCustomFamily(false);
+    }
+  };
+
+  // 2025-01-28: Added handler for family deletion confirmation
+  const handleDeleteFamily = async () => {
+    if (!familyGroupId) {
+      console.error('No family group ID found');
+      return;
+    }
+    
+    try {
+      console.log('Deleting family group:', familyGroupId);
+      const response = await familyService.deleteUpdatedFamilies({ family_group_id: familyGroupId });
+      console.log('Family deletion successful:', response);
+      
+      // Reset family data
+      setFamilyMembers([]);
+      setFamilyRelationships([]);
+      setHasCustomFamily(false);
+      setFamilyGroupId(null);
+      setError(null);
+      
+      // Re-fetch default family members
+      await fetchFamilyMembers();
+      
+    } catch (error: any) {
+      console.error('Failed to delete family:', error);
+      setError(error.response?.data?.error || error.message || 'Failed to delete family');
     }
   };
 
@@ -401,6 +785,36 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
               >
                 ✏️ Edit Tree
               </button>
+              
+              {/* 2025-01-28: Added Delete Family button for admin users */}
+              {isUserLoaded && isAdmin && hasCustomFamily && (
+                <button
+                  onClick={handleDeleteFamily}
+                  className="mr-3 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                  title="Delete Updated Family"
+                >
+                  🗑️ Delete Family
+                </button>
+              )}
+              
+              {/* 2025-01-28: DEBUG: Show admin and custom family status */}
+              {(() => {
+                console.log('Delete button debug:', { isAdmin, hasCustomFamily, familyGroupId });
+                return null;
+              })()}
+              
+              {/* 2025-01-28: DEBUG: Show delete button visibility conditions */}
+              <div className="text-xs text-gray-500 mt-1">
+                Delete button conditions: isUserLoaded={String(isUserLoaded)}, isAdmin={String(isAdmin)}, hasCustomFamily={String(hasCustomFamily)}
+              </div>
+              
+              {/* 2025-01-28: DEBUG: Show user loading state */}
+              {!isUserLoaded && (
+                <div className="text-xs text-yellow-600 mt-1">
+                  ⏳ Loading user data...
+                </div>
+              )}
+              
               <button
                 onClick={onClose}
                 className="modal-close-btn"
@@ -450,12 +864,39 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
                 <div className="family-tree-container">
                   <div className="family-tree-wrapper">
                     <div className="family-tree-content">
-                      <FamilyTreeVisualization 
-                        familyMembers={familyMembers} 
-                        relationships={familyRelationships}
-                        onRelationshipChange={handleRelationshipChange} 
-                        isEditable={true} 
-                      />
+                      {/* 2025-01-28: FIXED: Wait for relationships to be loaded before rendering family tree */}
+                      {isLoadingRelationships ? (
+                        <div className="loading-state">
+                          <div className="loading-spinner-container">
+                            <div className="loading-spinner"></div>
+                          </div>
+                          <p className="loading-text">Loading family relationships...</p>
+                        </div>
+                      ) : (
+                        <>
+                          {/* 2025-01-28: DEBUG: Show family composition to verify all members are included */}
+                          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+                            <strong>Family Composition:</strong> {familyMembers.length} total members
+                            <br />
+                            <strong>1st Generation:</strong> {familyMembers.filter(m => m.role === 'parent').length} parents
+                            <br />
+                            <strong>2nd Generation:</strong> {familyMembers.filter(m => m.role === 'child').length} children
+                            <br />
+                            <strong>Relationships:</strong> {familyRelationships.length} defined
+                            <br />
+                            <strong>All Members:</strong> {familyMembers.map(m => m.entry.name).join(', ')}
+                          </div>
+                          
+                          <FamilyTreeVisualization 
+                            familyMembers={familyMembers} 
+                            relationships={familyRelationships}
+                            onRelationshipChange={handleRelationshipChange} 
+                            isEditable={true} 
+                          />
+                        </>
+                      )}
+                      {/* 2025-01-28: DEBUG: Track relationships state */}
+                      {(() => { console.log('FamilyModal rendering with relationships:', familyRelationships); return null; })()}
                     </div>
                   </div>
                 </div>
@@ -496,7 +937,7 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
       />
     </>
   );
-
+  
   const bodyElement = document.body;
   console.log('Body element found:', bodyElement);
   

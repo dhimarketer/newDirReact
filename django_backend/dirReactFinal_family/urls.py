@@ -27,6 +27,9 @@ urlpatterns = [
     # 2025-01-27: Added custom actions for address-based family lookup and updates
     path('groups/by_address/', FamilyGroupViewSet.as_view({'get': 'by_address'}), name='family-by-address'),
     path('groups/create_or_update_by_address/', FamilyGroupViewSet.as_view({'post': 'create_or_update_by_address'}), name='family-create-or-update-by-address'),
+    
+    # 2025-01-28: Added custom action for deleting updated families while preserving phonebook entries
+    path('groups/delete_updated_families/', FamilyGroupViewSet.as_view({'post': 'delete_updated_families'}), name='family-delete-updated'),
 ]
 
 # The resulting URL patterns will be:
@@ -39,3 +42,4 @@ urlpatterns = [
 # /api/family/groups/{id}/members/ - Get members (custom action)
 # /api/family/groups/{id}/relationships/ - Get relationships (custom action)
 # /api/family/groups/{id}/stats/ - Get family group statistics (custom action)
+# /api/family/groups/delete_updated_families/ - Delete updated families while preserving phonebook entries (custom action)

@@ -189,6 +189,33 @@ class FamilyService {
     });
     return response.data;
   }
+
+  // 2025-01-28: Added method to delete updated families while preserving phonebook entries
+  async deleteUpdatedFamilies(params: {
+    family_group_id?: number;
+    address?: string;
+    island?: string;
+  }): Promise<{
+    message: string;
+    details: {
+      family_name: string;
+      address: string;
+      island: string;
+      members_removed: number;
+      relationships_removed: number;
+      phonebook_entries_preserved: number;
+              preserved_members: Array<{
+          entry_id: number;
+          name: string;
+          contact: string;
+          address: string;
+          island: string;
+        }>;
+    };
+  }> {
+    const response = await apiService.post('/family/groups/delete_updated_families/', params);
+    return response.data;
+  }
 }
 
 export const familyService = new FamilyService();

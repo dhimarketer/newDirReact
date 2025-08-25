@@ -98,6 +98,7 @@
 [2025-01-27 19:59] | django_backend/dirReactFinal_api/views.py:580 | ENHANCED: Implemented hybrid search approach - tries AND logic first for precise results, falls back to OR logic for broader results | ok
 [2025-01-27 20:00] | django_backend/dirReactFinal_api/views.py:580 | ENHANCED: Added wildcard placeholders (*term*) to search terms for more flexible partial matching within longer text | ok
 [2025-01-27 20:01] | django_backend/dirReactFinal_api/views.py:580 | FIXED: Backend now actually uses padded wildcard terms in database queries for flexible matching | ok
+[2025-01-28 19:45] | react_frontend/src/components/family/FamilyModal.tsx:309 | FIXED: SVG not updating after family relationship changes - added backend refresh after saving relationships | ok
 [2025-01-27 20:05] | react_frontend/src/components/family/FamilyModal.tsx:120 | FIXED: Family detection logic to properly identify both parents (mother and father) and treat people without ages as children | ok
 [2025-01-27 20:06] | react_frontend/src/pages/FamilyPage.tsx:120 | FIXED: Family detection logic in FamilyPage to match improved logic in FamilyModal for consistent parent-child identification | ok
 [2025-01-27 20:10] | django_backend/dirReactFinal_family/models.py:25 | ENHANCED: Added address and island fields to FamilyGroup model for address-based family lookup | ok
@@ -262,3 +263,49 @@
 [2025-01-28 03:00] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ADDED: Manual refresh button to force layout recalculation when needed | ok
 [2025-01-28 03:05] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | FIXED: Relationship creation logic to properly handle parent-child direction - now creates correct parent relationships for hierarchy | ok
 [2025-01-28 03:05] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ENHANCED: Debug logging to track relationship creation and state updates for troubleshooting | ok
+[2025-01-28 03:10] | react_frontend/src/components/family/FamilyModal.tsx:1 | ENHANCED: Added multi-generational family tree support by fetching existing relationships and enabling dynamic expansion beyond 2 generations | ok
+[2025-01-28 03:11] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ENHANCED: Implemented checkForNewGeneration function to detect when relationships create additional generation levels | ok
+[2025-01-28 03:12] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ENHANCED: Added calculateGenerationCount function and visual generation indicator in family tree controls | ok
+[2025-01-28 03:13] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ENHANCED: Improved multi-generational layout calculation with better dimensions and spacing for unlimited family levels | ok
+[2025-01-28 03:20] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | FIXED: SVG redraw issue where family members disappeared when new relationships were created - now ensures all family members are included in layout | ok
+[2025-01-28 03:21] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ENHANCED: Added missing members detection and positioning logic to prevent family members from disappearing from visualization | ok
+[2025-01-28 03:22] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ENHANCED: Improved dimension calculation to account for all family members, including those without relationships yet | ok
+[2025-01-28 03:30] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | FIXED: Connection preservation issue - now shows ALL relationship types to maintain complete family structure when new relationships are created | ok
+[2025-01-28 03:31] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ENHANCED: Added visual distinction for different relationship types with color-coded lines and styles (parent=blue, sibling=green, grandparent=purple, etc.) | ok
+[2025-01-28 03:32] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | ENHANCED: Added relationship legend in controls to help users understand different line styles and colors | ok
+[2025-01-28 03:40] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | IDENTIFIED: Layout optimization issue - current algorithm not optimally positioning family members for multi-generational display | blocked
+[2025-01-28 03:45] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:1 | FIXED: nodeLevels reference error by properly declaring and returning variable from calculateNodeLevels function | ok
+[2025-01-28 03:50] | react_frontend/src/components/family/FamilyModal.tsx:1 | ENHANCED: Added comprehensive authentication debugging to track token state and API calls during relationship changes | ok
+[2025-01-28 04:00] | react_frontend/src/components/family/FamilyModal.tsx:1 | CRITICAL FIX: Fixed authentication by using correct STORAGE_KEYS.AUTH_TOKEN instead of 'token' - this was causing 401 errors | ok
+[2025-01-28 04:10] | react_frontend/src/components/family/FamilyModal.tsx:1 | ENHANCED: Added auto-creation of family groups when first relationship is created to persist 2nd generation data | ok
+[2025-01-28 04:20] | react_frontend/src/components/family/FamilyModal.tsx:1 | ENHANCED: Added comprehensive debugging to track relationship state persistence and prevent loss during family group creation | ok
+[2025-01-28 04:30] | react_frontend/src/components/family/FamilyModal.tsx:1 | CRITICAL FIX: Implemented backend sync for existing family groups - relationships now persist when updating existing families | ok
+[2025-01-28 04:40] | react_frontend/src/components/family/FamilyModal.tsx:1 | FIXED: Added missing family_group field to relationship creation payload to resolve 405 error | ok
+[2025-01-28 04:50] | react_frontend/src/components/family/FamilyModal.tsx:1 | ENHANCED: Added fallback endpoint logic to try main relationships endpoint first, then nested router as backup | ok
+[2025-01-28 19:50] | react_frontend/src/components/family/FamilyModal.tsx:285 | FIXED: Removed incorrect main endpoint and fallback logic - now only uses correct nested endpoint for relationship saving | ok
+[2025-01-28 19:55] | react_frontend/src/components/family/FamilyModal.tsx:295 | FIXED: Removed family_group field from request body - backend sets this automatically from URL parameter | ok
+[2025-01-28 20:00] | django_backend/dirReactFinal_family/views.py:95 | FIXED: Removed conflicting relationships action from FamilyGroupViewSet - nested router provides full CRUD functionality | ok
+[2025-01-28 20:05] | react_frontend/src/components/family/FamilyModal.tsx:290 | CRITICAL FIX: Updated family persistence to save both members and relationships - ensures modified families are properly linked to addresses | ok
+[2025-01-28 20:10] | react_frontend/src/components/family/FamilyModal.tsx:260 | FIXED: Handle paginated response structure in fetchFamilyRelationships - use results array to prevent map error | ok
+[2025-01-28 20:15] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:100 | CRITICAL FIX: Fixed issue where only 2nd generation was shown - now ensures ALL family members (1st + 2nd generation) are displayed in SVG visualization | ok
+[2025-01-28 20:16] | react_frontend/src/components/family/FamilyTreeVisualization.tsx:350 | ENHANCED: Added comprehensive verification steps to prevent family members from being lost during layout calculation | ok
+[2025-01-28 20:17] | react_frontend/src/components/family/FamilyModal.tsx:700 | ADDED: Family composition debug display to show member counts and verify all generations are included | ok
+[2025-01-28 21:00] | django_backend/dirReactFinal_family/views.py:95 | IMPLEMENTED: Added delete_updated_families action to FamilyGroupViewSet for safely removing family associations while preserving phonebook entries | ok
+[2025-01-28 21:01] | django_backend/dirReactFinal_family/urls.py:35 | ADDED: URL route for delete_updated_families action at /api/family/groups/delete_updated_families/ | ok
+[2025-01-28 21:02] | django_backend/dirReactFinal_core/models.py:80 | ADDED: family_deleted event type to EventLog model for tracking family deletion events | ok
+[2025-01-28 21:03] | react_frontend/src/services/familyService.ts:200 | ADDED: deleteUpdatedFamilies method to FamilyService for calling the new backend endpoint | ok
+[2025-01-28 21:04] | react_frontend/src/components/family/DeleteUpdatedFamilyModal.tsx:1 | CREATED: React component for deleting updated families with form validation and success feedback | ok
+[2025-01-28 21:05] | react_frontend/src/components/family/index.ts:14 | ADDED: DeleteUpdatedFamilyModal export to family components index | ok
+[2025-01-28 21:06] | react_frontend/src/pages/FamilyPage.tsx:250 | ADDED: Admin section with delete updated families functionality for staff/superuser users | ok
+[2025-01-28 21:07] | django_backend/dirReactFinal_family/tests.py:1 | CREATED: Comprehensive test suite for delete_updated_families functionality including admin permissions, parameter validation, and data preservation | ok
+[2025-01-28 21:08] | react_frontend/src/components/family/FamilyModal.tsx:1 | INTEGRATED: Added delete updated families button to FamilyModal header actions for admin users with proper authentication checks | ok
+[2025-01-28 21:09] | react_frontend/src/components/family/FamilyModal.tsx:684 | FIXED: Family deletion now properly resets state and re-fetches default family members - default family creation process works again after deletion | ok
+[2025-01-28 21:10] | react_frontend/src/components/family/FamilyModal.tsx:684 | ENHANCED: Added familyDeleted state tracking and force refresh mechanism to ensure default family creation process works correctly after deletion | ok
+[2025-01-28 21:11] | react_frontend/src/components/family/FamilyModal.tsx:50 | DEBUGGING: Added comprehensive debugging to fix delete button visibility issue - monitoring user state, admin check, and custom family status | ok
+[2025-01-28 21:12] | react_frontend/src/components/family/FamilyModal.tsx:950 | FIXED: DeleteUpdatedFamilyModal now properly renders when delete button is clicked - fixed component structure to include delete modal in portal | ok
+[2025-01-28 21:13] | react_frontend/src/components/family/FamilyModal.tsx:950 | FIXED: Replaced nested modal with inline delete confirmation to avoid modal nesting issues - delete functionality now works properly | ok
+[2025-01-28 21:14] | react_frontend/src/components/family/FamilyModal.tsx:679 | SIMPLIFIED: Removed complex confirmation dialog - delete button now directly deletes family and reloads default data | ok
+[2025-01-28 21:50] | django_backend/dirReactFinal_family/views.py:280 | FIXED: Family deletion 500 error - corrected field names from 'phone' to 'contact' and removed non-existent 'metadata' field from EventLog | ok
+[2025-01-28 21:51] | django_backend/dirReactFinal_api/token_views.py:75 | FIXED: JWT token refresh 500 error - custom claims not available in refreshed tokens, now fetches user data from database | ok
+[2025-01-28 21:52] | react_frontend/src/services/familyService.ts:200 | UPDATED: Frontend service to use correct 'contact' field name instead of 'phone' | ok
+[2025-01-28 22:00] | django_backend/dirReactFinal_family/views.py:225 | FIXED: Incomplete with transaction.atomic(): block in delete_updated_families method - now properly closed and functional | ok

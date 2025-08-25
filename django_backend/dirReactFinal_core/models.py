@@ -86,6 +86,7 @@ class EventLog(models.Model):
         ('referral', 'Referral'),
         ('score_change', 'Score Change'),
         ('password_change', 'Password Change'),
+        ('family_deleted', 'Family Deleted'),  # 2025-01-28: Added for tracking family deletion events
     ]
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='event_logs')

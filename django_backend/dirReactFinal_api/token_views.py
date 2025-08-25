@@ -74,17 +74,44 @@ class CustomTokenRefreshView(TokenRefreshView):
             from rest_framework_simplejwt.tokens import AccessToken
             token = AccessToken(access_token)
             
-            response_data = {
-                'access_token': access_token,
-                'user': {
-                    'id': token['user_id'],
-                    'username': token['username'],
-                    'user_type': token['user_type'],
-                    'email': token['email'],
-                    'score': token['score'],
-                    'status': token['status']
+            # Get user information from the database since custom claims aren't available in refreshed tokens
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            
+            try:
+                user = User.objects.get(id=token['user_id'])
+                response_data = {
+                    'access_token': access_token,
+                    'user': {
+                        'id': user.id,
+                        'username': user.username,
+                        'user_type': user.user_type,
+                        'email': user.email,
+                        'score': user.score,
+                        'status': user.status,
+                        'is_staff': user.is_staff,
+                        'is_superuser': user.is_superuser,
+                        'first_name': user.first_name,
+                        'last_name': user.last_name
+                    }
                 }
-            }
+            except User.DoesNotExist:
+                # Fallback to basic token data if user not found
+                response_data = {
+                    'access_token': access_token,
+                    'user': {
+                        'id': token['user_id'],
+                        'username': token.get('username', ''),
+                        'user_type': token.get('user_type', ''),
+                        'email': token.get('email', ''),
+                        'score': token.get('score', 0),
+                        'status': token.get('status', ''),
+                        'is_staff': token.get('is_staff', False),
+                        'is_superuser': token.get('is_superuser', False),
+                        'first_name': token.get('first_name', ''),
+                        'last_name': token.get('last_name', '')
+                    }
+                }
             
             return Response(response_data, status=status.HTTP_200_OK)
         

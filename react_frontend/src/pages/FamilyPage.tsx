@@ -5,7 +5,9 @@
 import React, { useState, useEffect } from 'react';
 import SearchBar from '../components/directory/SearchBar';
 import SearchResults from '../components/directory/SearchResults';
+import { DeleteUpdatedFamilyModal } from '../components/family';
 import { PhoneBookEntry, SearchFilters } from '../types/directory';
+import { useAuthStore } from '../store/authStore';
 
 interface DetectedFamily {
   id: string;
@@ -18,6 +20,7 @@ interface DetectedFamily {
 }
 
 const FamilyPage: React.FC = () => {
+  const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PhoneBookEntry[]>([]);
   const [detectedFamilies, setDetectedFamilies] = useState<DetectedFamily[]>([]);
@@ -25,6 +28,12 @@ const FamilyPage: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [showFamilyEditor, setShowFamilyEditor] = useState(false);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
+  
+  // 2025-01-28: Added state for delete updated families modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Check if user is admin
+  const isAdmin = user?.is_staff || user?.is_superuser;
 
   // Handle search from the search bar
   const handleSearch = async (filters: SearchFilters) => {
@@ -244,6 +253,14 @@ const FamilyPage: React.FC = () => {
     }
   };
 
+  // 2025-01-28: Added handler for successful family deletion
+  const handleFamilyDeleted = () => {
+    // Refresh the page or update the detected families
+    setDetectedFamilies([]);
+    setSearchResults([]);
+    setSearchQuery('');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -254,6 +271,27 @@ const FamilyPage: React.FC = () => {
             Search for people and discover family relationships automatically based on address and island.
           </p>
         </div>
+
+        {/* Admin Section */}
+        {isAdmin && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-yellow-800 mb-2">Administrator Tools</h2>
+                <p className="text-yellow-700 text-sm">
+                  Manage updated families and family associations. This will preserve all phonebook entries 
+                  while removing family relationships.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors"
+              >
+                Delete Updated Family
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Search Section */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
@@ -408,6 +446,15 @@ const FamilyPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Updated Families Modal */}
+      {showDeleteModal && (
+        <DeleteUpdatedFamilyModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onSuccess={handleFamilyDeleted}
+        />
       )}
     </div>
   );

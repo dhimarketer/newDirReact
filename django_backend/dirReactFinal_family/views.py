@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, Count
 from django.contrib.auth import get_user_model
+from django.db import transaction
 
 from .models import FamilyGroup, FamilyMember, FamilyRelationship
 from .serializers import (
@@ -89,13 +90,14 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
         serializer = FamilyMemberDetailSerializer(members, many=True)
         return Response(serializer.data)
     
-    @action(detail=True, methods=['get'])
-    def relationships(self, request, pk=None):
-        """Get all relationships in a family group"""
-        family_group = self.get_object()
-        relationships = FamilyRelationship.objects.filter(family_group=family_group)
-        serializer = FamilyRelationshipSerializer(relationships, many=True)
-        return Response(serializer.data)
+    # 2025-01-28: REMOVED: Conflicting relationships action - nested router provides full CRUD functionality
+    # @action(detail=True, methods=['get'])
+    # def relationships(self, request, pk=None):
+    #     """Get all relationships in a family group"""
+    #     family_group = self.get_object()
+    #     relationships = FamilyRelationship.objects.filter(family_group=family_group)
+    #     serializer = FamilyRelationshipSerializer(relationships, many=True)
+    #     return Response(serializer.data)
     
     @action(detail=True, methods=['get'])
     def stats(self, request, pk=None):
@@ -220,6 +222,193 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'])
+    def delete_updated_families(self, request):
+        """
+        Delete updated families while preserving users and names from addresses.
+        This function removes family associations but keeps all phonebook entries intact.
+        """
+        print("=== DEBUG: delete_updated_families method called ===")
+        # 2025-01-28: Added function to delete updated families while preserving users and names
+        
+        # Check if user is admin or staff
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Only administrators can delete updated families'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get parameters
+        address = request.data.get('address')
+        island = request.data.get('island')
+        family_group_id = request.data.get('family_group_id')
+        
+        print(f"DEBUG: delete_updated_families called with address={address}, island={island}, family_group_id={family_group_id}")
+        print(f"DEBUG: Request data: {request.data}")
+        print(f"DEBUG: Request user: {request.user.username} (staff: {request.user.is_staff})")
+        
+        # Validate parameters
+        if not family_group_id and (not address or not island):
+            return Response(
+                {'error': 'Either family_group_id or both address and island are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate family_group_id if provided
+        if family_group_id:
+            try:
+                family_group_id = int(family_group_id)
+                if family_group_id <= 0:
+                    return Response(
+                        {'error': 'family_group_id must be a positive integer'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except (ValueError, TypeError):
+                return Response(
+                    {'error': 'family_group_id must be a valid integer'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        try:
+            print("DEBUG: About to start database transaction")
+            
+            with transaction.atomic():
+                print("DEBUG: Transaction started successfully")
+                
+                # Find the family group to delete
+                if family_group_id:
+                    print(f"DEBUG: Looking up family group by ID: {family_group_id}")
+                    try:
+                        family_group = FamilyGroup.objects.get(id=family_group_id)
+                    except FamilyGroup.DoesNotExist:
+                        return Response(
+                            {'error': f'Family group with ID {family_group_id} not found'}, 
+                            status=status.HTTP_404_NOT_FOUND
+                        )
+                else:
+                    print(f"DEBUG: Looking up family group by address: {address}, {island}")
+                    family_group = FamilyGroup.get_by_address(address, island)
+                    if not family_group:
+                        return Response(
+                            {'error': 'No family group found for this address'}, 
+                            status=status.HTTP_404_NOT_FOUND
+                        )
+                
+                print(f"DEBUG: Found family group: {family_group.id} - {family_group.name}")
+                
+                # Get family info before deletion for logging
+                family_name = family_group.name
+                family_address = family_group.address
+                family_island = family_group.island
+                member_count = family_group.members.count()
+                relationship_count = family_group.relationships.count()
+                
+                print(f"DEBUG: Family has {member_count} members and {relationship_count} relationships")
+                print(f"DEBUG: Family details - Name: {family_name}, Address: {family_address}, Island: {family_island}")
+                
+                # Store member information for confirmation (without deleting entries)
+                members_info = []
+                for member in family_group.members.all():
+                    print(f"DEBUG: Processing member: {member.entry.name} (PID: {member.entry.pid})")
+                    members_info.append({
+                        'entry_id': member.entry.pid,
+                        'name': member.entry.name,
+                        'contact': member.entry.contact,
+                        'address': member.entry.address,
+                        'island': member.entry.island
+                    })
+                
+                print(f"DEBUG: Stored info for {len(members_info)} members")
+                
+                # Clear family_group_id references in PhoneBookEntry records
+                print("DEBUG: Clearing family_group_id references in PhoneBookEntry records")
+                from dirReactFinal_directory.models import PhoneBookEntry
+                try:
+                    # First, let's check if there are any records to update
+                    records_to_update = PhoneBookEntry.objects.filter(family_group_id=family_group.id)
+                    print(f"DEBUG: Found {records_to_update.count()} PhoneBookEntry records to update")
+                    
+                    if records_to_update.exists():
+                        updated_count = records_to_update.update(family_group_id=None)
+                        print(f"DEBUG: Updated {updated_count} PhoneBookEntry records")
+                        
+                        # Verify the update was successful
+                        remaining_refs = PhoneBookEntry.objects.filter(family_group_id=family_group.id).count()
+                        if remaining_refs > 0:
+                            print(f"DEBUG: Warning - {remaining_refs} PhoneBookEntry records still reference family group")
+                        else:
+                            print("DEBUG: All PhoneBookEntry references cleared successfully")
+                    else:
+                        print("DEBUG: No PhoneBookEntry records found to update")
+                        
+                except Exception as e:
+                    print(f"DEBUG: Error updating PhoneBookEntry records: {str(e)}")
+                    raise Exception(f"Failed to clear family group references: {str(e)}")
+                
+                # Delete family associations (members and relationships) but NOT the phonebook entries
+                print("DEBUG: Deleting family members")
+                try:
+                    family_group.members.all().delete()
+                    print("DEBUG: Family members deleted successfully")
+                except Exception as e:
+                    print(f"DEBUG: Error deleting family members: {str(e)}")
+                    raise Exception(f"Failed to delete family members: {str(e)}")
+                
+                print("DEBUG: Deleting family relationships")
+                try:
+                    family_group.relationships.all().delete()
+                    print("DEBUG: Family relationships deleted successfully")
+                except Exception as e:
+                    print(f"DEBUG: Error deleting family relationships: {str(e)}")
+                    raise Exception(f"Failed to delete family relationships: {str(e)}")
+                
+                # Delete the family group itself
+                print("DEBUG: Deleting family group")
+                try:
+                    family_group.delete()
+                    print("DEBUG: Family group deleted successfully")
+                except Exception as e:
+                    print(f"DEBUG: Error deleting family group: {str(e)}")
+                    raise Exception(f"Failed to delete family group: {str(e)}")
+                
+                print("DEBUG: Family deletion completed successfully")
+                
+                return Response({
+                    'message': f'Successfully deleted family "{family_name}" at {family_address}, {family_island}',
+                    'details': {
+                        'family_name': family_name,
+                        'address': family_address,
+                        'island': family_island,
+                        'members_removed': member_count,
+                        'relationships_removed': relationship_count,
+                        'phonebook_entries_preserved': len(members_info),
+                        'preserved_members': members_info
+                    }
+                }, status=status.HTTP_200_OK)
+                
+        except Exception as e:
+            import traceback
+            print(f"DEBUG: Exception occurred: {str(e)}")
+            print(f"DEBUG: Traceback: {traceback.format_exc()}")
+            
+            # Provide more specific error information
+            error_message = str(e)
+            if "foreign key constraint" in error_message.lower():
+                error_message = "Database constraint violation - family group has active references"
+            elif "does not exist" in error_message.lower():
+                error_message = "Family group not found or already deleted"
+            elif "permission" in error_message.lower():
+                error_message = "Permission denied - insufficient privileges"
+            elif "database is locked" in error_message.lower():
+                error_message = "Database is locked - another operation may be in progress"
+            elif "timeout" in error_message.lower():
+                error_message = "Database operation timed out"
+            
+            return Response(
+                {'error': f'Failed to delete family: {error_message}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class FamilyMemberViewSet(viewsets.ModelViewSet):
     """
@@ -332,3 +521,5 @@ class FamilyRelationshipViewSet(viewsets.ModelViewSet):
             raise permissions.PermissionDenied("Only the creator or admins can delete relationships")
         
         instance.delete()
+
+print("=== DEBUG: views.py file loaded successfully ===")
