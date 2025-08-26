@@ -82,6 +82,8 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
     fromMember: FamilyMember;
     relationshipType: string;
   } | null>(null);
+  const [isFittingToView, setIsFittingToView] = useState(false);
+  const [fitToViewSuccess, setFitToViewSuccess] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const resizeTimeout = useRef<number | null>(null);
@@ -314,15 +316,17 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
       (nodesByLevel.get(0) || []).length + estimatedMissingMembers
     );
     
-    // 2025-01-28: Ensure minimum dimensions for multi-generational display
-    const minWidth = Math.max(estimatedLevel0Nodes * horizontalSpacing - 40, 600);
-    const minHeight = Math.max(200 + (maxLevel * verticalSpacing), 400); // Minimum height for multi-gen
+    // 2025-01-28: ENHANCED: Better dimension calculation for multi-generational families
+    // 2025-01-28: Ensure sufficient space for all generations and members
+    const minWidth = Math.max(estimatedLevel0Nodes * horizontalSpacing - 40, 800);
+    const minHeight = Math.max(200 + (maxLevel * verticalSpacing), 600); // Increased minimum height
     
-    const requiredWidth = minWidth;
-    const requiredHeight = minHeight;
+    // 2025-01-28: Add extra padding for better visual spacing
+    const requiredWidth = minWidth + 160; // Extra horizontal padding
+    const requiredHeight = minHeight + 120; // Extra vertical padding
     
-    const svgWidth = requiredWidth + 80;
-    const svgHeight = requiredHeight + 80;
+    const svgWidth = requiredWidth;
+    const svgHeight = requiredHeight;
     
     console.log('Enhanced dimension calculation:', {
       maxLevel,
@@ -362,7 +366,7 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
       // 2025-01-28: Calculate horizontal positioning for this level
       const totalLevelWidth = (levelNodes.length - 1) * horizontalSpacing + nodeWidth;
       const levelStartX = (svgWidth - totalLevelWidth) / 2;
-      const levelY = 40 + (level * verticalSpacing);
+      const levelY = 60 + (level * verticalSpacing); // Increased top margin for better spacing
       
       // 2025-01-28: Position each node in this level
       levelNodes.forEach((pid, index) => {
@@ -406,14 +410,14 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
       
       // 2025-01-28: Add missing members to level 0 (or appropriate level)
       const missingLevel = 0; // Default to top level for members without relationships
-      const missingLevelY = 40 + (missingLevel * verticalSpacing);
+      const missingLevelY = 60 + (missingLevel * verticalSpacing); // Match the level 0 Y position
       
       missingMembers.forEach((member, index) => {
         // 2025-01-28: Position missing members to the right of existing level 0 nodes
         const existingLevel0Nodes = newNodes.filter(n => n.y === missingLevelY);
         const startX = existingLevel0Nodes.length > 0 
           ? Math.max(...existingLevel0Nodes.map(n => n.x + n.width)) + 20
-          : 40;
+          : 80; // Increased left margin for better spacing
         
         newNodes.push({
           id: `node-${member.entry.pid}`,
@@ -444,8 +448,8 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
       console.error('This should never happen - all family members must be included in the visualization');
       
       // 2025-01-28: Emergency fallback - add any missing members to level 0
-      const emergencyLevelY = 40;
-      const rightmostX = newNodes.length > 0 ? Math.max(...newNodes.map(n => n.x + n.width)) + 20 : 40;
+      const emergencyLevelY = 60; // Match the level 0 Y position
+      const rightmostX = newNodes.length > 0 ? Math.max(...newNodes.map(n => n.x + n.width)) + 20 : 80;
       
       finalMissingMembers.forEach((member, index) => {
         console.log(`Emergency adding missing member: ${member.entry.name}`);
@@ -463,11 +467,36 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
     }
     
     // 2025-01-28: ENHANCED: Create connection lines from ALL relationships to preserve complete family structure
+    console.log('Creating connections from relationships:', {
+      totalRelationships: relationships.length,
+      activeRelationships: relationships.filter(r => r.is_active).length,
+      relationships: relationships.map(r => ({
+        id: r.id,
+        person1: r.person1,
+        person2: r.person2,
+        type: r.relationship_type,
+        active: r.is_active
+      }))
+    });
+    
     relationships.forEach(rel => {
-      if (!rel.is_active) return; // Skip inactive relationships
+      if (!rel.is_active) {
+        console.log(`Skipping inactive relationship: ${rel.id} (${rel.relationship_type})`);
+        return; // Skip inactive relationships
+      }
       
       const fromNode = newNodes.find(n => n.member.entry.pid === rel.person1);
       const toNode = newNodes.find(n => n.member.entry.pid === rel.person2);
+      
+      console.log(`Processing relationship ${rel.id}:`, {
+        type: rel.relationship_type,
+        person1: rel.person1,
+        person2: rel.person2,
+        fromNodeFound: !!fromNode,
+        toNodeFound: !!toNode,
+        fromNodeName: fromNode?.member.entry.name,
+        toNodeName: toNode?.member.entry.name
+      });
       
       if (fromNode && toNode) {
         // 2025-01-28: Create connection for all active relationship types
@@ -553,6 +582,30 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
       allNodes: newNodes.map(n => ({ pid: n.member.entry.pid, name: n.member.entry.name, x: n.x, y: n.y })),
       missingMembers: familyMembers.filter(m => !newNodes.some(n => n.member.entry.pid === m.entry.pid)).map(m => m.entry.name)
     });
+    
+    // 2025-01-28: Auto-fit large families to ensure they're visible
+    if (newNodes.length > 8 || maxLevel > 2) {
+      console.log('🌳 Large extended family detected - auto-fitting to view');
+      // Show brief auto-fit indicator
+      setFitToViewSuccess(true);
+      setTimeout(() => setFitToViewSuccess(false), 2000);
+      
+      setTimeout(() => {
+        fitToView();
+      }, 100); // Small delay to ensure DOM is updated
+    }
+    
+    // 2025-01-28: Auto-fit multi-generational families
+    if (relationships.length > 0 && maxLevel > 1) {
+      console.log('👨‍👩‍👧‍👦 Multi-generational family detected - auto-fitting to view');
+      // Show brief auto-fit indicator
+      setFitToViewSuccess(true);
+      setTimeout(() => setFitToViewSuccess(false), 2000);
+      
+      setTimeout(() => {
+        fitToView();
+      }, 200); // Slightly longer delay for complex layouts
+    }
   };
 
   // 2025-01-28: Calculate layout based on inferred roles (fallback)
@@ -996,7 +1049,12 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
           console.log('New generation level detected! Family tree will expand to show all generations.');
         }
         
-        onRelationshipChange(updatedRelationships);
+        // 2025-01-28: CRITICAL FIX: Only send the NEW relationship, not all relationships
+        // 2025-01-28: This prevents the parent component from losing existing relationships
+        const newRelationships = [newRelationship];
+        console.log('Sending only new relationships to parent:', newRelationships);
+        
+        onRelationshipChange(newRelationships);
         
         // 2025-01-28: Reset editing state
         setSelectedNode(null);
@@ -1019,11 +1077,26 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
   useEffect(() => {
     // 2025-01-28: Recalculate whenever data changes
     if (familyMembers.length > 0 || relationships.length > 0) {
-      console.log('Data changed, recalculating layout:', {
+      console.log('🔄 LAYOUT RECALCULATION TRIGGERED:', {
         familyMembersCount: familyMembers.length,
         relationshipsCount: relationships.length,
-        relationships: relationships.map(r => `${r.person1}->${r.person2}(${r.person2})`)
+        familyMembers: familyMembers.map(m => ({ pid: m.entry.pid, name: m.entry.name, role: m.role })),
+        relationships: relationships.map(r => ({
+          id: r.id,
+          person1: r.person1,
+          person2: r.person2,
+          type: r.relationship_type,
+          active: r.is_active
+        })),
+        timestamp: new Date().toISOString()
       });
+      
+      // 2025-01-28: CRITICAL: Verify that relationships are properly structured
+      const invalidRelationships = relationships.filter(r => !r.person1 || !r.person2 || !r.relationship_type);
+      if (invalidRelationships.length > 0) {
+        console.error('❌ INVALID RELATIONSHIPS DETECTED:', invalidRelationships);
+      }
+      
       console.log('Full relationships data:', relationships);
       calculateLayout();
     }
@@ -1053,13 +1126,123 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
         clearTimeout(resizeTimeout.current);
       }
     };
-  }, []); // 2025-01-28: Empty dependency array - only run once on mount
+  }, [familyMembers, relationships, calculateLayout]);
 
-  // 2025-01-28: Fit to view function
-  const fitToView = () => {
-    setZoomLevel(1);
-    calculateLayout();
-  };
+  // 2025-01-28: ENHANCED: Fit to view functionality for optimal family tree display
+  const fitToView = useCallback(() => {
+    if (!containerRef.current || !svgRef.current) return;
+    
+    setIsFittingToView(true);
+    
+    // 2025-01-28: Small delay to show loading state
+    setTimeout(() => {
+      try {
+        const container = containerRef.current;
+        const svg = svgRef.current;
+        
+        if (!container || !svg) return;
+        
+        // 2025-01-28: Get container dimensions
+        const containerRect = container.getBoundingClientRect();
+        const containerWidth = containerRect.width - 40; // Account for padding
+        const containerHeight = containerRect.height - 200; // Account for controls and padding
+        
+        // 2025-01-28: Get SVG content dimensions
+        const svgContentWidth = svgDimensions.width;
+        const svgContentHeight = svgDimensions.height;
+        
+        console.log('🔄 Fit to view calculation:', {
+          containerWidth,
+          containerHeight,
+          svgContentWidth,
+          svgContentHeight,
+          currentZoom: zoomLevel,
+          familyMembersCount: familyMembers.length,
+          relationshipsCount: relationships.length
+        });
+        
+        // 2025-01-28: Calculate optimal zoom level to fit content in container
+        const scaleX = containerWidth / svgContentWidth;
+        const scaleY = containerHeight / svgContentHeight;
+        const optimalScale = Math.min(scaleX, scaleY, 1); // Don't zoom in beyond 100%
+        
+        // 2025-01-28: Set new zoom level with better bounds for extended families
+        const newZoomLevel = Math.max(0.05, Math.min(optimalScale, 1.5)); // Allow 5% to 150% zoom
+        setZoomLevel(newZoomLevel);
+        
+        console.log('✅ Fit to view result:', {
+          scaleX,
+          scaleY,
+          optimalScale,
+          newZoomLevel,
+          willFit: newZoomLevel <= 1,
+          zoomPercentage: Math.round(newZoomLevel * 100)
+        });
+        
+        // 2025-01-28: Enhanced scrolling for extended families
+        if (container.scrollHeight > container.clientHeight || container.scrollWidth > container.clientWidth) {
+          // Calculate center point of the family tree
+          const centerX = (svgContentWidth * newZoomLevel - containerWidth) / 2;
+          const centerY = (svgContentHeight * newZoomLevel - containerHeight) / 2;
+          
+          // Smooth scroll to center with bounds checking
+          const scrollLeft = Math.max(0, centerX);
+          const scrollTop = Math.max(0, centerY);
+          
+          container.scrollTo({
+            left: scrollLeft,
+            top: scrollTop,
+            behavior: 'smooth'
+          });
+          
+          console.log('🎯 Scrolled to center:', { 
+            scrollLeft, 
+            scrollTop, 
+            familyTreeCenter: { x: centerX, y: centerY }
+          });
+        }
+        
+        // 2025-01-28: Show success message for extended families
+        if (relationships.length > 0 && familyMembers.length > 5) {
+          const generationCount = calculateGenerationCount();
+          const message = `🌳 Extended family fitted to view! Showing ${familyMembers.length} members across ${generationCount} generations.`;
+          console.log(message);
+          
+          // Set success state
+          setFitToViewSuccess(true);
+          setTimeout(() => setFitToViewSuccess(false), 3000); // Clear after 3 seconds
+          
+          // Optional: Show a brief toast notification
+          setTimeout(() => {
+            // You can add a toast notification here if desired
+            console.log('🎉 Family tree successfully fitted to view');
+          }, 500);
+        } else {
+          // Set success state for smaller families too
+          setFitToViewSuccess(true);
+          setTimeout(() => setFitToViewSuccess(false), 2000); // Clear after 2 seconds
+        }
+      } catch (error) {
+        console.error('❌ Error in fit to view:', error);
+      } finally {
+        setIsFittingToView(false);
+      }
+    }, 100);
+  }, [svgDimensions, zoomLevel, familyMembers.length, relationships.length, calculateGenerationCount]);
+
+  // 2025-01-28: Add keyboard shortcut for Fit to View (Ctrl+F or Cmd+F)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+        event.preventDefault();
+        console.log('⌨️ Keyboard shortcut detected: Fit to View');
+        fitToView();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [fitToView]);
 
   // 2025-01-28: Zoom functions
   const zoomIn = () => setZoomLevel(prev => Math.min(prev * 1.2, 3));
@@ -1189,6 +1372,31 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
 
   // 2025-01-28: ENHANCED: Render connection lines with different styles for different relationship types
   const renderConnections = () => {
+    // 2025-01-28: DEBUG: Log connection rendering details
+    console.log('Rendering connections:', {
+      totalConnections: connections.length,
+      connections: connections.map(c => ({
+        id: c.id,
+        from: c.fromNode,
+        to: c.toNode,
+        type: c.relationshipType,
+        fromCoords: [c.fromX, c.fromY],
+        toCoords: [c.toX, c.toY]
+      })),
+      relationships: relationships.map(r => ({
+        id: r.id,
+        person1: r.person1,
+        person2: r.person2,
+        type: r.relationship_type,
+        active: r.is_active
+      }))
+    });
+    
+    if (connections.length === 0) {
+      console.warn('No connections to render - this might indicate a rendering issue');
+      return null;
+    }
+    
     return connections.map(conn => {
       // 2025-01-28: Define different line styles for different relationship types
       let lineStyle: {
@@ -1301,12 +1509,41 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
     <div ref={containerRef} className="family-tree-container">
       {/* 2025-01-28: Family tree controls */}
       <div className="family-tree-controls">
+        {/* 2025-01-28: ENHANCED: Prominent Fit to View button for extended families */}
         <button
           onClick={fitToView}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm font-medium"
+          disabled={isFittingToView}
+          className={`bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 ${
+            isFittingToView ? 'opacity-75 cursor-not-allowed' : ''
+          } ${fitToViewSuccess ? 'ring-2 ring-green-400 ring-opacity-75' : ''}`}
+          title="Fit entire extended family to view (Ctrl+F or Cmd+F)"
         >
-          Fit to View
+          <span className="text-lg">
+            {isFittingToView ? '⏳' : fitToViewSuccess ? '✅' : '🔍'}
+          </span>
+          {isFittingToView ? 'Fitting...' : fitToViewSuccess ? 'Fitted!' : 'Fit to View'}
+          {relationships.length > 0 && !isFittingToView && (
+            <span className="bg-white bg-opacity-20 px-2 py-1 rounded text-xs">
+              {familyMembers.length} members
+            </span>
+          )}
         </button>
+        
+        {/* 2025-01-28: Helpful instruction for Fit to View functionality */}
+        <div className="text-xs text-gray-600 ml-2 max-w-xs">
+          {relationships.length > 0 ? (
+            <span title="Click to automatically resize and center the extended family tree">
+              🌳 Automatically fits {familyMembers.length} family members to view
+            </span>
+          ) : (
+            <span title="Click to automatically resize and center the family tree">
+              🔍 Automatically fits family tree to view
+            </span>
+          )}
+          <div className="text-gray-500 mt-1">
+            ⌨️ Shortcut: Ctrl+F (or Cmd+F)
+          </div>
+        </div>
         <button
           onClick={() => {
             console.log('Manual refresh triggered');
@@ -1410,8 +1647,10 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
             transform: `scale(${zoomLevel})`,
             transformOrigin: 'top left',
             maxWidth: '100%',
-            height: 'auto'
+            height: 'auto',
+            overflow: 'visible'
           }}
+          className="family-tree-svg"
         >
           {/* 2025-01-28: Arrow marker for connections */}
           <defs>

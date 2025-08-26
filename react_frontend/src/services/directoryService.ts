@@ -143,6 +143,7 @@ class DirectoryService {
   async premiumImageSearch(params: {
     query?: string;
     pep_only?: boolean;
+    status?: string;  // 2025-01-28: Added status filter
     atoll?: string;
     island?: string;
     party?: string;

@@ -165,9 +165,25 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_403_FORBIDDEN
                     )
                 
-                # Update members and relationships
+                # 2025-01-28: FIXED: Preserve existing relationships while updating members
+                # 2025-01-28: This prevents loss of original family structure when adding new relationships
+                print(f"DEBUG: Updating existing family group {family_group.id} - preserving relationships")
+                
+                # Update members (replace completely as requested)
                 family_group.members.all().delete()
-                family_group.relationships.all().delete()
+                
+                # 2025-01-28: CRITICAL: Do NOT delete existing relationships - merge with new ones
+                # 2025-01-28: This preserves the original family structure while allowing additions
+                existing_relationships = list(family_group.relationships.all())
+                print(f"DEBUG: Preserving {len(existing_relationships)} existing relationships")
+                
+                # 2025-01-28: Create a set of existing relationship pairs to avoid duplicates
+                existing_pairs = set()
+                for rel in existing_relationships:
+                    pair = tuple(sorted([rel.person1.pid, rel.person2.pid]))
+                    existing_pairs.add(pair)
+                
+                print(f"DEBUG: Existing relationship pairs: {existing_pairs}")
             else:
                 # Create new family group
                 family_group = FamilyGroup.objects.create(
@@ -177,6 +193,9 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
                     island=island,
                     created_by=request.user
                 )
+                existing_relationships = []
+                existing_pairs = set()
+                print(f"DEBUG: Created new family group {family_group.id}")
             
             # Add members
             for member_data in members:
@@ -195,7 +214,10 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
                     except PhoneBookEntry.DoesNotExist:
                         continue
             
-            # Add relationships
+            # 2025-01-28: ENHANCED: Add relationships with duplicate prevention
+            relationships_added = 0
+            relationships_skipped = 0
+            
             for rel_data in relationships:
                 person1_id = rel_data.get('person1_id')
                 person2_id = rel_data.get('person2_id')
@@ -207,6 +229,15 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
                         # 2025-01-28: Fixed to use pid field instead of id for PhoneBookEntry
                         person1 = PhoneBookEntry.objects.get(pid=person1_id)
                         person2 = PhoneBookEntry.objects.get(pid=person2_id)
+                        
+                        # 2025-01-28: Check if this relationship already exists to prevent duplicates
+                        pair = tuple(sorted([person1_id, person2_id]))
+                        if pair in existing_pairs:
+                            print(f"DEBUG: Skipping duplicate relationship: {person1.name} -> {person2.name} ({rel_type})")
+                            relationships_skipped += 1
+                            continue
+                        
+                        # 2025-01-28: Create new relationship
                         FamilyRelationship.objects.create(
                             person1=person1,
                             person2=person2,
@@ -214,9 +245,18 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
                             notes=notes,
                             family_group=family_group
                         )
+                        
+                        # 2025-01-28: Add to existing pairs to prevent future duplicates
+                        existing_pairs.add(pair)
+                        relationships_added += 1
+                        
+                        print(f"DEBUG: Created relationship: {person1.name} -> {person2.name} ({rel_type})")
                     except PhoneBookEntry.DoesNotExist:
                         continue
             
+            print(f"DEBUG: Relationship update summary: {relationships_added} added, {relationships_skipped} skipped")
+            
+            # 2025-01-28: Return the updated family group with all relationships
             serializer = self.get_serializer(family_group)
             return Response(serializer.data, status=status.HTTP_200_OK if family_group else status.HTTP_201_CREATED)
             

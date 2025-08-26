@@ -29,10 +29,9 @@ export interface FieldProbability {
  * 
  * Examples:
  * - "habaruge, hithadhoo" -> address: "habaruge", island: "hithadhoo"
- * - "ali*, male, hulhumale, MDP" -> name: "ali*", island: "male", address: "hulhumale", party: "MDP"
- * - "ali, hee*, >30" -> name: "ali", profession: "hee*", min_age: 30
- * - "j*n, >25, MDP" -> name: "j*n", min_age: 25, party: "MDP"
- * - "ali%" -> name: "ali*" (wildcard)
+ * - "john*, london, central park, MDP" -> name: "john*", island: "london", address: "central park", party: "MDP"
+ * - "john, main*, >30" -> name: "john", profession: "main*", min_age: 30
+ * - "john%" -> name: "john*" (wildcard)
  * - "1234567" -> contact: "1234567" (numeric)
  */
 export const parseSmartQuery = async (rawQuery: string): Promise<ParsedQuery> => {

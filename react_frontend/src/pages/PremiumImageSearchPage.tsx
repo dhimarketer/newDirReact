@@ -1,12 +1,13 @@
+// 2025-01-28: MODIFIED - 4-column grid with 2"x2" images and infinite scroll instead of pagination
 // 2025-01-27: Creating premium image search page for PEP profiles with image grid layout
 // 2025-01-27: Added collapsible image placeholders to save space
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PhoneBookEntryWithImage } from '../types/directory';
 import { directoryService } from '../services/directoryService';
 import { useAuth } from '../store/authStore';
 import { toast } from 'react-hot-toast';
-import { ChevronDown, ChevronUp, Image, Search, User } from 'lucide-react';
+import { User } from 'lucide-react';
 
 interface PremiumImageSearchPageProps {}
 
@@ -15,44 +16,83 @@ const PremiumImageSearchPage: React.FC<PremiumImageSearchPageProps> = () => {
   const [searchResults, setSearchResults] = useState<PhoneBookEntryWithImage[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(40); // Load 40 images per batch for infinite scroll
   const [isLoading, setIsLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<PhoneBookEntryWithImage | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [showImages, setShowImages] = useState(true); // 2025-01-27: Added toggle for image visibility
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadingRef = useRef<HTMLDivElement>(null);
   
-  // Search filters
-  const [filters, setFilters] = useState({
-    query: '',
-    pep_only: false,
-    atoll: '',
-    island: '',
-    party: '',
-    profession: ''
-  });
-
   // Check if user has sufficient points for image search
   const hasSufficientPoints = user && (user.score ?? 0) >= 10; // Minimum 10 points required for image search
 
-  // Load initial search results
+  // Load initial search results - only active PEP entries with images
   useEffect(() => {
     if (hasSufficientPoints) {
-      performSearch();
+      performSearch(true); // Reset search
     }
   }, [hasSufficientPoints]);
 
-  // Perform premium image search
-  const performSearch = async () => {
+  // Infinite scroll observer setup
+  useEffect(() => {
+    if (loadingRef.current && hasMore && !isLoading) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMore && !isLoading) {
+            loadMoreImages();
+          }
+        },
+        { threshold: 0.1 }
+      );
+      
+      observerRef.current = observer;
+      observer.observe(loadingRef.current);
+      
+      return () => {
+        if (observerRef.current) {
+          observerRef.current.disconnect();
+        }
+      };
+    }
+  }, [hasMore, isLoading]);
+
+  // Perform premium image search - only active PEP entries with images
+  const performSearch = async (reset: boolean = false) => {
     if (!hasSufficientPoints) {
       toast.error('Insufficient points for image search. You need at least 10 points.');
       return;
     }
 
+    if (reset) {
+      setSearchResults([]);
+      setCurrentPage(1);
+      setHasMore(true);
+    }
+
     setIsLoading(true);
     try {
-      const response = await directoryService.premiumImageSearch(filters, currentPage, pageSize);
-      setSearchResults(response.results);
+      // Search for active PEP entries with images only
+      const response = await directoryService.premiumImageSearch({
+        query: '',
+        pep_only: true, // Only PEP entries
+        status: 'active', // Only active entries
+        atoll: '',
+        island: '',
+        party: '',
+        profession: '',
+        page: reset ? 1 : currentPage,
+        page_size: pageSize
+      });
+      
+      if (reset) {
+        setSearchResults(response.results);
+      } else {
+        setSearchResults(prev => [...prev, ...response.results]);
+      }
+      
       setTotalCount(response.total_count);
+      setHasMore(response.results.length === pageSize);
       
       // Deduct points for search
       if (user) {
@@ -67,22 +107,13 @@ const PremiumImageSearchPage: React.FC<PremiumImageSearchPageProps> = () => {
     }
   };
 
-  // Handle search form submission
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCurrentPage(1);
-    performSearch();
-  };
-
-  // Handle filter changes
-  const handleFilterChange = (key: string, value: string | boolean) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
-
-  // Handle page change
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
+  // Load more images for infinite scroll
+  const loadMoreImages = useCallback(() => {
+    if (!isLoading && hasMore) {
+      setCurrentPage(prev => prev + 1);
+      performSearch(false);
+    }
+  }, [isLoading, hasMore]);
 
   // Handle image click to show modal
   const handleImageClick = (entry: PhoneBookEntryWithImage) => {
@@ -90,25 +121,19 @@ const PremiumImageSearchPage: React.FC<PremiumImageSearchPageProps> = () => {
     setShowModal(true);
   };
 
-  // Toggle image visibility
-  const toggleImages = () => {
-    setShowImages(!showImages);
-  };
-
   if (!hasSufficientPoints) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="text-center py-12">
           <div className="text-gray-400 mb-4">
-            <Image className="mx-auto h-16 w-16" />
+            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 002 2z" />
+            </svg>
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Insufficient Points</h3>
-          <p className="text-gray-600 mb-4">
-            You need at least 10 points to access premium image search.
+          <p className="text-gray-600">
+            You need at least 10 points to access the image search feature.
           </p>
-          <div className="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-800 text-sm rounded-lg">
-            <span>Current Points: {user?.score || 0}</span>
-          </div>
         </div>
       </div>
     );
@@ -116,129 +141,21 @@ const PremiumImageSearchPage: React.FC<PremiumImageSearchPageProps> = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* Header */}
+      {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Premium Image Search</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">PEP Image Search</h1>
         <p className="text-gray-600">
-          Search through profiles with images and get comprehensive results.
+          Browse active Politically Exposed Person (PEP) profiles with images. Click on any image to view details.
         </p>
-        <div className="mt-2 inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-lg">
-          <span>Cost: 10 points per search • Available Points: {user?.score || 0}</span>
-        </div>
       </div>
 
-      {/* Search Form */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <form onSubmit={handleSearch} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search Query</label>
-              <input
-                type="text"
-                value={filters.query}
-                onChange={(e) => handleFilterChange('query', e.target.value)}
-                placeholder="Search by name, contact, or other details"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Atoll</label>
-              <input
-                type="text"
-                value={filters.atoll}
-                onChange={(e) => handleFilterChange('atoll', e.target.value)}
-                placeholder="Enter atoll"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Island</label>
-              <input
-                type="text"
-                value={filters.island}
-                onChange={(e) => handleFilterChange('island', e.target.value)}
-                placeholder="Enter island"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Party</label>
-              <input
-                type="text"
-                value={filters.party}
-                onChange={(e) => handleFilterChange('party', e.target.value)}
-                placeholder="Enter political party"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Profession</label>
-              <input
-                type="text"
-                value={filters.profession}
-                onChange={(e) => handleFilterChange('profession', e.target.value)}
-                placeholder="Enter profession"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            
-            <div className="flex items-center">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={filters.pep_only}
-                  onChange={(e) => handleFilterChange('pep_only', e.target.checked)}
-                  className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="text-sm font-medium text-gray-700">PEP Only</span>
-              </label>
-            </div>
-          </div>
-          
-          <div className="flex justify-between items-center">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoading ? (
-                <span className="flex items-center">
-                  <div className="loading-spinner mr-2"></div>
-                  Searching...
-                </span>
-              ) : (
-                <span className="flex items-center">
-                  <Search className="w-4 h-4 mr-2" />
-                  Search Images
-                </span>
-              )}
-            </button>
-            
-            {/* Image Toggle Button */}
-            <button
-              type="button"
-              onClick={toggleImages}
-              className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-            >
-              {showImages ? (
-                <>
-                  <ChevronUp className="w-4 h-4 mr-2" />
-                  Hide Images
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="w-4 h-4 mr-2" />
-                  Show Images
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
+      {/* Loading State */}
+      {isLoading && searchResults.length === 0 && (
+        <div className="text-center py-12">
+          <div className="loading-spinner mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading PEP images...</p>
+        </div>
+      )}
 
       {/* Search Results */}
       {searchResults.length > 0 ? (
@@ -247,102 +164,61 @@ const PremiumImageSearchPage: React.FC<PremiumImageSearchPageProps> = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
             <div>
               <h2 className="text-lg font-medium text-gray-900">
-                Search Results
+                PEP Images
               </h2>
               <p className="text-sm text-gray-500">
-                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} entries with images
+                Showing {searchResults.length} of {totalCount} active PEP entries with images
               </p>
             </div>
           </div>
 
-          {/* Image Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+          {/* 4-Column Image Grid with square images that fill the page width */}
+          <div className="image-grid">
             {searchResults.map((entry) => (
               <div
                 key={entry.pid}
                 onClick={() => handleImageClick(entry)}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                className="image-grid-item cursor-pointer hover:opacity-80 transition-opacity bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
               >
-                {/* Image Section - Collapsible */}
-                {showImages && (
-                  <div className="h-32 bg-gray-100 relative transition-all duration-300 ease-in-out">
-                    {entry.image_url ? (
-                      <img
-                        src={entry.image_url}
-                        alt={entry.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          console.error(`Image failed to load: ${entry.image_url}`, e);
-                          const target = e.target as HTMLImageElement;
-                          target.src = '/placeholder-avatar.png';
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
-                    )}
-                    
-                    {/* PEP Badge */}
-                    {entry.pep_status === 'yes' && (
-                      <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                        PEP
-                      </div>
-                    )}
+                {/* Pure Image - No borders, no backgrounds, no styling */}
+                {entry.image_url ? (
+                  <img
+                    src={entry.image_url}
+                    alt={entry.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      console.error(`Image failed to load: ${entry.image_url}`, e);
+                      const target = e.target as HTMLImageElement;
+                      target.src = '/placeholder-avatar.png';
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                    <User className="w-24 h-24 text-gray-400" />
                   </div>
                 )}
-                
-                {/* Info Section - Always visible */}
-                <div className="p-3">
-                  <h4 className="font-medium text-gray-900 text-sm truncate">{entry.name}</h4>
-                  <p className="text-gray-600 text-xs truncate">{entry.contact}</p>
-                  {entry.profession && (
-                    <p className="text-gray-500 text-xs truncate">{entry.profession}</p>
-                  )}
-                </div>
               </div>
             ))}
           </div>
 
-          {/* Pagination */}
-          {totalCount > pageSize && (
-            <div className="mt-6 flex justify-center">
-              <nav className="flex space-x-2">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                
-                {Array.from({ length: Math.min(5, Math.ceil(totalCount / pageSize)) }, (_, i) => {
-                  const page = i + 1;
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => handlePageChange(page)}
-                      className={`px-3 py-2 text-sm font-medium rounded-md ${
-                        page === currentPage
-                          ? 'bg-blue-600 text-white'
-                          : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  );
-                })}
-                
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage >= Math.ceil(totalCount / pageSize)}
-                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </nav>
+          {/* Infinite Scroll Loading Indicator */}
+          {hasMore && (
+            <div ref={loadingRef} className="mt-8 text-center py-4">
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <div className="loading-spinner mr-2"></div>
+                  <span className="text-gray-600">Loading more images...</span>
+                </div>
+              ) : (
+                <div className="text-gray-500">Scroll down to load more images</div>
+              )}
+            </div>
+          )}
+
+          {/* End of results indicator */}
+          {!hasMore && searchResults.length > 0 && (
+            <div className="mt-8 text-center py-4">
+              <div className="text-gray-500">All images loaded</div>
             </div>
           )}
         </div>
@@ -350,12 +226,12 @@ const PremiumImageSearchPage: React.FC<PremiumImageSearchPageProps> = () => {
         <div className="text-center py-12">
           <div className="text-gray-400 mb-4">
             <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 002 2z" />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No images found</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No PEP images found</h3>
           <p className="text-gray-600">
-            Try adjusting your search criteria to find entries with images.
+            No active PEP entries with images were found.
           </p>
         </div>
       )}
@@ -459,14 +335,12 @@ const PremiumImageSearchPage: React.FC<PremiumImageSearchPageProps> = () => {
                     </div>
                   )}
                   
-                  {selectedEntry.pep_status === 'yes' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">PEP Status</label>
-                      <div className="inline-flex items-center px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
-                        <span>PEP</span>
-                      </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">PEP Status</label>
+                    <div className="inline-flex items-center px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
+                      <span>PEP</span>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>

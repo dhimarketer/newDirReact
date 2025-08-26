@@ -491,8 +491,107 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             has_min_age_filter = data.get('min_age') and data['min_age'] > 0
             has_max_age_filter = data.get('max_age') and data['max_age'] > 0
             is_family_search = data.get('limit_results', False)  # Flag for family searches
+            use_and_logic = data.get('useAndLogic', False)  # Flag for comma-separated queries
             
-            print(f"Search analysis - Address: {has_address_filter}, Island: {has_island_filter}, Query: {has_query}, Family search: {is_family_search}")
+            print(f"Search analysis - Address: {has_address_filter}, Island: {has_island_filter}, Query: {has_query}, Family search: {is_family_search}, Use AND logic: {use_and_logic}")
+            
+            # 2025-01-28: Handle comma-separated queries with AND logic for proper narrowing
+            if use_and_logic:
+                print(f"Comma-separated query detected - using AND logic for all specified fields")
+                
+                # Reset queryset to all entries for comma-separated search
+                queryset = PhoneBookEntry.objects.all()
+                print(f"Reset queryset to all entries: {queryset.count()}")
+                
+                # Build AND query for all specified fields
+                and_conditions = Q()
+                field_count = 0
+                
+                if has_name_filter:
+                    name_query = create_wildcard_query('name', data['name'].strip())
+                    and_conditions &= name_query
+                    field_count += 1
+                    print(f"Added name filter: '{data['name'].strip()}'")
+                
+                if has_address_filter:
+                    address_query = create_wildcard_query('address', data['address'].strip())
+                    and_conditions &= address_query
+                    field_count += 1
+                    print(f"Added address filter: '{data['address'].strip()}'")
+                
+                if has_island_filter:
+                    island_query = create_wildcard_query('island', data['island'].strip())
+                    and_conditions &= island_query
+                    field_count += 1
+                    print(f"Added island filter: '{data['island'].strip()}'")
+                
+                if has_party_filter:
+                    party_query = create_wildcard_query('party', data['party'].strip())
+                    and_conditions &= party_query
+                    field_count += 1
+                    print(f"Added party filter: '{data['party'].strip()}'")
+                
+                if has_contact_filter:
+                    contact_query = create_wildcard_query('contact', data['contact'].strip())
+                    and_conditions &= contact_query
+                    field_count += 1
+                    print(f"Added contact filter: '{data['contact'].strip()}'")
+                
+                if has_nid_filter:
+                    nid_query = create_wildcard_query('nid', data['nid'].strip())
+                    and_conditions &= nid_query
+                    field_count += 1
+                    print(f"Added NID filter: '{data['nid'].strip()}'")
+                
+                if has_profession_filter:
+                    profession_query = create_wildcard_query('profession', data['profession'].strip())
+                    and_conditions &= profession_query
+                    field_count += 1
+                    print(f"Added profession filter: '{data['profession'].strip()}'")
+                
+                if has_gender_filter:
+                    gender_query = create_wildcard_query('gender', data['gender'].strip())
+                    and_conditions &= gender_query
+                    field_count += 1
+                    print(f"Added gender filter: '{data['gender'].strip()}'")
+                
+                if has_min_age_filter:
+                    and_conditions &= Q(age__gte=data['min_age'])
+                    field_count += 1
+                    print(f"Added min age filter: {data['min_age']}")
+                
+                if has_max_age_filter:
+                    and_conditions &= Q(age__lte=data['max_age'])
+                    field_count += 1
+                    print(f"Added max age filter: {data['max_age']}")
+                
+                print(f"Comma-separated query: {field_count} fields with AND logic")
+                
+                # Apply AND logic to get precise results
+                precise_queryset = queryset.filter(and_conditions)
+                print(f"Results after AND logic: {precise_queryset.count()}")
+                
+                if precise_queryset.count() > 0:
+                    queryset = precise_queryset
+                    print("Using precise AND logic results for comma-separated query")
+                    
+                    # Show sample results for debugging
+                    sample_entries = queryset[:3]
+                    for entry in sample_entries:
+                        print(f"Sample result: {entry.name} - Address: {entry.address} - Island: {entry.island} - Party: {entry.party}")
+                else:
+                    print("No results found with AND logic for comma-separated query")
+                    print("This combination of fields may not exist in the database")
+                
+                # Return early since we've handled the comma-separated query
+                serializer = PhoneBookEntrySerializer(queryset, many=True)
+                return Response({
+                    'count': queryset.count(),
+                    'results': serializer.data,
+                    'search_type': 'comma_separated_and_logic',
+                    'fields_used': field_count,
+                    'logic_applied': 'AND'
+                })
             
             # PRIORITY: Handle specific field filters FIRST (address+island, address+party, etc.)
             # This ensures that when users search with specific fields, they get precise results
@@ -1081,6 +1180,7 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             # Get query parameters
             query = request.query_params.get('query', '')
             pep_only = request.query_params.get('pep_only', 'false').lower() == 'true'
+            status = request.query_params.get('status', '')  # 2025-01-28: Added status filter
             atoll = request.query_params.get('atoll', '')
             island = request.query_params.get('island', '')
             party = request.query_params.get('party', '')
@@ -1090,12 +1190,18 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             queryset = PhoneBookEntry.objects.exclude(image_status__isnull=True).exclude(image_status='0')
             
             # Debug: Log the search parameters
-            print(f"Premium image search - Query: '{query}', Party: '{party}', PEP only: {pep_only}")
+            print(f"Premium image search - Query: '{query}', Party: '{party}', PEP only: {pep_only}, Status: '{status}'")
             print(f"Initial queryset count (entries with images): {queryset.count()}")
+            
+            # Apply status filter if requested (2025-01-28: Added status filtering)
+            if status:
+                queryset = queryset.filter(status=status)
+                print(f"Filtered by status '{status}': {queryset.count()} entries")
             
             # Apply PEP filter if requested
             if pep_only:
                 queryset = queryset.filter(pep_status='1')  # 1 means PEP in your data
+                print(f"Filtered by PEP status: {queryset.count()} entries")
             
             # Apply search filters
             if query:

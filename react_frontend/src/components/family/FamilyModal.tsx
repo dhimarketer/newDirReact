@@ -375,21 +375,42 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
       setIsLoadingRelationships(true); // 2025-01-28: Set loading state
       
       const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      console.log('🔐 Authentication debug for fetchFamilyRelationships:', {
+        tokenExists: !!token,
+        tokenLength: token?.length,
+        tokenPreview: token ? `${token.substring(0, 20)}...` : 'none',
+        familyGroupId: familyGroupId
+      });
+      
       const headers: HeadersInit = {
         'Content-Type': 'application/json'
       };
       
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+        console.log('✅ Authorization header set:', `Bearer ${token.substring(0, 20)}...`);
+      } else {
+        console.warn('⚠️ No auth token found - request will fail with 401');
       }
       
-      const response = await fetch(`/api/family/groups/${familyGroupId}/relationships/`, {
+      const apiUrl = `/api/family/groups/${familyGroupId}/relationships/`;
+      console.log('🌐 Making request to:', apiUrl);
+      console.log('📋 Request headers:', headers);
+      
+      const response = await fetch(apiUrl, {
         headers
+      });
+      
+      console.log('📡 Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
       });
       
       if (response.ok) {
         const relationshipsData = await response.json();
-        console.log('Fetched family relationships:', relationshipsData);
+        console.log('✅ Fetched family relationships:', relationshipsData);
         
         // 2025-01-28: Transform backend data to match frontend interface
         // 2025-01-28: FIXED: Handle paginated response structure - use results array
@@ -416,7 +437,15 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
           valid: r.id && r.person1 && r.person2 && r.relationship_type
         })));
         
-        setFamilyRelationships(transformedRelationships);
+        // 2025-01-28: ENHANCED: Merge with existing relationships to preserve frontend state
+        const mergedRelationships = mergeRelationships(familyRelationships, transformedRelationships);
+        console.log('Merged relationships:', {
+          existing: familyRelationships.length,
+          fetched: transformedRelationships.length,
+          merged: mergedRelationships.length
+        });
+        
+        setFamilyRelationships(mergedRelationships);
       } else {
         console.log('Failed to fetch relationships:', response.status);
         setFamilyRelationships([]);
@@ -427,6 +456,48 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
     } finally {
       setIsLoadingRelationships(false); // 2025-01-28: Clear loading state
     }
+  };
+
+  // 2025-01-28: ENHANCED: Function to merge relationships without losing frontend state
+  const mergeRelationships = (existing: FamilyRelationship[], fetched: FamilyRelationship[]): FamilyRelationship[] => {
+    // 2025-01-28: Create a map of existing relationships by their unique pair
+    const existingMap = new Map<string, FamilyRelationship>();
+    existing.forEach(rel => {
+      const pair = JSON.stringify([Math.min(rel.person1, rel.person2), Math.max(rel.person1, rel.person2)]);
+      existingMap.set(pair, rel);
+    });
+    
+    // 2025-01-28: Create a map of fetched relationships by their unique pair
+    const fetchedMap = new Map<string, FamilyRelationship>();
+    fetched.forEach(rel => {
+      const pair = JSON.stringify([Math.min(rel.person1, rel.person2), Math.max(rel.person1, rel.person2)]);
+      fetchedMap.set(pair, rel);
+    });
+    
+    // 2025-01-28: Merge: use fetched relationships, but preserve any frontend-only relationships
+    const merged = new Map<string, FamilyRelationship>();
+    
+    // 2025-01-28: Add all fetched relationships first
+    fetchedMap.forEach((rel, pair) => {
+      merged.set(pair, rel);
+    });
+    
+    // 2025-01-28: Add any existing relationships that aren't in fetched (frontend-only)
+    existingMap.forEach((rel, pair) => {
+      if (!fetchedMap.has(pair)) {
+        merged.set(pair, rel);
+      }
+    });
+    
+    const result = Array.from(merged.values());
+    console.log('Relationship merge result:', {
+      existingCount: existing.length,
+      fetchedCount: fetched.length,
+      mergedCount: result.length,
+      frontendOnly: existing.length + fetched.length - result.length
+    });
+    
+    return result;
   };
 
   // 2025-01-28: ENHANCED: Function to handle relationship changes from FamilyTreeVisualization
@@ -443,64 +514,33 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
       preview: tokenBefore ? `${tokenBefore.substring(0, 20)}...` : 'none'
     });
     
-    try {
-      // 2025-01-28: Update local state immediately for responsive UI
-      setFamilyRelationships(newRelationships);
+    // 2025-01-28: CRITICAL FIX: Store the current relationships BEFORE updating state
+    // 2025-01-28: This prevents the comparison logic from using already-updated state
+    const currentRelationships = [...familyRelationships];
+    
+    // 2025-01-28: CRITICAL FIX: FamilyTreeVisualization now sends only NEW relationships
+    // 2025-01-28: Merge the new relationships with existing ones to maintain complete state
+    const mergedRelationships = [...currentRelationships, ...newRelationships];
+    console.log('Merging relationships:', {
+      existing: currentRelationships.length,
+      new: newRelationships.length,
+      merged: mergedRelationships.length
+    });
+    
+    // 2025-01-28: Update local state with merged relationships for responsive UI
+    setFamilyRelationships(mergedRelationships);
+    
+    // 2025-01-28: If we have a family group, update the backend
+    if (hasCustomFamily) {
+      console.log('Updating existing family group with new relationships');
       
-      // 2025-01-28: If we have a family group, update the backend
-      if (hasCustomFamily) {
-        console.log('Updating existing family group with new relationships');
-        
-        try {
-          // 2025-01-28: Update the existing family group with both members and relationships
-          if (familyGroupId) {
-            const response = await fetch('/api/family/groups/create_or_update_by_address/', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)}`
-              },
-              body: JSON.stringify({
-                address: address,
-                island: island,
-                members: familyMembers.map(member => ({
-                  entry_id: member.entry.pid,
-                  role: member.role
-                })),
-                relationships: newRelationships.map(rel => ({
-                  person1_id: rel.person1,
-                  person2_id: rel.person2,
-                  relationship_type: rel.relationship_type,
-                  notes: rel.notes || ''
-                }))
-              })
-            });
-            
-            if (response.ok) {
-              console.log('Family group updated successfully with members and relationships');
-              
-              // 2025-01-28: CRITICAL: Refresh relationships from backend to ensure state consistency
-              console.log('Refreshing relationships from backend after save...');
-              await fetchFamilyRelationships(familyGroupId);
-              
-              alert('Family relationships updated and saved successfully!');
-            } else {
-              const errorData = await response.json();
-              throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-            }
-          } else {
-            console.error('No family group ID available');
-            alert('Error: Family group ID not found. Changes will not be persisted.');
-          }
-        } catch (error) {
-          console.error('Failed to save relationships to existing family group:', error);
-          alert('Failed to save relationships. Changes will not be persisted.');
-        }
-      } else {
-        console.log('No existing family group - creating one to persist relationships');
-        
-        // 2025-01-28: Create a new family group to persist the relationships
-        try {
+      try {
+        // 2025-01-28: Update the existing family group with both members and relationships
+        if (familyGroupId) {
+          // 2025-01-28: CRITICAL FIX: Since we're receiving only new relationships, no need to filter
+          // 2025-01-28: All received relationships are new and should be saved
+          console.log('Saving new relationships to backend:', newRelationships);
+          
           const response = await fetch('/api/family/groups/create_or_update_by_address/', {
             method: 'POST',
             headers: {
@@ -514,6 +554,7 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
                 entry_id: member.entry.pid,
                 role: member.role
               })),
+              // 2025-01-28: Send all new relationships since they're guaranteed to be new
               relationships: newRelationships.map(rel => ({
                 person1_id: rel.person1,
                 person2_id: rel.person2,
@@ -524,64 +565,100 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
           });
           
           if (response.ok) {
-            const familyGroup = await response.json();
-            console.log('Family group created successfully:', familyGroup);
-            setHasCustomFamily(true);
-            setFamilyGroupId(familyGroup.id); // 2025-01-28: Store the new family group ID
+            console.log('Family group updated successfully with new relationships');
             
             // 2025-01-28: CRITICAL: Refresh relationships from backend to ensure state consistency
-            console.log('Refreshing relationships from backend after creating new family group...');
-            await fetchFamilyRelationships(familyGroup.id);
+            console.log('Refreshing relationships from backend after save...');
+            await fetchFamilyRelationships(familyGroupId);
             
-            // 2025-01-28: CRITICAL: Ensure relationships are still set after saving
-            console.log('After saving relationships, current familyRelationships state:', familyRelationships);
-            console.log('Re-asserting relationships to prevent loss:', newRelationships);
-            setFamilyRelationships(newRelationships);
-            
-            alert('Family group created and relationships saved successfully!');
+            alert('Family relationships updated and saved successfully!');
           } else {
-            console.error('Failed to create family group:', response.status);
-            alert('Failed to create family group. Relationships will not be persisted.');
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
           }
-        } catch (error) {
-          console.error('Error creating family group:', error);
-          alert('Error creating family group. Relationships will not be persisted.');
+        } else {
+          console.error('No family group ID available');
+          alert('Error: Family group ID not found. Changes will not be persisted.');
         }
+      } catch (error) {
+        console.error('Failed to save relationships to existing family group:', error);
+        alert('Failed to save relationships. Changes will not be persisted.');
+        
+        // 2025-01-28: CRITICAL: Revert to previous state if save failed
+        console.log('Reverting to previous relationship state due to save failure');
+        setFamilyRelationships(currentRelationships);
       }
+    } else {
+      console.log('No existing family group - creating one to persist relationships');
       
-      // 2025-01-28: DEBUG: Check token state after relationship change
-      const tokenAfter = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      console.log('Token state after relationship change:', {
-        exists: !!tokenAfter,
-        length: tokenAfter?.length,
-        preview: tokenAfter ? `${tokenAfter.substring(0, 20)}...` : 'none',
-        changed: tokenBefore !== tokenAfter
-      });
-      
-      // 2025-01-28: DEBUG: Test API call immediately after relationship change
-      if (tokenAfter) {
-        console.log('Testing API call immediately after relationship change...');
-        try {
-          const testResponse = await fetch('/api/family/groups/by_address/?address=test&island=test', {
-            headers: {
-              'Authorization': `Bearer ${tokenAfter}`,
-              'Content-Type': 'application/json'
-            }
+      // 2025-01-28: Create a new family group to persist the relationships
+      try {
+        const response = await fetch('/api/family/groups/create_or_update_by_address/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)}`
+          },
+          body: JSON.stringify({
+            address: address,
+            island: island,
+            members: familyMembers.map(member => ({
+              entry_id: member.entry.pid,
+              role: member.role
+            })),
+            relationships: newRelationships.map(rel => ({
+              person1_id: rel.person1,
+              person2_id: rel.person2,
+              relationship_type: rel.relationship_type,
+              notes: rel.notes || ''
+            }))
+          })
+        });
+        
+        if (response.ok) {
+          const familyGroup = await response.json();
+          console.log('Family group created successfully:', familyGroup);
+          setHasCustomFamily(true);
+          setFamilyGroupId(familyGroup.id); // 2025-01-28: Store the new family group ID
+          
+          // 2025-01-28: CRITICAL: Refresh relationships from backend to ensure state consistency
+          console.log('Refreshing relationships from backend after creating new family group...');
+          
+          // 2025-01-28: DEBUG: Check token state before fetching relationships
+          const tokenBeforeFetch = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+          console.log('🔐 Token state before fetchFamilyRelationships:', {
+            exists: !!tokenBeforeFetch,
+            length: tokenBeforeFetch?.length,
+            preview: tokenBeforeFetch ? `${tokenBeforeFetch.substring(0, 20)}...` : 'none'
           });
-          console.log('Test API call result:', {
-            status: testResponse.status,
-            ok: testResponse.ok,
-            statusText: testResponse.statusText
-          });
-        } catch (testError) {
-          console.error('Test API call failed:', testError);
+          
+          await fetchFamilyRelationships(familyGroup.id);
+          
+          // 2025-01-28: CRITICAL: Ensure relationships are still set after saving
+          console.log('After saving relationships, current familyRelationships state:', familyRelationships);
+          console.log('Re-asserting relationships to prevent loss:', newRelationships);
+          setFamilyRelationships(newRelationships);
+          
+          alert('Family group created and relationships saved successfully!');
+        } else {
+          console.error('Failed to create family group:', response.status);
+          alert('Failed to create family group. Relationships will not be persisted.');
         }
+      } catch (error) {
+        console.error('Error creating family group:', error);
+        alert('Error creating family group. Relationships will not be persisted.');
       }
-      
-    } catch (error) {
-      console.error('Error updating relationships:', error);
-      alert('Error updating family relationships. Please try again.');
     }
+    
+    // 2025-01-28: DEBUG: Check token state after relationship change
+    const tokenAfter = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    console.log('Token state after relationship change:', {
+      exists: !!tokenAfter,
+      length: tokenAfter?.length,
+      preview: tokenAfter ? `${tokenAfter.substring(0, 20)}...` : 'none',
+      changed: tokenBefore !== tokenAfter
+    });
+    
   };
 
   // 2025-01-28: Handle family tree update

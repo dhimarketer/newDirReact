@@ -9,7 +9,7 @@ import { SearchFilters } from '../../types/directory';
 import { directoryService } from '../../services/directoryService';
 import { SEARCH } from '../../utils/constants';
 import { toast } from 'react-hot-toast';
-import { parseSmartQuery, formatParsedQuery } from '../../utils/searchQueryParser';
+import { parseEnhancedQuery, formatEnhancedParsedQuery } from '../../utils/enhancedSearchQueryParser';
 
 interface SearchBarProps {
   onSearch: (filters: SearchFilters) => void;
@@ -74,8 +74,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
     // Parse the query to show what fields were detected
     if (newQuery.trim()) {
       try {
-        const parsed = await parseSmartQuery(newQuery);
-        const formatted = formatParsedQuery(parsed);
+        const parsed = await parseEnhancedQuery(newQuery);
+        const formatted = formatEnhancedParsedQuery(parsed);
         setParsedQueryInfo(formatted);
       } catch (error) {
         console.error('Error parsing query:', error);
@@ -117,7 +117,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
     if (query.trim()) {
       try {
         // Parse the smart query to extract specific filters
-        const parsed = await parseSmartQuery(query.trim());
+        const parsed = await parseEnhancedQuery(query.trim());
         
         // Clear all existing specific field filters and use only the parsed ones
         // This prevents old filter values from persisting between searches
@@ -141,12 +141,31 @@ const SearchBar: React.FC<SearchBarProps> = ({
         // Merge parsed filters with cleared filters
         const mergedFilters = { ...clearedFilters, ...parsed.filters };
         
+        // Check if this is a comma-separated query (should use AND logic)
+        const isCommaSeparated = (parsed.filters as any)._commaSeparated;
+        
         // If we have specific filters from parsing, use them
+        console.log('🔍 SearchBar: Parsed result:', parsed);
+        console.log('🔍 SearchBar: Parsed filters:', parsed.filters);
+        console.log('🔍 SearchBar: Filter keys:', Object.keys(parsed.filters));
+        console.log('🔍 SearchBar: Filter count:', Object.keys(parsed.filters).length);
+        
         if (Object.keys(parsed.filters).length > 0) {
-          console.log('Smart search with parsed filters:', parsed.filters);
+          console.log('✅ Smart search with parsed filters:', parsed.filters);
+          console.log('✅ Comma-separated query (AND logic):', isCommaSeparated);
+          
+          // Remove the internal flag before sending to backend
+          if (isCommaSeparated) {
+            delete (mergedFilters as any)._commaSeparated;
+            // Add a flag to indicate this should use AND logic
+            (mergedFilters as any).useAndLogic = true;
+          }
+          
           onSearch(mergedFilters);
         } else {
           // Fallback to general search
+          console.log('❌ No specific filters found, falling back to general search');
+          console.log('❌ This is why you get 34 results instead of 1!');
           onSearch(clearedFilters);
         }
         
