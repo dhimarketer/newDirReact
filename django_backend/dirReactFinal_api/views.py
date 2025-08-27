@@ -1441,6 +1441,16 @@ class AnalyticsViewSet(viewsets.ViewSet):
     
     def list(self, request):
         """Get basic analytics overview"""
+        # 2025-01-28: DEBUG - Log request details
+        print(f"=== ANALYTICS DEBUG ===")
+        print(f"DEBUG: User authenticated: {request.user.is_authenticated}")
+        print(f"DEBUG: User username: {request.user.username}")
+        print(f"DEBUG: User is_superuser: {request.user.is_superuser}")
+        print(f"DEBUG: User is_staff: {request.user.is_staff}")
+        print(f"DEBUG: User user_type: {getattr(request.user, 'user_type', 'N/A')}")
+        print(f"DEBUG: Request headers: {dict(request.headers)}")
+        print(f"=== END ANALYTICS DEBUG ===")
+        
         try:
             # Basic statistics
             total_users = User.objects.count()

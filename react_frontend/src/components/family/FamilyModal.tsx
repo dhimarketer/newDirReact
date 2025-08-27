@@ -821,6 +821,24 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
     }
   };
 
+  // 2025-01-28: Format name with age suffix
+  const formatNameWithAge = (name: string, dob?: string): string => {
+    if (!dob) return name;
+    try {
+      const birthDate = new Date(dob);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        return `${name} (${age - 1})`;
+      }
+      return `${name} (${age})`;
+    } catch {
+      return name;
+    }
+  };
+
   if (!isOpen) return null;
 
   console.log('FamilyModal is rendering!', { isOpen, address, island, familyMembersLength: familyMembers.length });
@@ -961,7 +979,7 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
                             <br />
                             <strong>Relationships:</strong> {familyRelationships.length} defined
                             <br />
-                            <strong>All Members:</strong> {familyMembers.map(m => m.entry.name).join(', ')}
+                            <strong>All Members:</strong> {familyMembers.map(m => formatNameWithAge(m.entry.name, m.entry.DOB)).join(', ')}
                           </div>
                           
                           <FamilyTreeVisualization 

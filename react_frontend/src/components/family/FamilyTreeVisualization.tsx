@@ -1255,6 +1255,24 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
     const isSelected = selectedNode === node.id;
     const isPending = pendingRelationship?.fromNode === node.id;
     
+    // Format name with age suffix
+    const formatNameWithAge = (name: string, dob?: string): string => {
+      if (!dob) return name;
+      try {
+        const birthDate = new Date(dob);
+        const today = new Date();
+        const calculatedAge = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          return `${name} (${calculatedAge - 1})`;
+        }
+        return `${name} (${calculatedAge})`;
+      } catch {
+        return name;
+      }
+    };
+    
     return (
       <g key={node.id}>
         {/* 2025-01-28: Node background */}
@@ -1278,7 +1296,7 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
           }}
         />
         
-        {/* 2025-01-28: Member name */}
+        {/* 2025-01-28: Member name with age suffix */}
         <text
           x={node.x + node.width / 2}
           y={node.y + 20}
@@ -1287,29 +1305,18 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
           fontWeight="600"
           fill="#1f2937"
         >
-          {member.entry.name || 'Unknown'}
+          {formatNameWithAge(member.entry.name || 'Unknown', member.entry.DOB)}
         </text>
         
-        {/* 2025-01-28: Age display */}
-        {age && (
-          <text
-            x={node.x + node.width / 2}
-            y={node.y + 35}
-            textAnchor="middle"
-            fontSize="10"
-            fill="#6b7280"
-          >
-            ({age})
-          </text>
-        )}
+        {/* Remove separate age display since it's now part of the name */}
         
         {/* 2025-01-28: Contact number */}
         {member.entry.contact && (
           <text
             x={node.x + node.width / 2}
-            y={node.y + 50}
+            y={node.y + 35}
             textAnchor="middle"
-            fontSize="9"
+            fontSize="10"
             fill="#6b7280"
           >
             {member.entry.contact}

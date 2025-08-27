@@ -1,6 +1,7 @@
 // 2025-01-28: NEW - Dedicated family tree window component for better user experience
 // 2025-01-28: Replaces embedded modal approach with focused, expandable window
 // 2025-01-28: Implements responsive design and proper window sizing
+// 2025-01-28: ENHANCED: Added drag-and-drop family relationship editing functionality
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -8,6 +9,7 @@ import { STORAGE_KEYS } from '../../utils/constants';
 import { useAuthStore } from '../../store/authStore';
 import { familyService } from '../../services/familyService';
 import ClassicFamilyTree from './ClassicFamilyTree';
+import RelationshipManager from './RelationshipManager';
 import { PhoneBookEntry } from '../../types/directory';
 
 interface FamilyTreeWindowProps {
@@ -56,6 +58,9 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [windowPosition, setWindowPosition] = useState({ x: 50, y: 50 });
+  
+  // 2025-01-28: ENHANCED: Added state for editing mode
+  const [isEditingMode, setIsEditingMode] = useState(false);
   
   const windowRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -140,7 +145,7 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     }
   }, [isOpen, address, island]);
 
-  // Fetch family members from API
+  // Fetch family members for the given address
   const fetchFamilyMembers = async () => {
     // 2025-01-28: ADDED - Check if there's a valid token before making API call
     const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
@@ -162,9 +167,21 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
       console.log('DEBUG: API response:', response);
       console.log('DEBUG: Response success:', response.success);
       console.log('DEBUG: Response data:', response.data);
+      console.log('DEBUG: Response notFound:', response.notFound);
       console.log('DEBUG: Members array:', response.data?.members);
       console.log('DEBUG: Relationships array:', response.data?.relationships);
       console.log('=== END FAMILY TREE WINDOW DEBUG ===');
+      
+      // 2025-01-28: NEW - Handle notFound flag to distinguish between missing family vs actual errors
+      if (response.notFound) {
+        // Family group doesn't exist - show create button
+        setFamilyMembers([]);
+        setFamilyRelationships([]);
+        setFamilyGroupExists(false);
+        setFamilyGroupData(null);
+        setError(null); // Clear any previous errors
+        return;
+      }
       
       if (response.success && response.data) {
         const members = response.data.members || [];
@@ -187,7 +204,7 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
             street: member.entry?.street || '',
             ward: member.entry?.ward || '',
             party: member.entry?.party || '',
-            DOB: member.entry?.DOB || member.entry_dob || member.dob || '',
+            DOB: member.entry?.DOB || member.entry_dob || member.dob || member.entry?.dob || '',
             status: member.entry?.status || '',
             remark: member.entry?.remark || '',
             email: member.entry?.email || '',
@@ -220,14 +237,15 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
         setFamilyGroupExists(true); // Assume family group exists if data is returned
         setFamilyGroupData(response.data); // Store full response data
       } else {
-        setError('Failed to fetch family data');
-        setFamilyGroupExists(false); // No family group found
+        // 2025-01-28: NEW - Only show error for actual failures, not for missing family groups
+        setError(response.error || 'Failed to fetch family data');
+        setFamilyGroupExists(false);
         setFamilyGroupData(null);
       }
     } catch (err) {
       console.error('Error fetching family members:', err);
       setError('Error loading family data');
-      setFamilyGroupExists(false); // No family group found
+      setFamilyGroupExists(false);
       setFamilyGroupData(null);
     } finally {
       setIsLoading(false);
@@ -257,6 +275,24 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     }
   };
 
+  // 2025-01-28: ENHANCED: Handle relationship changes from RelationshipManager
+  const handleRelationshipChange = (updatedRelationships: FamilyRelationship[]) => {
+    setFamilyRelationships(updatedRelationships);
+    // TODO: Save relationships to backend
+    console.log('Relationships updated:', updatedRelationships);
+  };
+
+  // 2025-01-28: ENHANCED: Handle family member changes (exclusions/inclusions)
+  const handleFamilyMembersChange = (updatedMembers: FamilyMember[]) => {
+    setFamilyMembers(updatedMembers);
+    console.log('Family members updated:', updatedMembers);
+  };
+
+  // 2025-01-28: ENHANCED: Toggle editing mode
+  const toggleEditingMode = () => {
+    setIsEditingMode(!isEditingMode);
+  };
+
   // Handle window close
   const handleClose = () => {
     setFamilyMembers([]);
@@ -275,44 +311,105 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     return null;
   }
 
-  return (
-    <div className="family-tree-window">
-      <div className="family-tree-header">
-        <h3>Family Tree - {address}, {island}</h3>
-        <button onClick={onClose} className="close-button">×</button>
-      </div>
-      
-      <div className="family-tree-content">
-        <div className="family-tree-header">
-          <h4>Family Tree Visualization</h4>
-          <p>Showing {familyMembers.length} family members with their relationships.</p>
-        </div>
-        
-        {isLoading ? (
-          <div className="loading-state">
-            <p>Loading family tree...</p>
+  return createPortal(
+    <div className="family-tree-overlay" onClick={onClose}>
+      <div
+        ref={windowRef}
+        className="family-tree-window"
+        style={{
+          width: `${windowSize.width}px`,
+          height: `${windowSize.height}px`,
+          left: `${windowPosition.x}px`,
+          top: `${windowPosition.y}px`
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Window Header */}
+        <div 
+          ref={headerRef}
+          className="family-tree-header"
+          onMouseDown={startDrag}
+        >
+          <div className="family-tree-title">
+            <h2>Family Tree - {address}, {island}</h2>
+            <div className="family-tree-subtitle">
+              {familyMembers.length} family members
+            </div>
           </div>
-        ) : error ? (
-          <div className="error-state">
-            <p>Error: {error}</p>
-          </div>
-        ) : familyMembers.length === 0 ? (
-          <div className="empty-state">
-            <p>No family members found for this address.</p>
-            <button onClick={handleCreateFamilyGroup} disabled={isCreatingFamily}>
-              {isCreatingFamily ? 'Creating...' : 'Create Family Group'}
+          
+          <div className="family-tree-controls">
+            {/* 2025-01-28: ENHANCED: Added Edit Family Tree button */}
+            <button
+              onClick={toggleEditingMode}
+              className={`edit-family-btn ${isEditingMode ? 'active' : ''}`}
+              title={isEditingMode ? 'Exit Edit Mode' : 'Edit Family Tree'}
+            >
+              {isEditingMode ? '✏️ Exit Edit' : '✏️ Edit Tree'}
+            </button>
+            
+            <button
+              onClick={onClose}
+              className="close-btn"
+              title="Close window"
+            >
+              ✕
             </button>
           </div>
-        ) : (
-          <div className="family-tree-container">
-            <ClassicFamilyTree 
-              familyMembers={familyMembers}
-              relationships={familyRelationships}
-            />
-          </div>
-        )}
+        </div>
+
+        {/* Window Content */}
+        <div className="family-tree-content">
+          {isLoading ? (
+            <div className="loading-state">
+              <div className="loading-spinner"></div>
+              <p>Loading family data...</p>
+            </div>
+          ) : error ? (
+            <div className="error-state">
+              <p>Error: {error}</p>
+            </div>
+          ) : familyMembers.length === 0 ? (
+            <div className="empty-state">
+              <p>No family members found for this address.</p>
+              <button
+                onClick={handleCreateFamilyGroup}
+                className="create-family-btn"
+                disabled={isCreatingFamily}
+              >
+                {isCreatingFamily ? 'Creating...' : 'Create Family Group'}
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* 2025-01-28: ENHANCED: Show RelationshipManager when in editing mode */}
+              {isEditingMode ? (
+                <RelationshipManager
+                  familyMembers={familyMembers}
+                  relationships={familyRelationships}
+                  onRelationshipChange={handleRelationshipChange}
+                  onFamilyMembersChange={handleFamilyMembersChange}
+                  isEditable={true}
+                />
+              ) : (
+                /* Show ClassicFamilyTree when not editing */
+                <ClassicFamilyTree
+                  familyMembers={familyMembers}
+                  relationships={familyRelationships}
+                />
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Resize Handle */}
+        <div
+          ref={resizeHandleRef}
+          className="resize-handle"
+          onMouseDown={startResize}
+        />
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

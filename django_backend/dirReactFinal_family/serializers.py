@@ -9,7 +9,7 @@ class PhoneBookEntrySerializer(serializers.ModelSerializer):
     """Serializer for phone book entries in family context"""
     class Meta:
         model = PhoneBookEntry
-        fields = ['id', 'name', 'phone_number', 'island', 'address', 'party', 'number']
+        fields = ['pid', 'name', 'contact', 'island', 'address', 'party', 'DOB', 'gender']
 
 class FamilyGroupSerializer(serializers.ModelSerializer):
     """Basic serializer for family groups"""
@@ -39,9 +39,9 @@ class FamilyGroupDetailSerializer(FamilyGroupSerializer):
         fields = FamilyGroupSerializer.Meta.fields + ['members', 'relationships']
     
     def get_members(self, obj):
-        """Get basic member information"""
+        """Get detailed member information including full entry data"""
         members = obj.members.all()[:10]  # Limit to first 10 for performance
-        return FamilyMemberSerializer(members, many=True).data
+        return FamilyMemberDetailSerializer(members, many=True).data
     
     def get_relationships(self, obj):
         """Get basic relationship information"""

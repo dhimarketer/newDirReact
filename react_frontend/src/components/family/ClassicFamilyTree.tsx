@@ -40,17 +40,82 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
       return { parents: [], children: [] };
     }
 
-    // 2025-01-28: FIXED - Show all family members instead of restrictive filtering
-    // For now, show first 2 as parents and rest as children to ensure all are visible
-    const parents = validMembers.slice(0, 2);
-    const children = validMembers.slice(2);
-    
-    // If we have less than 2 members, adjust accordingly
-    if (validMembers.length === 1) {
-      return { parents: validMembers, children: [] };
+    // 2025-01-28: ENHANCED: Use relationships data to determine family structure instead of hardcoded logic
+    if (relationships && relationships.length > 0) {
+      // Build family structure from relationships
+      const parentChildMap = new Map<number, number[]>(); // parent -> children
+      const childParentMap = new Map<number, number[]>(); // child -> parents
+      const spouseMap = new Map<number, number[]>(); // person -> spouses
+      
+      // Process relationships to build family structure
+      relationships.forEach(rel => {
+        if (rel.is_active) {
+          switch (rel.relationship_type) {
+            case 'parent':
+              // person1 is parent of person2
+              if (!parentChildMap.has(rel.person1)) {
+                parentChildMap.set(rel.person1, []);
+              }
+              parentChildMap.get(rel.person1)!.push(rel.person2);
+              
+              if (!childParentMap.has(rel.person2)) {
+                childParentMap.set(rel.person2, []);
+              }
+              childParentMap.get(rel.person2)!.push(rel.person1);
+              break;
+              
+            case 'spouse':
+              // Both are spouses
+              if (!spouseMap.has(rel.person1)) {
+                spouseMap.set(rel.person1, []);
+              }
+              spouseMap.get(rel.person1)!.push(rel.person2);
+              
+              if (!spouseMap.has(rel.person2)) {
+                spouseMap.set(rel.person2, []);
+              }
+              spouseMap.get(rel.person2)!.push(rel.person1);
+              break;
+          }
+        }
+      });
+      
+      // Find people who are parents (have children)
+      const parents = validMembers.filter(member => 
+        parentChildMap.has(member.entry.pid) && parentChildMap.get(member.entry.pid)!.length > 0
+      );
+      
+      // Find people who are children (have parents)
+      const children = validMembers.filter(member => 
+        childParentMap.has(member.entry.pid) && childParentMap.get(member.entry.pid)!.length > 0
+      );
+      
+      // If no clear parent-child relationships, fall back to original logic
+      if (parents.length === 0 && children.length === 0) {
+        const firstTwo = validMembers.slice(0, 2);
+        const rest = validMembers.slice(2);
+        return { 
+          parents: firstTwo, 
+          children: rest, 
+          parentChildMap, 
+          childParentMap, 
+          spouseMap 
+        };
+      }
+      
+      return { 
+        parents: parents.length > 0 ? parents : validMembers.slice(0, 2), 
+        children: children.length > 0 ? children : validMembers.slice(2),
+        parentChildMap,
+        childParentMap,
+        spouseMap
+      };
     }
     
-    return { parents, children };
+    // Fallback to original logic if no relationships
+    const firstTwo = validMembers.slice(0, 2);
+    const rest = validMembers.slice(2);
+    return { parents: firstTwo, children: rest };
   }, [familyMembers, relationships]);
 
   // Calculate tree dimensions
@@ -101,6 +166,69 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
     return firstNodeLeftEdge + index * (treeDimensions.nodeWidth + spacing);
   };
 
+  // Calculate connections between family members
+  const connections = useMemo(() => {
+    const connections: Array<{
+      from: { x: number; y: number };
+      to: { x: number; y: number };
+      type: string;
+    }> = [];
+    
+    // Add parent-child connections
+    organizedMembers.parentChildMap?.forEach((childIds, parentId) => {
+      const parent = organizedMembers.parents.find(p => p.entry.pid === parentId);
+      if (parent) {
+        const parentIndex = organizedMembers.parents.findIndex(p => p.entry.pid === parentId);
+        const parentX = calculateCenteredPosition(parentIndex, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2;
+        const parentY = 50 + treeDimensions.nodeHeight;
+        
+        childIds.forEach(childId => {
+          const child = organizedMembers.children.find(c => c.entry.pid === childId);
+          if (child) {
+            const childIndex = organizedMembers.children.findIndex(c => c.entry.pid === childId);
+            const childX = calculateCenteredPosition(childIndex, organizedMembers.children.length, treeDimensions.childSpacing) + treeDimensions.nodeWidth / 2;
+            const childY = 220;
+            
+            connections.push({
+              from: { x: parentX, y: parentY },
+              to: { x: childX, y: childY },
+              type: 'parent-child'
+            });
+          }
+        });
+      }
+    });
+    
+    // Add spouse connections between parents
+    if (organizedMembers.spouseMap) {
+      organizedMembers.spouseMap?.forEach((spouseIds, personId) => {
+        const person = organizedMembers.parents.find(p => p.entry.pid === personId);
+        if (person) {
+          const personIndex = organizedMembers.parents.findIndex(p => p.entry.pid === personId);
+          const personX = calculateCenteredPosition(personIndex, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2;
+          const personY = 50 + treeDimensions.nodeHeight / 2;
+          
+          spouseIds.forEach(spouseId => {
+            const spouse = organizedMembers.parents.find(p => p.entry.pid === spouseId);
+            if (spouse && spouseId > personId) { // Only draw once per pair
+              const spouseIndex = organizedMembers.parents.findIndex(p => p.entry.pid === spouseId);
+              const spouseX = calculateCenteredPosition(spouseIndex, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2;
+              const spouseY = 50 + treeDimensions.nodeHeight / 2;
+              
+              connections.push({
+                from: { x: personX, y: personY },
+                to: { x: spouseX, y: spouseY },
+                type: 'spouse'
+              });
+            }
+          });
+        }
+      });
+    }
+    
+    return connections;
+  }, [organizedMembers, treeDimensions]);
+
   // Format age from DOB
   const formatAge = (dob?: string): string => {
     if (!dob) return '';
@@ -111,12 +239,20 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
       const monthDiff = today.getMonth() - birthDate.getMonth();
       
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        return `(${age - 1})`;
+        return (age - 1).toString();
       }
-      return `(${age})`;
+      return age.toString();
     } catch {
       return '';
     }
+  };
+
+  // Format name with age suffix
+  const formatNameWithAge = (name: string, dob?: string): string => {
+    if (!dob) return name;
+    const age = formatAge(dob);
+    if (age === '') return name;
+    return `${name} (${age})`;
   };
 
   // Don't render if no members
@@ -188,24 +324,13 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                       fontWeight="600"
                       fill="#8B4513"
                     >
-                      {parent.entry.name}
-                    </text>
-                    
-                    {/* Parent age */}
-                    <text
-                      x={x + treeDimensions.nodeWidth / 2}
-                      y={y + 40}
-                      textAnchor="middle"
-                      fontSize="10"
-                      fill="#8B4513"
-                    >
-                      {formatAge(parent.entry.DOB)}
+                      {formatNameWithAge(parent.entry.name, parent.entry.DOB)}
                     </text>
                     
                     {/* Parent contact */}
                     <text
                       x={x + treeDimensions.nodeWidth / 2}
-                      y={y + 55}
+                      y={y + 40}
                       textAnchor="middle"
                       fontSize="9"
                       fill="#8B4513"
@@ -217,30 +342,50 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
               })}
             </g>
 
-            {/* Parent connection line */}
-            {organizedMembers.parents.length > 1 && (
+            {/* 2025-01-28: ENHANCED: Dynamic relationship-based connections instead of hardcoded lines */}
+            {connections.map((connection, index) => (
               <line
-                x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
-                y1={50 + treeDimensions.nodeHeight / 2}
-                x2={calculateCenteredPosition(organizedMembers.parents.length - 1, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
-                y2={50 + treeDimensions.nodeHeight / 2}
-                stroke="#8B4513"
-                strokeWidth="3"
+                key={`connection-${index}`}
+                x1={connection.from.x}
+                y1={connection.from.y}
+                x2={connection.to.x}
+                y2={connection.to.y}
+                stroke={connection.type === 'spouse' ? '#FF69B4' : '#8B4513'}
+                strokeWidth={connection.type === 'spouse' ? '2' : '3'}
                 markerEnd="url(#arrowhead-classic)"
+                strokeDasharray={connection.type === 'spouse' ? '5,5' : 'none'}
               />
-            )}
+            ))}
+            
+            {/* Fallback connections if no relationships defined */}
+            {connections.length === 0 && (
+              <>
+                {/* Parent connection line */}
+                {organizedMembers.parents.length > 1 && (
+                  <line
+                    x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
+                    y1={50 + treeDimensions.nodeHeight / 2}
+                    x2={calculateCenteredPosition(organizedMembers.parents.length - 1, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
+                    y2={50 + treeDimensions.nodeHeight / 2}
+                    stroke="#8B4513"
+                    strokeWidth="3"
+                    markerEnd="url(#arrowhead-classic)"
+                  />
+                )}
 
-            {/* Vertical connection from parents to children */}
-            {organizedMembers.children.length > 0 && (
-              <line
-                x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
-                y1={50 + treeDimensions.nodeHeight}
-                x2={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
-                y2={200}
-                stroke="#8B4513"
-                strokeWidth="2"
-                markerEnd="url(#arrowhead-classic)"
-              />
+                {/* Vertical connection from parents to children */}
+                {organizedMembers.children.length > 0 && (
+                  <line
+                    x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
+                    y1={50 + treeDimensions.nodeHeight}
+                    x2={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
+                    y2={200}
+                    stroke="#8B4513"
+                    strokeWidth="2"
+                    markerEnd="url(#arrowhead-classic)"
+                  />
+                )}
+              </>
             )}
 
             {/* Child Generation */}
@@ -275,24 +420,13 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                       fontWeight="600"
                       fill="#8B4513"
                     >
-                      {child.entry.name}
-                    </text>
-                    
-                    {/* Child age */}
-                    <text
-                      x={x + treeDimensions.nodeWidth / 2}
-                      y={y + 40}
-                      textAnchor="middle"
-                      fontSize="10"
-                      fill="#8B4513"
-                    >
-                      {formatAge(child.entry.DOB)}
+                      {formatNameWithAge(child.entry.name, child.entry.DOB)}
                     </text>
                     
                     {/* Child contact */}
                     <text
                       x={x + treeDimensions.nodeWidth / 2}
-                      y={y + 55}
+                      y={y + 40}
                       textAnchor="middle"
                       fontSize="9"
                       fill="#8B4513"

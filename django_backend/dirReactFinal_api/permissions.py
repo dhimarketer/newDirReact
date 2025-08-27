@@ -246,11 +246,22 @@ class CanViewAnalytics(permissions.BasePermission):
     """Custom permission for viewing analytics"""
     
     def has_permission(self, request, view):
+        # 2025-01-28: DEBUG - Log permission check details
+        print(f"=== PERMISSION DEBUG ===")
+        print(f"DEBUG: User authenticated: {request.user.is_authenticated}")
+        print(f"DEBUG: User username: {request.user.username}")
+        print(f"DEBUG: User is_superuser: {request.user.is_superuser}")
+        print(f"DEBUG: User is_staff: {request.user.is_staff}")
+        print(f"DEBUG: User user_type: {getattr(request.user, 'user_type', 'N/A')}")
+        print(f"=== END PERMISSION DEBUG ===")
+        
         if not request.user.is_authenticated:
+            print("DEBUG: Permission denied - user not authenticated")
             return False
         
-        # Superusers and staff can view analytics
-        if request.user.is_superuser or request.user.is_staff:
+        # Superusers, staff, and admin users can view analytics
+        if request.user.is_superuser or request.user.is_staff or request.user.user_type == 'admin':
+            print("DEBUG: Permission granted - user is superuser, staff, or admin")
             return True
         
         # Check if user has analytics permission
@@ -259,8 +270,10 @@ class CanViewAnalytics(permissions.BasePermission):
                 user_type=request.user.user_type,
                 module='analytics'
             )
+            print(f"DEBUG: Permission check result: {user_perm.can_read}")
             return user_perm.can_read
         except UserPermission.DoesNotExist:
+            print("DEBUG: Permission denied - no UserPermission record found")
             return False
 
 # Permission mixins for viewsets

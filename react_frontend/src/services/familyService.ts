@@ -389,6 +389,7 @@ class FamilyService {
       }>;
     };
     error?: string;
+    notFound?: boolean; // 2025-01-28: NEW - Flag to indicate family not found vs actual error
   }> {
     try {
       // 2025-01-28: ENHANCED - Use the by_address endpoint to get existing family data
@@ -461,34 +462,37 @@ class FamilyService {
           }
         };
       } else {
-        // 2025-01-28: FIXED - Handle case where no family group exists for this address
-        console.log('FamilyService: No family group found for address:', address, island);
+        // 2025-01-28: NEW - Return not found instead of error for missing family groups
         return {
           success: false,
+          notFound: true,
           error: 'No family group found for this address'
         };
       }
     } catch (error: any) {
-      console.error('FamilyService: Failed to fetch family by address:', error);
+      console.error('Error fetching family by address:', error);
       
-      // 2025-01-28: FIXED - Handle 404 responses as "no family group found" instead of errors
+      // 2025-01-28: NEW - Handle 404 errors as "family not found" rather than actual errors
       if (error.response?.status === 404) {
-        console.log('FamilyService: 404 response - no family group found for address:', address, island);
         return {
           success: false,
+          notFound: true,
           error: 'No family group found for this address'
         };
       }
       
-      // 2025-01-28: FIXED - Handle 401 errors properly
+      // Handle 401 errors gracefully
       if (error.response?.status === 401) {
-        console.log('FamilyService: 401 Unauthorized - user not authenticated');
-        throw new Error('User not authenticated');
+        console.log('FamilyService: User not authenticated, cannot fetch family data');
+        return {
+          success: false,
+          error: 'Please log in to view family information'
+        };
       }
       
       return {
         success: false,
-        error: error.message || 'Failed to fetch family data'
+        error: 'Failed to fetch family data'
       };
     }
   }

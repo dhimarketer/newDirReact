@@ -167,32 +167,86 @@ const isPoliticalParty = (term: string): boolean => {
  * Island detection
  */
 const isIsland = (term: string): boolean => {
+  const cleanTerm = term.toLowerCase().trim();
+  
+  // Check exact matches first
   const islands = [
     'male', 'hithadhoo', 'thinadhoo', 'goidhoo', 'hulhumale', 'addu', 'fuvahmulah',
     'kulhudhuffushi', 'naifaru', 'mahibadhoo', 'villingili', 'gan', 'maradhoo',
-    'feydhoo', 'hithadhoo', 'thinadhoo', 'goidhoo', 'habaruge', 'maafushi'
+    'feydhoo', 'habaruge', 'maafushi'
   ];
   
-  // Check exact matches first
-  if (islands.includes(term)) return true;
+  if (islands.includes(cleanTerm)) return true;
   
-  // Check atoll prefixes
-  const atollPrefixes = ['k.', 's.', 'hdh.', 'gdh.', 'lh.', 'ha.', 'adh.', 'aa.', 'b.', 'r.', 'sh.', 'th.', 'v.', 'm.', 'n.', 'l.', 'gn.', 'ga.', 'dh.', 'f.'];
-  return atollPrefixes.some(prefix => term.startsWith(prefix));
+  // Check atoll prefixes with dots and optional spaces
+  const atollPrefixes = [
+    'k.', 's.', 'hdh.', 'gdh.', 'lh.', 'ha.', 'adh.', 'aa.', 'b.', 'r.', 
+    'sh.', 'th.', 'v.', 'm.', 'n.', 'l.', 'gn.', 'ga.', 'dh.', 'f.'
+  ];
+  
+  // Check if term starts with any atoll prefix
+  for (const prefix of atollPrefixes) {
+    if (cleanTerm.startsWith(prefix)) {
+      // Check if there's an island name after the prefix
+      const islandPart = cleanTerm.substring(prefix.length).trim();
+      if (islandPart.length > 0) {
+        return true;
+      }
+    }
+  }
+  
+  // Check for atoll prefixes with spaces (e.g., "s. hithadhoo")
+  for (const prefix of atollPrefixes) {
+    const prefixWithoutDot = prefix.replace('.', '');
+    if (cleanTerm.startsWith(prefixWithoutDot + ' ') || cleanTerm.startsWith(prefixWithoutDot + '+')) {
+      const islandPart = cleanTerm.substring(prefixWithoutDot.length + 1).trim();
+      if (islandPart.length > 0) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
 };
 
 /**
  * Address detection
  */
 const isAddress = (term: string): boolean => {
+  const cleanTerm = term.toLowerCase().trim();
+  
   // Multi-word phrases are usually addresses
-  if (term.includes(' ') && term.split(' ').length >= 2) {
+  if (cleanTerm.includes(' ') && cleanTerm.split(' ').length >= 2) {
     return true;
   }
   
-  // Common address suffixes
-  const addressSuffixes = ['ge', 'aage', 'illa', 'eege', 'maa', 'villa', 'hotel', 'resort', 'guesthouse'];
-  return addressSuffixes.some(suffix => term.endsWith(suffix));
+  // Common Maldivian address suffixes
+  const addressSuffixes = [
+    'ge', 'aage', 'illa', 'eege', 'maa', 'villa', 'hotel', 'resort', 'guesthouse',
+    'building', 'complex', 'center', 'centre', 'office', 'shop', 'store'
+  ];
+  
+  // Check if term ends with any address suffix
+  for (const suffix of addressSuffixes) {
+    if (cleanTerm.endsWith(suffix)) {
+      return true;
+    }
+  }
+  
+  // Check for common Maldivian address patterns
+  const addressPatterns = [
+    /^[a-z]+(?:ge|aage|illa|eege|maa|villa)$/i,  // Single word with address suffix
+    /^[a-z]+\s+[a-z]+/i,  // Two or more words
+    /^[a-z]+\d+[a-z]*/i,  // Word with numbers (e.g., "building123")
+  ];
+  
+  for (const pattern of addressPatterns) {
+    if (pattern.test(cleanTerm)) {
+      return true;
+    }
+  }
+  
+  return false;
 };
 
 /**

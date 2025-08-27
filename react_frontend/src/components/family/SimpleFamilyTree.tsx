@@ -408,13 +408,21 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
       const monthDiff = today.getMonth() - birthDate.getMonth();
       
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        return ` (${age - 1})`;
+        return age - 1;
       }
-      return ` (${age})`;
+      return age;
     } catch {
       return '';
     }
   }, []);
+
+  // Format name with age suffix
+  const formatNameWithAge = useCallback((name: string, dob?: string): string => {
+    if (!dob) return name;
+    const age = formatAge(dob);
+    if (age === '') return name;
+    return `${name} (${age})`;
+  }, [formatAge]);
 
   // Format contact number
   const formatContact = useCallback((contact: string): string => {
@@ -585,23 +593,14 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
                   fontWeight="600"
                   fill="#1f2937"
                 >
-                  {node.member.entry.name}
+                  {formatNameWithAge(node.member.entry.name, node.member.entry.DOB)}
                 </text>
+                
+                {/* Remove separate age display since it's now part of the name */}
                 
                 <text
                   x={node.x + node.width / 2}
                   y={node.y + 35}
-                  textAnchor="middle"
-                  className="node-age"
-                  fontSize="10"
-                  fill="#6b7280"
-                >
-                  {formatAge(node.member.entry.DOB)}
-                </text>
-                
-                <text
-                  x={node.x + node.width / 2}
-                  y={node.y + 50}
                   textAnchor="middle"
                   className="node-role"
                   fontSize="10"
@@ -612,7 +611,7 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
                 
                 <text
                   x={node.x + node.width / 2}
-                  y={node.y + 65}
+                  y={node.y + 50}
                   textAnchor="middle"
                   className="node-contact"
                   fontSize="9"
@@ -623,7 +622,7 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
                 
                 <text
                   x={node.x + node.width / 2}
-                  y={node.y + 80}
+                  y={node.y + 65}
                   textAnchor="middle"
                   className="node-address"
                   fontSize="8"

@@ -37,6 +37,12 @@ class HomePageService {
    */
   async getHomePageStats(): Promise<HomePageStats> {
     try {
+      // Check if user is authenticated before making API call
+      if (!apiService.isAuthenticated()) {
+        console.log('HomePageService: User not authenticated, returning fallback data');
+        return this.getFallbackStats();
+      }
+      
       console.log('HomePageService: Making API call to: /analytics/');
       const response = await apiService.get<HomePageStats>('/analytics/');
       console.log('HomePageService: API response received:', response);
@@ -51,22 +57,29 @@ class HomePageService {
       });
       
       // Return fallback data if API fails
-      return {
-        overview: {
-          total_users: 0,
-          total_contacts: 0,
-          total_families: 0,
-          pending_changes: 0
-        },
-        users: {
-          active_users: 0,
-          banned_users: 0,
-          average_score: 0
-        },
-        contacts_by_atoll: [],
-        recent_activity: []
-      };
+      return this.getFallbackStats();
     }
+  }
+
+  /**
+   * Get fallback statistics when API is unavailable or user is not authenticated
+   */
+  private getFallbackStats(): HomePageStats {
+    return {
+      overview: {
+        total_users: 0,
+        total_contacts: 0,
+        total_families: 0,
+        pending_changes: 0
+      },
+      users: {
+        active_users: 0,
+        banned_users: 0,
+        average_score: 0
+      },
+      contacts_by_atoll: [],
+      recent_activity: []
+    };
   }
 
   /**
