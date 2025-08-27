@@ -61,43 +61,45 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
     const nodeWidth = 120;
     const nodeHeight = 80;
     
-    // 2025-01-28: FIXED - Use absolute minimal spacing to prevent clipping and maximize space usage
-    // For 7 family members, we need to fit them in the available width with minimal gaps
-    const estimatedContainerWidth = 1000; // Approximate container width
-    const availableWidth = estimatedContainerWidth - 40; // Leave 20px margin on each side
+    // 2025-01-28: FIXED - Use fixed spacing and center the tree properly
+    // Use fixed spacing between nodes for consistent layout
+    const fixedSpacing = 60; // Fixed spacing between nodes
     
-    // Calculate minimum spacing needed to fit all nodes
-    let parentSpacing = 0;
-    let childSpacing = 0;
+    // Calculate total width needed for each generation with fixed spacing
+    const totalParentWidth = parentCount * nodeWidth + (parentCount > 1 ? (parentCount - 1) * fixedSpacing : 0);
+    const totalChildWidth = childCount * nodeWidth + (childCount > 1 ? (childCount - 1) * fixedSpacing : 0);
     
-    if (parentCount > 1) {
-      // Calculate exact spacing needed: (availableWidth - totalNodeWidth) / gaps
-      const totalParentWidth = parentCount * nodeWidth;
-      const gapsBetweenParents = parentCount - 1;
-      parentSpacing = gapsBetweenParents > 0 ? (availableWidth - totalParentWidth) / gapsBetweenParents : 0;
-    }
-    
-    if (childCount > 1) {
-      // Calculate exact spacing needed: (availableWidth - totalNodeWidth) / gaps
-      const totalChildWidth = childCount * nodeWidth;
-      const gapsBetweenChildren = childCount - 1;
-      childSpacing = gapsBetweenChildren > 0 ? (availableWidth - totalChildWidth) / gapsBetweenChildren : 0;
-    }
-    
-    // Use the actual container width to prevent clipping
-    const totalWidth = availableWidth;
-    
-    const totalHeight = 300;
+    // Use container width (1000px) with margins
+    const containerWidth = 1000;
+    const margin = 40;
+    const availableWidth = containerWidth - margin;
     
     return {
       nodeWidth,
       nodeHeight,
-      parentSpacing: Math.max(parentSpacing, 0), // No minimum, use calculated spacing
-      childSpacing: Math.max(childSpacing, 0),   // No minimum, use calculated spacing
-      totalWidth,
-      totalHeight
+      parentSpacing: fixedSpacing,
+      childSpacing: fixedSpacing,
+      totalWidth: availableWidth,
+      totalHeight: 300,
+      containerWidth: availableWidth
     };
   }, [organizedMembers]);
+
+  // 2025-01-28: Helper function to calculate centered positions
+  const calculateCenteredPosition = (index: number, totalCount: number, spacing: number) => {
+    // Calculate the total width needed for all nodes
+    const totalWidth = totalCount * treeDimensions.nodeWidth + 
+      (totalCount > 1 ? (totalCount - 1) * spacing : 0);
+    
+    // Calculate the center of the container
+    const containerCenter = treeDimensions.containerWidth / 2;
+    
+    // Calculate the left edge of the first node to center the entire group
+    const firstNodeLeftEdge = containerCenter - (totalWidth / 2);
+    
+    // Return the position for the current node
+    return firstNodeLeftEdge + index * (treeDimensions.nodeWidth + spacing);
+  };
 
   // Format age from DOB
   const formatAge = (dob?: string): string => {
@@ -157,9 +159,9 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
             {/* Parent Generation */}
             <g className="parent-generation">
               {organizedMembers.parents.map((parent, index) => {
-                // 2025-01-28: FIXED - Use correct spacing variable for positioning
-                // Calculate x position: start from left edge + index * (nodeWidth + spacing)
-                const x = 20 + index * (nodeWidth + parentSpacing);
+                // 2025-01-28: FIXED - Center-based positioning to prevent clipping
+                // Calculate center position and expand outward
+                const x = calculateCenteredPosition(index, organizedMembers.parents.length, treeDimensions.parentSpacing);
                 const y = 50;
                 
                 return (
@@ -168,8 +170,8 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                     <rect
                       x={x}
                       y={y}
-                      width={nodeWidth}
-                      height={nodeHeight}
+                      width={treeDimensions.nodeWidth}
+                      height={treeDimensions.nodeHeight}
                       rx="8"
                       ry="8"
                       fill="#F5F5DC"
@@ -179,7 +181,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                     
                     {/* Parent name */}
                     <text
-                      x={x + nodeWidth / 2}
+                      x={x + treeDimensions.nodeWidth / 2}
                       y={y + 25}
                       textAnchor="middle"
                       fontSize="12"
@@ -191,7 +193,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                     
                     {/* Parent age */}
                     <text
-                      x={x + nodeWidth / 2}
+                      x={x + treeDimensions.nodeWidth / 2}
                       y={y + 40}
                       textAnchor="middle"
                       fontSize="10"
@@ -202,7 +204,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                     
                     {/* Parent contact */}
                     <text
-                      x={x + nodeWidth / 2}
+                      x={x + treeDimensions.nodeWidth / 2}
                       y={y + 55}
                       textAnchor="middle"
                       fontSize="9"
@@ -218,10 +220,10 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
             {/* Parent connection line */}
             {organizedMembers.parents.length > 1 && (
               <line
-                x1={20 + nodeWidth / 2}
-                y1={50 + nodeHeight / 2}
-                x2={20 + (organizedMembers.parents.length - 1) * (nodeWidth + parentSpacing) + nodeWidth / 2}
-                y2={50 + nodeHeight / 2}
+                x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
+                y1={50 + treeDimensions.nodeHeight / 2}
+                x2={calculateCenteredPosition(organizedMembers.parents.length - 1, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
+                y2={50 + treeDimensions.nodeHeight / 2}
                 stroke="#8B4513"
                 strokeWidth="3"
                 markerEnd="url(#arrowhead-classic)"
@@ -231,9 +233,9 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
             {/* Vertical connection from parents to children */}
             {organizedMembers.children.length > 0 && (
               <line
-                x1={20 + (organizedMembers.parents.length - 1) * (nodeWidth + parentSpacing) / 2 + nodeWidth / 2}
-                y1={50 + nodeHeight}
-                x2={20 + (organizedMembers.parents.length - 1) * (nodeWidth + parentSpacing) / 2 + nodeWidth / 2}
+                x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
+                y1={50 + treeDimensions.nodeHeight}
+                x2={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
                 y2={200}
                 stroke="#8B4513"
                 strokeWidth="2"
@@ -244,9 +246,9 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
             {/* Child Generation */}
             <g className="child-generation">
               {organizedMembers.children.map((child, index) => {
-                // 2025-01-28: FIXED - Use correct spacing variable for positioning
-                // Calculate x position: start from left edge + index * (nodeWidth + spacing)
-                const x = 20 + index * (nodeWidth + childSpacing);
+                // 2025-01-28: FIXED - Center-based positioning to prevent clipping
+                // Calculate center position and expand outward
+                const x = calculateCenteredPosition(index, organizedMembers.children.length, treeDimensions.childSpacing);
                 const y = 220;
                 
                 return (
@@ -255,8 +257,8 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                     <rect
                       x={x}
                       y={y}
-                      width={nodeWidth}
-                      height={nodeHeight}
+                      width={treeDimensions.nodeWidth}
+                      height={treeDimensions.nodeHeight}
                       rx="8"
                       ry="8"
                       fill="#F0F8FF"
@@ -266,7 +268,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                     
                     {/* Child name */}
                     <text
-                      x={x + nodeWidth / 2}
+                      x={x + treeDimensions.nodeWidth / 2}
                       y={y + 25}
                       textAnchor="middle"
                       fontSize="12"
@@ -278,7 +280,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                     
                     {/* Child age */}
                     <text
-                      x={x + nodeWidth / 2}
+                      x={x + treeDimensions.nodeWidth / 2}
                       y={y + 40}
                       textAnchor="middle"
                       fontSize="10"
@@ -289,7 +291,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                     
                     {/* Child contact */}
                     <text
-                      x={x + nodeWidth / 2}
+                      x={x + treeDimensions.nodeWidth / 2}
                       y={y + 55}
                       textAnchor="middle"
                       fontSize="9"
@@ -300,10 +302,10 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                     
                     {/* Connection line from main vertical to child */}
                     <line
-                      x1={20 + (organizedMembers.parents.length - 1) * (nodeWidth + parentSpacing) / 2 + nodeWidth / 2}
+                      x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
                       y1={200}
-                      x2={x + nodeWidth / 2}
-                      y2={y + nodeHeight / 2}
+                      x2={x + treeDimensions.nodeWidth / 2}
+                      y2={y + treeDimensions.nodeHeight / 2}
                       stroke="#8B4513"
                       strokeWidth="1"
                       markerEnd="url(#arrowhead-classic)"
