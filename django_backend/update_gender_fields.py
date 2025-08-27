@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# 2025-01-27: Gender field update script for family tree functionality
-# Updates empty gender fields based on exact name matches with existing gender data
+# 2025-01-28: SIMPLIFIED Gender field update script
+# Fast and efficient approach: exact name matching + female name detection
 
 import os
 import sys
@@ -8,7 +8,6 @@ import django
 from django.db import transaction
 from django.db.models import Q
 import logging
-from typing import Dict, List, Tuple
 
 # Setup Django environment
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'dirfinal.settings')
@@ -17,329 +16,108 @@ django.setup()
 from dirReactFinal_directory.models import PhoneBookEntry
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('gender_update.log'),
-        logging.StreamHandler()
-    ]
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class GenderFieldUpdater:
-    """Updates gender fields based on exact name matches"""
+def update_gender_fields_simple():
+    """Simple and fast gender field update"""
     
-    def __init__(self):
-        self.update_stats = {
-            'total_entries': 0,
-            'entries_with_gender': 0,
-            'entries_without_gender': 0,
-            'exact_matches_found': 0,
-            'gender_updates_applied': 0,
-            'errors': []
-        }
-        
-    def analyze_gender_fields(self) -> Dict[str, int]:
-        """Analyze current state of gender fields in the database"""
-        logger.info("Analyzing gender fields in database...")
-        
-        try:
-            # Get total count
-            total_entries = PhoneBookEntry.objects.count()
-            
-            # Count entries with gender data
-            entries_with_gender = PhoneBookEntry.objects.exclude(
-                Q(gender__isnull=True) | Q(gender__exact='')
-            ).count()
-            
-            # Count entries without gender data
-            entries_without_gender = PhoneBookEntry.objects.filter(
-                Q(gender__isnull=True) | Q(gender__exact='')
-            ).count()
-            
-            # Count by gender type
-            male_count = PhoneBookEntry.objects.filter(
-                Q(gender__icontains='m') | Q(gender__icontains='male')
-            ).exclude(
-                Q(gender__icontains='f') | Q(gender__icontains='female')
-            ).count()
-            
-            female_count = PhoneBookEntry.objects.filter(
-                Q(gender__icontains='f') | Q(gender__icontains='female')
-            ).exclude(
-                Q(gender__icontains='m') | Q(gender__icontains='male')
-            ).count()
-            
-            # Count entries with unclear gender data
-            unclear_count = PhoneBookEntry.objects.filter(
-                Q(gender__icontains='m') & Q(gender__icontains='f')
-            ).count()
-            
-            analysis = {
-                'total_entries': total_entries,
-                'entries_with_gender': entries_with_gender,
-                'entries_without_gender': entries_without_gender,
-                'male_count': male_count,
-                'female_count': female_count,
-                'unclear_count': unclear_count
-            }
-            
-            logger.info(f"Gender field analysis completed:")
-            logger.info(f"  Total entries: {total_entries}")
-            logger.info(f"  With gender: {entries_with_gender}")
-            logger.info(f"  Without gender: {entries_without_gender}")
-            logger.info(f"  Male: {male_count}")
-            logger.info(f"  Female: {female_count}")
-            logger.info(f"  Unclear: {unclear_count}")
-            
-            return analysis
-            
-        except Exception as e:
-            logger.error(f"Error analyzing gender fields: {e}")
-            self.update_stats['errors'].append(f"Analysis error: {e}")
-            return {}
+    # Step 1: Get all entries with gender data
+    logger.info("Step 1: Finding entries with existing gender data...")
+    entries_with_gender = PhoneBookEntry.objects.exclude(
+        Q(gender__isnull=True) | Q(gender__exact='')
+    ).values('name', 'gender')
     
-    def find_exact_name_matches(self) -> List[Tuple[PhoneBookEntry, PhoneBookEntry]]:
-        """Find entries with exact names where one has gender and the other doesn't"""
-        logger.info("Finding exact name matches for gender updates...")
-        
-        matches = []
-        
-        try:
-            # Get all entries without gender
-            entries_without_gender = PhoneBookEntry.objects.filter(
-                Q(gender__isnull=True) | Q(gender__exact='')
-            )
-            
-            # Get all entries with gender
-            entries_with_gender = PhoneBookEntry.objects.exclude(
-                Q(gender__isnull=True) | Q(gender__exact='')
-            )
-            
-            logger.info(f"Found {entries_without_gender.count()} entries without gender")
-            logger.info(f"Found {entries_with_gender.count()} entries with gender")
-            
-            # Find exact name matches
-            for entry_without in entries_without_gender:
-                # Look for exact name matches with gender data
-                exact_matches = entries_with_gender.filter(name__exact=entry_without.name)
-                
-                for match in exact_matches:
-                    # Verify the match has valid gender data
-                    if self.is_valid_gender(match.gender):
-                        matches.append((entry_without, match))
-                        break  # Use first valid match
-            
-            logger.info(f"Found {len(matches)} exact name matches for gender updates")
-            return matches
-            
-        except Exception as e:
-            logger.error(f"Error finding exact name matches: {e}")
-            self.update_stats['errors'].append(f"Match finding error: {e}")
-            return []
+    # Create a mapping of name -> gender
+    name_gender_map = {}
+    for entry in entries_with_gender:
+        name_gender_map[entry['name']] = entry['gender']
     
-    def is_valid_gender(self, gender: str) -> bool:
-        """Check if gender field contains valid gender information"""
-        if not gender:
-            return False
-        
-        gender_lower = gender.lower().strip()
-        
-        # Check for male indicators
-        male_indicators = ['m', 'male', 'm.']
-        # Check for female indicators  
-        female_indicators = ['f', 'female', 'f.']
-        
-        # Check if it's clearly male or female (not both)
-        is_male = any(indicator in gender_lower for indicator in male_indicators)
-        is_female = any(indicator in gender_lower for indicator in female_indicators)
-        
-        # Return True if it's clearly one gender (not both, not unclear)
-        return (is_male and not is_female) or (is_female and not is_male)
+    logger.info(f"Found {len(name_gender_map)} unique names with gender data")
     
-    def normalize_gender(self, gender: str) -> str:
-        """Normalize gender field to standard format (M or F)"""
-        if not gender:
-            return ''
-        
-        gender_lower = gender.lower().strip()
-        
-        # Check for male indicators
-        male_indicators = ['m', 'male', 'm.']
-        # Check for female indicators
-        female_indicators = ['f', 'female', 'f.']
-        
-        if any(indicator in gender_lower for indicator in male_indicators):
-            return 'M'
-        elif any(indicator in gender_lower for indicator in female_indicators):
-            return 'F'
-        else:
-            return gender  # Keep original if unclear
+    # Step 2: Update entries without gender using exact name matches
+    logger.info("Step 2: Updating gender using exact name matches...")
+    entries_without_gender = PhoneBookEntry.objects.filter(
+        Q(gender__isnull=True) | Q(gender__exact='')
+    )
     
-    def update_gender_fields(self, matches: List[Tuple[PhoneBookEntry, PhoneBookEntry]]) -> bool:
-        """Update gender fields based on exact name matches"""
-        logger.info(f"Starting gender field updates for {len(matches)} matches...")
-        
-        try:
-            with transaction.atomic():
-                updates_applied = 0
-                
-                for entry_without, entry_with in matches:
-                    try:
-                        # Normalize the gender from the source entry
-                        normalized_gender = self.normalize_gender(entry_with.gender)
-                        
-                        if normalized_gender in ['M', 'F']:
-                            # Update the entry without gender
-                            entry_without.gender = normalized_gender
-                            entry_without.save(update_fields=['gender'])
-                            updates_applied += 1
-                            
-                            logger.info(f"Updated {entry_without.name} (PID: {entry_without.pid}) "
-                                      f"with gender: {normalized_gender} "
-                                      f"(from match with PID: {entry_with.pid})")
-                        else:
-                            logger.warning(f"Skipping {entry_with.name} - unclear gender: {entry_with.gender}")
-                            
-                    except Exception as e:
-                        logger.error(f"Error updating entry {entry_without.pid}: {e}")
-                        self.update_stats['errors'].append(f"Update error for PID {entry_without.pid}: {e}")
-                
-                logger.info(f"Successfully applied {updates_applied} gender updates")
-                self.update_stats['gender_updates_applied'] = updates_applied
-                return True
-                
-        except Exception as e:
-            logger.error(f"Transaction failed during gender updates: {e}")
-            self.update_stats['errors'].append(f"Transaction error: {e}")
-            return False
+    updates_from_names = 0
+    for entry in entries_without_gender:
+        if entry.name in name_gender_map:
+            entry.gender = name_gender_map[entry.name]
+            entry.save(update_fields=['gender'])
+            updates_from_names += 1
     
-    def run_gender_analysis(self) -> Dict[str, any]:
-        """Run complete gender field analysis and update process"""
-        logger.info("Starting gender field analysis and update process...")
-        
-        try:
-            # Step 1: Analyze current state
-            analysis = self.analyze_gender_fields()
-            if not analysis:
-                return {'success': False, 'error': 'Analysis failed'}
-            
-            # Step 2: Find exact name matches
-            matches = self.find_exact_name_matches()
-            if not matches:
-                logger.info("No exact name matches found for gender updates")
-                return {'success': True, 'analysis': analysis, 'updates_applied': 0}
-            
-            # Step 3: Update gender fields
-            update_success = self.update_gender_fields(matches)
-            if not update_success:
-                return {'success': False, 'error': 'Gender updates failed'}
-            
-            # Step 4: Final analysis
-            final_analysis = self.analyze_gender_fields()
-            
-            result = {
-                'success': True,
-                'initial_analysis': analysis,
-                'final_analysis': final_analysis,
-                'matches_found': len(matches),
-                'updates_applied': self.update_stats['gender_updates_applied'],
-                'errors': self.update_stats['errors']
-            }
-            
-            logger.info("Gender field analysis and update process completed successfully")
-            return result
-            
-        except Exception as e:
-            logger.error(f"Gender analysis process failed: {e}")
-            return {'success': False, 'error': str(e)}
+    logger.info(f"Updated {updates_from_names} entries using exact name matches")
     
-    def generate_report(self, result: Dict[str, any]) -> str:
-        """Generate a human-readable report of the gender update process"""
-        if not result.get('success'):
-            return f"Gender update process failed: {result.get('error', 'Unknown error')}"
-        
-        report = []
-        report.append("=" * 60)
-        report.append("GENDER FIELD UPDATE REPORT")
-        report.append("=" * 60)
-        report.append("")
-        
-        # Initial state
-        initial = result['initial_analysis']
-        report.append("INITIAL STATE:")
-        report.append(f"  Total entries: {initial['total_entries']:,}")
-        report.append(f"  With gender: {initial['entries_with_gender']:,}")
-        report.append(f"  Without gender: {initial['entries_without_gender']:,}")
-        report.append(f"  Male: {initial['male_count']:,}")
-        report.append(f"  Female: {initial['female_count']:,}")
-        report.append("")
-        
-        # Update results
-        report.append("UPDATE RESULTS:")
-        report.append(f"  Exact name matches found: {result['matches_found']:,}")
-        report.append(f"  Gender updates applied: {result['updates_applied']:,}")
-        report.append("")
-        
-        # Final state
-        final = result['final_analysis']
-        report.append("FINAL STATE:")
-        report.append(f"  Total entries: {final['total_entries']:,}")
-        report.append(f"  With gender: {final['entries_with_gender']:,}")
-        report.append(f"  Without gender: {final['entries_without_gender']:,}")
-        report.append(f"  Male: {final['male_count']:,}")
-        report.append(f"  Female: {final['female_count']:,}")
-        report.append("")
-        
-        # Improvement
-        improvement = initial['entries_without_gender'] - final['entries_without_gender']
-        if improvement > 0:
-            report.append(f"IMPROVEMENT: {improvement:,} more entries now have gender data")
-        else:
-            report.append("No improvement in gender data coverage")
-        
-        # Errors
-        if result['errors']:
-            report.append("")
-            report.append("ERRORS ENCOUNTERED:")
-            for error in result['errors']:
-                report.append(f"  - {error}")
-        
-        report.append("")
-        report.append("=" * 60)
-        
-        return "\n".join(report)
+    # Step 3: Detect female names by checking for female name parts
+    logger.info("Step 3: Detecting female names by name parts...")
+    
+    # Common female name parts in Maldivian names
+    female_name_parts = [
+        'fathmath', 'fathimath', 'aishath', 'aishath', 'mariyam', 'mariya',
+        'hawwa', 'hawwa', 'shareefa', 'shareefa', 'shazna', 'shazna',
+        'jameela', 'jameela', 'adheeba', 'adheeba', 'aminath', 'aminath',
+        'shabana', 'shabana', 'faiga', 'faiga'
+    ]
+    
+    # Find entries still without gender
+    entries_still_without_gender = PhoneBookEntry.objects.filter(
+        Q(gender__isnull=True) | Q(gender__exact='')
+    )
+    
+    female_detections = 0
+    for entry in entries_still_without_gender:
+        # Skip entries with null names
+        if not entry.name:
+            continue
+            
+        name_lower = entry.name.lower()
+        for female_part in female_name_parts:
+            if female_part in name_lower:
+                entry.gender = 'f'
+                entry.save(update_fields=['gender'])
+                female_detections += 1
+                break
+    
+    logger.info(f"Detected {female_detections} female names by name parts")
+    
+    # Step 4: Final statistics
+    final_with_gender = PhoneBookEntry.objects.exclude(
+        Q(gender__isnull=True) | Q(gender__exact='')
+    ).count()
+    
+    total_entries = PhoneBookEntry.objects.count()
+    
+    logger.info("=" * 50)
+    logger.info("GENDER UPDATE COMPLETED!")
+    logger.info(f"Total entries: {total_entries}")
+    logger.info(f"Entries with gender: {final_with_gender}")
+    logger.info(f"Entries without gender: {total_entries - final_with_gender}")
+    logger.info(f"Updates from name matches: {updates_from_names}")
+    logger.info(f"Female detections: {female_detections}")
+    logger.info("=" * 50)
+    
+    return {
+        'total_entries': total_entries,
+        'entries_with_gender': final_with_gender,
+        'updates_from_names': updates_from_names,
+        'female_detections': female_detections
+    }
 
 def main():
     """Main execution function"""
-    logger.info("Starting gender field update script...")
+    logger.info("Starting SIMPLIFIED gender field update...")
     
     try:
-        # Create updater instance
-        updater = GenderFieldUpdater()
+        with transaction.atomic():
+            result = update_gender_fields_simple()
         
-        # Run the complete process
-        result = updater.run_gender_analysis()
+        logger.info("Gender update completed successfully!")
+        return 0
         
-        # Generate and display report
-        report = updater.generate_report(result)
-        print(report)
-        
-        # Save report to file
-        with open('gender_update_report.txt', 'w', encoding='utf-8') as f:
-            f.write(report)
-        
-        logger.info("Gender update script completed. Report saved to gender_update_report.txt")
-        
-        if result.get('success'):
-            return 0
-        else:
-            return 1
-            
     except Exception as e:
-        logger.error(f"Script execution failed: {e}")
-        print(f"Script execution failed: {e}")
+        logger.error(f"Gender update failed: {e}")
         return 1
 
 if __name__ == "__main__":

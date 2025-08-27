@@ -49,6 +49,7 @@ class HomePageService {
         status: error.response?.status,
         data: error.response?.data
       });
+      
       // Return fallback data if API fails
       return {
         overview: {

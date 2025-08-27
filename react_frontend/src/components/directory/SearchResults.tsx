@@ -9,7 +9,7 @@ import { toast } from 'react-hot-toast';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuth } from '../../store/authStore';
 import { getUserType, getVisibleFields } from '../../utils/searchFieldUtils';
-import FamilyModal from '../family/FamilyModal';
+import FamilyTreeWindow from '../family/FamilyTreeWindow';
 
 interface SearchResultsProps {
   results: PhoneBookEntry[];
@@ -35,8 +35,8 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   const { user } = useAuth();
   const { adminSearchFieldSettings, fetchAdminSearchFieldSettings } = useSettingsStore();
   
-  // Family modal state
-  const [familyModalOpen, setFamilyModalOpen] = useState(false);
+  // Family tree window state
+  const [familyTreeWindowOpen, setFamilyTreeWindowOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState('');
   const [selectedIsland, setSelectedIsland] = useState('');
   
@@ -93,12 +93,12 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     return contact;
   };
 
-  // Handle address click to show family modal
+  // Handle address click to show family tree window
   const handleAddressClick = (address: string, island: string) => {
-    console.log('Address clicked:', { address, island }); // 2025-01-27: Debug logging for address click
+    console.log('Address clicked:', { address, island }); // 2025-01-28: Debug logging for address click
     setSelectedAddress(address);
     setSelectedIsland(island);
-    setFamilyModalOpen(true);
+    setFamilyTreeWindowOpen(true);
   };
 
   // Get field value for display
@@ -315,13 +315,13 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         </div>
       </div>
 
-      {/* Family Modal */}
-      <FamilyModal
-        isOpen={familyModalOpen}
-        onClose={() => setFamilyModalOpen(false)}
-        address={selectedAddress}
-        island={selectedIsland}
-      />
+              {/* Family Tree Window */}
+              <FamilyTreeWindow
+          isOpen={familyTreeWindowOpen}
+          onClose={() => setFamilyTreeWindowOpen(false)}
+          address={selectedAddress}
+          island={selectedIsland}
+        />
     </div>
   );
 };

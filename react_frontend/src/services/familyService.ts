@@ -4,11 +4,11 @@ import { apiService } from './api';
 import { 
   FamilyGroup, 
   FamilyMember, 
-  FamilyRole, 
-  FamilyInvitation, 
+  FamilyRole,
+  FamilyInvitation,
   FamilyTree,
   FamilyStats,
-  PaginatedResponse,
+  PaginatedResponse, 
   ApiResponse 
 } from '../types';
 
@@ -215,6 +215,282 @@ class FamilyService {
   }> {
     const response = await apiService.post('/family/groups/delete_updated_families/', params);
     return response.data;
+  }
+
+  // 2025-01-28: Added method to create or update family group by address
+  async createOrUpdateFamilyByAddress(address: string, island: string): Promise<{
+    success: boolean;
+    data?: {
+      id: number;
+      name: string;
+      description: string;
+      address: string;
+      island: string;
+      members: Array<{
+        entry: {
+          pid: number;
+          name: string;
+          contact: string;
+          dob?: string;
+          address: string;
+          island: string;
+        };
+        role: 'parent' | 'child' | 'other';
+        relationship?: string;
+      }>;
+      relationships: Array<{
+        id: number;
+        person1: number;
+        person2: number;
+        relationship_type: string;
+        notes?: string;
+        is_active: boolean;
+      }>;
+    };
+    error?: string;
+  }> {
+    try {
+      // 2025-01-28: IMMEDIATE DEBUG - Log everything to identify the issue
+      console.log('=== FAMILY CREATION DEBUG START ===');
+      console.log('DEBUG: Auth token exists:', !!localStorage.getItem('dirfinal_auth_token'));
+      console.log('DEBUG: Refresh token exists:', !!localStorage.getItem('dirfinal_refresh_token'));
+      console.log('DEBUG: Auth token length:', localStorage.getItem('dirfinal_auth_token')?.length || 0);
+      console.log('DEBUG: Auth token preview:', localStorage.getItem('dirfinal_auth_token')?.substring(0, 20) + '...');
+      console.log('=== FAMILY CREATION DEBUG END ===');
+      
+      // 2025-01-28: ENHANCED - Use the new family inference endpoint for automatic family creation
+      const response = await apiService.post('/family/groups/infer_family/', {
+        address,
+        island
+      });
+      
+      // 2025-01-28: DEBUG - Log the actual response received
+      console.log('=== FAMILY CREATION RESPONSE DEBUG ===');
+      console.log('DEBUG: Response received:', response);
+      console.log('DEBUG: Response status:', response.status);
+      console.log('DEBUG: Response data:', response.data);
+      console.log('=== END FAMILY CREATION RESPONSE DEBUG ===');
+      
+      if (response.data && response.data.success && response.data.data) {
+        return {
+          success: true,
+          data: response.data.data
+        };
+      } else if (response.data && response.data.data) {
+        // Handle case where response doesn't have success field but has data
+        return {
+          success: true,
+          data: response.data.data
+        };
+      }
+      
+      return {
+        success: false,
+        error: response.data?.error || response.data?.message || 'Failed to create family group'
+      };
+    } catch (error) {
+      console.error('Error creating/updating family by address:', error);
+      return {
+        success: false,
+        error: 'Failed to create family group'
+      };
+    }
+  }
+  
+  // 2025-01-28: NEW - Method to use family inference endpoint specifically
+  async inferFamilyByAddress(address: string, island: string): Promise<{
+    success: boolean;
+    data?: any;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      console.log('DEBUG: Using family inference endpoint for:', { address, island });
+      
+      const response = await apiService.post('/family/groups/infer_family/', {
+        address,
+        island
+      });
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data?.error || response.data?.message || 'Family inference failed'
+        };
+      }
+    } catch (error: any) {
+      console.error('Error inferring family by address:', error);
+      
+      if (error.response?.status === 404) {
+        return {
+          success: false,
+          error: 'No family members found with DOB for this address'
+        };
+      }
+      
+      return {
+        success: false,
+        error: 'Failed to infer family relationships'
+      };
+    }
+  }
+
+  // 2025-01-28: Added method to get family by address for family tree window
+  async getFamilyByAddress(address: string, island: string): Promise<{
+    success: boolean;
+    data?: {
+      id: number;
+      name: string;
+      description?: string;
+      address: string;
+      island: string;
+      members: Array<{
+        entry: {
+          pid: number;
+          name: string;
+          contact?: string;
+          dob?: string;
+          address: string;
+          island: string;
+          atoll?: string;
+          street?: string;
+          ward?: string;
+          party?: string;
+          status?: string;
+          remark?: string;
+          email?: string;
+          gender?: string;
+          extra?: string;
+          profession?: string;
+          pep_status?: string;
+          change_status?: string;
+          requested_by?: string;
+          batch?: string;
+          image_status?: string;
+          family_group_id?: number;
+          nid?: string;
+        };
+        role: string;
+        relationship?: string;
+      }>;
+      relationships: Array<{
+        id: number;
+        person1: number;
+        person2: number;
+        relationship_type: string;
+        notes?: string;
+        is_active: boolean;
+      }>;
+    };
+    error?: string;
+  }> {
+    try {
+      // 2025-01-28: ENHANCED - Use the by_address endpoint to get existing family data
+      const response = await apiService.get(`/family/groups/by_address/`, {
+        params: { address, island }
+      });
+      
+      // 2025-01-28: DEBUG - Log the actual response received
+      console.log('=== FAMILY FETCH RESPONSE DEBUG ===');
+      console.log('DEBUG: Response received:', response);
+      console.log('DEBUG: Response data:', response.data);
+      console.log('DEBUG: Members array:', response.data?.members);
+      console.log('DEBUG: Relationships array:', response.data?.relationships);
+      console.log('=== END FAMILY FETCH RESPONSE DEBUG ===');
+      
+      // 2025-01-28: FIXED - Django returns family data directly, not wrapped in success field
+      if (response.data && response.data.id) {
+        // Transform Django response to expected frontend format
+        const familyGroup = response.data;
+        
+        // Extract members from the family group
+        const members = familyGroup.members || [];
+        const relationships = familyGroup.relationships || [];
+        
+        return {
+          success: true,
+          data: {
+            id: familyGroup.id,
+            name: familyGroup.name,
+            description: familyGroup.description,
+            address: familyGroup.address,
+            island: familyGroup.island,
+            members: members.map((member: any) => ({
+              entry: {
+                pid: member.entry?.pid || member.entry_id || member.id,
+                name: member.entry?.name || member.entry_name || member.name || '',
+                contact: member.entry?.contact || member.entry_contact || member.contact || '',
+                dob: member.entry?.DOB || member.entry_dob || member.dob || '',
+                address: member.entry?.address || member.entry_address || member.address || '',
+                island: member.entry?.island || member.entry_island || member.island || '',
+                atoll: member.entry?.atoll || '',
+                street: member.entry?.street || '',
+                ward: member.entry?.ward || '',
+                party: member.entry?.party || '',
+                status: member.entry?.status || '',
+                remark: member.entry?.remark || '',
+                email: member.entry?.email || '',
+                gender: member.entry?.gender || '',
+                extra: member.entry?.extra || '',
+                profession: member.entry?.profession || '',
+                pep_status: member.entry?.pep_status || '',
+                change_status: member.entry?.change_status || 'Active',
+                requested_by: member.entry?.requested_by || '',
+                batch: member.entry?.batch || '',
+                image_status: member.entry?.image_status || '',
+                family_group_id: member.entry?.family_group_id || undefined,
+                nid: member.entry?.nid || undefined
+              },
+              role: member.role_in_family || member.role || 'other',
+              relationship: member.relationship || ''
+            })),
+            relationships: relationships.map((rel: any) => ({
+              id: rel.id,
+              person1: rel.person1?.pid || rel.person1_id || rel.person1,
+              person2: rel.person2?.pid || rel.person2_id || rel.person2,
+              relationship_type: rel.relationship_type,
+              notes: rel.notes || '',
+              is_active: rel.is_active !== false
+            }))
+          }
+        };
+      } else {
+        // 2025-01-28: FIXED - Handle case where no family group exists for this address
+        console.log('FamilyService: No family group found for address:', address, island);
+        return {
+          success: false,
+          error: 'No family group found for this address'
+        };
+      }
+    } catch (error: any) {
+      console.error('FamilyService: Failed to fetch family by address:', error);
+      
+      // 2025-01-28: FIXED - Handle 404 responses as "no family group found" instead of errors
+      if (error.response?.status === 404) {
+        console.log('FamilyService: 404 response - no family group found for address:', address, island);
+        return {
+          success: false,
+          error: 'No family group found for this address'
+        };
+      }
+      
+      // 2025-01-28: FIXED - Handle 401 errors properly
+      if (error.response?.status === 401) {
+        console.log('FamilyService: 401 Unauthorized - user not authenticated');
+        throw new Error('User not authenticated');
+      }
+      
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch family data'
+      };
+    }
   }
 }
 

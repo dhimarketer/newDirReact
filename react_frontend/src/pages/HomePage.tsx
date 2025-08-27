@@ -20,6 +20,7 @@ import {
   Crown
 } from 'lucide-react';
 import { homePageService, HomePageStats } from '../services/homePageService';
+import { STORAGE_KEYS } from '../utils/constants';
 
 const HomePage: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
@@ -29,8 +30,14 @@ const HomePage: React.FC = () => {
 
   // Fetch home page statistics on component mount
   useEffect(() => {
-    if (user && isAuthenticated) {
+    // 2025-01-28: ADDED - Check if there's a valid token before making API call
+    const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (user && isAuthenticated && token) {
       loadHomePageStats();
+    } else {
+      // 2025-01-28: FIXED - Don't try to fetch stats if not authenticated
+      console.log('HomePage: User not authenticated or no token, skipping stats fetch');
+      setIsLoading(false);
     }
   }, [user, isAuthenticated]);
 
@@ -42,9 +49,17 @@ const HomePage: React.FC = () => {
       const homeStats = await homePageService.getHomePageStats();
       console.log('HomePage: Stats loaded successfully:', homeStats);
       setStats(homeStats);
-    } catch (error) {
+    } catch (error: any) {
       console.error('HomePage: Failed to load home page stats:', error);
-      setError('Failed to load statistics. Please try again later.');
+      
+      // 2025-01-28: FIXED - Handle 401 errors gracefully
+      if (error.response?.status === 401) {
+        console.log('HomePage: User not authorized, setting fallback stats');
+        setError('Please log in to view statistics.');
+      } else {
+        setError('Failed to load statistics. Please try again later.');
+      }
+      
       // Set fallback stats
       setStats({
         overview: {

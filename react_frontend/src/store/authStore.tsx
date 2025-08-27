@@ -37,12 +37,15 @@ export const useAuthStore = create<AuthStore>()(
           set({ isLoading: true, error: null });
           
           const response = await authService.login(credentials);
-          const { user, access_token, refresh_token } = response.data;
+          const { user, tokens } = response.data;
           
           // Transform Django response format to match frontend expectations
-          const tokens = {
-            access: access_token,
-            refresh: refresh_token
+          // 2025-01-28: FIXED - Use correct property names from AuthResponse
+          const authTokens = {
+            access: tokens.access,
+            refresh: tokens.refresh,
+            access_expires: tokens.access_expires,
+            refresh_expires: tokens.refresh_expires
           };
           
           // Ensure boolean fields are properly typed
@@ -54,12 +57,12 @@ export const useAuthStore = create<AuthStore>()(
           };
           
           // Store tokens in localStorage for API service
-          localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, access_token);
-          localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refresh_token);
+          localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, tokens.access);
+          localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, tokens.refresh);
           
           set({
             user: normalizedUser,
-            tokens,
+            tokens: authTokens,
             isAuthenticated: true,
             isLoading: false,
             error: null,
@@ -78,12 +81,15 @@ export const useAuthStore = create<AuthStore>()(
           set({ isLoading: true, error: null });
           
           const response = await authService.register(userData);
-          const { user, access_token, refresh_token } = response.data;
+          const { user, tokens } = response.data;
           
           // Transform Django response format to match frontend expectations
-          const tokens = {
-            access: access_token,
-            refresh: refresh_token
+          // 2025-01-28: FIXED - Use correct property names from AuthResponse
+          const authTokens = {
+            access: tokens.access,
+            refresh: tokens.refresh,
+            access_expires: tokens.access_expires,
+            refresh_expires: tokens.refresh_expires
           };
           
           // Ensure boolean fields are properly typed
@@ -95,12 +101,12 @@ export const useAuthStore = create<AuthStore>()(
           };
           
           // Store tokens in localStorage for API service
-          localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, access_token);
-          localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refresh_token);
+          localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, tokens.access);
+          localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, tokens.refresh);
           
           set({
             user: normalizedUser,
-            tokens,
+            tokens: authTokens,
             isAuthenticated: true,
             isLoading: false,
             error: null,
@@ -131,25 +137,32 @@ export const useAuthStore = create<AuthStore>()(
 
       refreshToken: async () => {
         try {
-          const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+          const currentTokens = get().tokens;
+          if (!currentTokens) {
+            throw new Error('No tokens available for refresh');
+          }
+          
+          const refreshToken = currentTokens.refresh;
           if (!refreshToken) {
             throw new Error('No refresh token available');
           }
-          
+
           const response = await authService.refreshToken(refreshToken);
-          const { access_token, refresh_token } = response.data;
+          const { access, refresh, access_expires, refresh_expires } = response.data;
           
           // Update tokens in localStorage
-          localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, access_token);
-          if (refresh_token) {
-            localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refresh_token);
+          localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, access);
+          if (refresh) {
+            localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refresh);
           }
           
           // Update state
           set({
             tokens: {
-              access: access_token,
-              refresh: refresh_token || refreshToken
+              access,
+              refresh: refresh || refreshToken,
+              access_expires,
+              refresh_expires: refresh_expires || currentTokens.refresh_expires || ''
             }
           });
         } catch (error: any) {
@@ -180,6 +193,15 @@ export const useAuthStore = create<AuthStore>()(
             isLoading: false,
           });
         } catch (error: any) {
+          console.log('AuthStore: getCurrentUser failed with error:', error);
+          
+          // If it's a 401 error, clear authentication state
+          if (error.response?.status === 401) {
+            console.log('AuthStore: 401 error, clearing authentication state');
+            get().logout();
+            return; // Don't set error state since we're logging out
+          }
+          
           set({
             isLoading: false,
             error: error.message || 'Failed to get user profile',
@@ -254,11 +276,24 @@ export const useAuthStore = create<AuthStore>()(
 
       initializeFromStorage: () => {
         const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+        console.log('AuthStore: initializeFromStorage called, token exists:', !!token);
+        
         if (token) {
           // Try to get current user from API
-          get().getCurrentUser().catch(() => {
+          get().getCurrentUser().catch((error) => {
+            console.log('AuthStore: getCurrentUser failed, clearing invalid token:', error);
             // If failed, clear invalid token
             get().logout();
+          });
+        } else {
+          console.log('AuthStore: No token found, user not authenticated');
+          // Ensure state is cleared if no token
+          set({
+            user: null,
+            tokens: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: null,
           });
         }
       },

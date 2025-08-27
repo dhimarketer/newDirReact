@@ -132,7 +132,9 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
         try:
             family_group = FamilyGroup.get_by_address(address, island)
             if family_group:
-                serializer = self.get_serializer(family_group)
+                # 2025-01-28: FIXED - Use FamilyGroupDetailSerializer to include members and relationships
+                from .serializers import FamilyGroupDetailSerializer
+                serializer = FamilyGroupDetailSerializer(family_group)
                 return Response(serializer.data)
             else:
                 return Response({'error': 'No family group found for this address'}, status=status.HTTP_404_NOT_FOUND)
@@ -154,6 +156,28 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
             )
         
         try:
+            # 2025-01-28: ENHANCED - Use automatic family inference if no explicit data provided
+            if not members and not relationships:
+                print(f"DEBUG: No explicit members/relationships provided - using automatic family inference")
+                family_group = FamilyGroup.infer_family_from_address(address, island, request.user)
+                
+                if family_group:
+                    print(f"DEBUG: Successfully auto-inferred family group {family_group.id}")
+                    serializer = self.get_serializer(family_group)
+                    return Response(serializer.data, status=status.HTTP_201_CREATED)
+                else:
+                    print(f"DEBUG: No family could be inferred - creating empty family group")
+                    # Create empty family group if inference fails
+                    family_group = FamilyGroup.objects.create(
+                        name=f"Family at {address}",
+                        description=f"Family from {address}, {island}",
+                        address=address,
+                        island=island,
+                        created_by=request.user
+                    )
+                    serializer = self.get_serializer(family_group)
+                    return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
             # Try to get existing family group
             family_group = FamilyGroup.get_by_address(address, island)
             
@@ -262,6 +286,53 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'])
+    def infer_family(self, request):
+        """
+        2025-01-28: NEW - Dedicated endpoint for automatic family inference
+        
+        Automatically creates family groups and relationships based on:
+        1. All members of the same address are assumed to be family by default
+        2. The eldest two (female, male) with DOB are considered parents
+        3. Parents to children shall have an age gap of at least 10 years
+        4. People with no DOB are not considered parents
+        """
+        address = request.data.get('address')
+        island = request.data.get('island')
+        
+        if not address or not island:
+            return Response(
+                {'error': 'Both address and island are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            print(f"DEBUG: Family inference requested for {address}, {island}")
+            family_group = FamilyGroup.infer_family_from_address(address, island, request.user)
+            
+            if family_group:
+                print(f"DEBUG: Successfully inferred family group {family_group.id}")
+                serializer = self.get_serializer(family_group)
+                return Response({
+                    'success': True,
+                    'message': f'Family automatically inferred for {address}, {island}',
+                    'data': serializer.data
+                }, status=status.HTTP_201_CREATED)
+            else:
+                print(f"DEBUG: No family could be inferred for {address}, {island}")
+                return Response({
+                    'success': False,
+                    'message': f'No family members found with DOB for {address}, {island}',
+                    'data': None
+                }, status=status.HTTP_404_NOT_FOUND)
+                
+        except Exception as e:
+            print(f"ERROR: Family inference failed for {address}, {island}: {str(e)}")
+            return Response({
+                'success': False,
+                'error': f'Failed to infer family: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=False, methods=['post'])
     def delete_updated_families(self, request):

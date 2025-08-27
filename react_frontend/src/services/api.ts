@@ -2,7 +2,6 @@
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { API_CONFIG, STORAGE_KEYS } from '../utils/constants';
-import { useAuthStore } from '../store/authStore';
 
 class ApiService {
   private api: AxiosInstance;
@@ -26,6 +25,15 @@ class ApiService {
         const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+          // 2025-01-28: DEBUG - Log the authorization header being added
+          console.log('=== API REQUEST DEBUG ===');
+          console.log('DEBUG: Adding Authorization header:', `Bearer ${token.substring(0, 20)}...`);
+          console.log('DEBUG: Request URL:', config.url);
+          console.log('DEBUG: Request method:', config.method);
+          console.log('DEBUG: Full headers:', config.headers);
+          console.log('=== END API REQUEST DEBUG ===');
+        } else {
+          console.log('DEBUG: No auth token found in localStorage');
         }
         return config;
       },
@@ -40,6 +48,16 @@ class ApiService {
         return response;
       },
       async (error: AxiosError) => {
+        // 2025-01-28: DEBUG - Log error details
+        console.log('=== API RESPONSE ERROR DEBUG ===');
+        console.log('DEBUG: Error status:', error.response?.status);
+        console.log('DEBUG: Error message:', error.message);
+        console.log('DEBUG: Error response data:', error.response?.data);
+        console.log('DEBUG: Request URL:', error.config?.url);
+        console.log('DEBUG: Request method:', error.config?.method);
+        console.log('DEBUG: Request headers:', error.config?.headers);
+        console.log('=== END API RESPONSE ERROR DEBUG ===');
+        
         const originalRequest = error.config as any;
         
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -48,20 +66,28 @@ class ApiService {
           try {
             const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
             if (refreshToken) {
-              const response = await this.api.post('/auth/refresh/', {
+              console.log('DEBUG: Attempting token refresh...');
+              // 2025-01-28: FIXED - Use correct refresh endpoint with /api prefix
+              const response = await this.api.post('/api/auth/refresh/', {
                 refresh: refreshToken,
               });
               
               const { access } = response.data;
               localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, access);
+              console.log('DEBUG: Token refresh successful, new access token stored');
               
               // Retry original request
               originalRequest.headers.Authorization = `Bearer ${access}`;
               return this.api(originalRequest);
+            } else {
+              console.log('DEBUG: No refresh token available');
             }
           } catch (refreshError) {
-            // If refresh fails, logout user
-            useAuthStore.getState().logout();
+            console.log('DEBUG: Token refresh failed:', refreshError);
+            // 2025-01-28: FIXED - Remove incorrect useAuthStore usage from interceptor
+            // Clear tokens and let the component handle logout
+            localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+            localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
             return Promise.reject(refreshError);
           }
         }
@@ -80,6 +106,8 @@ class ApiService {
       throw error;
     }
   }
+
+
 
   // GET request
   async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
@@ -221,6 +249,17 @@ class ApiService {
   // Get auth token
   getAuthToken(): string | null {
     return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  }
+
+  // 2025-01-28: ADDED - Check if user is authenticated
+  isAuthenticated(): boolean {
+    const token = this.getAuthToken();
+    return token !== null && token !== undefined && token !== '';
+  }
+
+  // 2025-01-28: ADDED - Get base URL for debugging
+  getBaseURL(): string {
+    return this.api.defaults.baseURL || 'unknown';
   }
 }
 

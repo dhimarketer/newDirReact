@@ -2,11 +2,18 @@
 
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api',
+  // 2025-01-28: FIXED - Use proxy during development, relative path in production
+  BASE_URL: window.location.hostname === 'localhost' && window.location.port === '3000' ? '/api' : '/api',
   TIMEOUT: 30000,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
 } as const;
+
+// 2025-01-28: DEBUG - Log the API config when constants are loaded
+console.log('=== CONSTANTS DEBUG ===');
+console.log('API_CONFIG.BASE_URL:', API_CONFIG.BASE_URL);
+console.log('Current location:', window.location.href);
+console.log('=== END CONSTANTS DEBUG ===');
 
 // Application Configuration
 export const APP_CONFIG = {

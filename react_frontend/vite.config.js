@@ -38,12 +38,8 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      // Proxy auth requests to Django backend during development
-      '/auth': {
-        target: 'http://localhost:8000/api',
-        changeOrigin: true,
-        secure: false,
-      },
+      // 2025-01-27: REMOVED - /auth proxy rule conflicts with /api rule
+      // All auth requests should go through /api proxy rule
     },
   },
 })

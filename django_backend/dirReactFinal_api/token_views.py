@@ -40,8 +40,12 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             
             # Create response with user data
             response_data = {
-                'access_token': data['access'],
-                'refresh_token': data['refresh'],
+                'tokens': {
+                    'access': data['access'],
+                    'refresh': data['refresh'],
+                    'access_expires': data.get('access_expires'),
+                    'refresh_expires': data.get('refresh_expires')
+                },
                 'user': {
                     'id': serializer.user.id,
                     'username': data['username'],
@@ -81,7 +85,9 @@ class CustomTokenRefreshView(TokenRefreshView):
             try:
                 user = User.objects.get(id=token['user_id'])
                 response_data = {
-                    'access_token': access_token,
+                    'tokens': {
+                        'access': access_token
+                    },
                     'user': {
                         'id': user.id,
                         'username': user.username,
@@ -98,7 +104,9 @@ class CustomTokenRefreshView(TokenRefreshView):
             except User.DoesNotExist:
                 # Fallback to basic token data if user not found
                 response_data = {
-                    'access_token': access_token,
+                    'tokens': {
+                        'access': access_token
+                    },
                     'user': {
                         'id': token['user_id'],
                         'username': token.get('username', ''),
