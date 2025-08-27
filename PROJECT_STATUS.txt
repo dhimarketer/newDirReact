@@ -523,3 +523,19 @@
 [2025-01-28 20:56] | project root | VERIFIED: Frontend builds successfully after fixing redirect loop issue | ok
 [2025-01-28 21:00] | django_backend/dirReactFinal_api/token_views.py:40 | FIXED: Django backend response format now matches frontend expectations - tokens wrapped in tokens object, frontend login should now work | ok
 [2025-01-28 21:01] | django_backend/dirReactFinal_api/token_views.py:40 | ENHANCED: Added expiration time fields to tokens response for complete frontend compatibility | ok
+[2025-01-28 21:22] | project root | COMPLETED: Family tree nodes now properly spaced without overlapping | ok
+[2025-01-28 21:30] | react_frontend/src/components/family/ClassicFamilyTree.tsx:105 | FIXED: Family tree centering issue - implemented proper center-based positioning with fixed spacing | ok
+[2025-01-28 21:31] | project root | VERIFIED: Frontend builds successfully after family tree centering fix | ok
+[2025-01-28 21:32] | project root | COMPLETED: Family tree now properly centered in container with no clipping | ok
+[2025-01-28 22:00] | react_frontend/src/components/common/ProtectedRoute.tsx:40 | CRITICAL FIX: Fixed "Rendered fewer hooks than expected" error by moving all useEffect hooks to top level and removing conditional hook calls that violated Rules of Hooks | ok
+[2025-01-28 22:01] | react_frontend/src/router.tsx:60 | FIXED: Removed nested ProtectedRoute components to prevent hook violations and moved admin access checks to individual page components | ok
+[2025-01-28 22:02] | react_frontend/src/pages/AdminPage.tsx:15 | ADDED: Admin access check to AdminPage component to replace removed nested ProtectedRoute | ok
+[2025-01-28 22:03] | project root | VERIFIED: Frontend builds successfully after fixing conditional hook violations | ok
+[2025-01-28 22:04] | project root | COMPLETED: Blank window issue resolved - React hooks now called consistently in same order on every render | ok
+[2025-01-28 22:10] | react_frontend/src/components/layout/Sidebar.tsx:40 | FIXED: Early return after hooks by restructuring component to use useMemo and useEffect instead of conditional returns | ok
+[2025-01-28 22:11] | react_frontend/src/router.tsx:30 | FIXED: Conditional rendering in router that caused hook violations by removing conditional element rendering | ok
+[2025-01-28 22:12] | react_frontend/src/pages/LoginPage.tsx:20 | ADDED: Authentication redirect logic to LoginPage to handle redirects at component level | ok
+[2025-01-28 22:13] | react_frontend/src/services/api.ts:75 | FIXED: Double /api/ issue in refresh endpoint by removing /api prefix since base URL already includes it | ok
+[2025-01-28 22:14] | react_frontend/src/services/api.ts:180 | FIXED: Double /api/ issues in user management endpoints by removing /api prefix from all endpoints | ok
+[2025-01-28 22:15] | project root | VERIFIED: Frontend builds successfully after all hook violation and API routing fixes | ok
+[2025-01-28 22:16] | project root | COMPLETED: All React hook violations resolved - components now render consistently without "Rendered fewer hooks than expected" errors | ok

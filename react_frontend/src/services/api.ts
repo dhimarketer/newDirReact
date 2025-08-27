@@ -67,8 +67,8 @@ class ApiService {
             const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
             if (refreshToken) {
               console.log('DEBUG: Attempting token refresh...');
-              // 2025-01-28: FIXED - Use correct refresh endpoint with /api prefix
-              const response = await this.api.post('/api/auth/refresh/', {
+              // 2025-01-28: FIXED - Remove /api prefix since base URL already includes it
+              const response = await this.api.post('/auth/refresh/', {
                 refresh: refreshToken,
               });
               
@@ -177,29 +177,29 @@ class ApiService {
     }
   }
 
-  // User Management Methods
-  async getUsers(): Promise<any> {
-    return this.get('/api/users/');
+  // User management methods
+  getUsers() {
+    return this.get('/users/');
   }
 
-  async registerUser(userData: any): Promise<any> {
-    return this.post('/api/auth/register/', userData);
+  registerUser(userData: any) {
+    return this.post('/auth/register/', userData);
   }
 
-  async updateUser(userId: number, userData: any): Promise<any> {
-    return this.put(`/api/users/${userId}/`, userData);
+  updateUser(userId: number, userData: any) {
+    return this.put(`/users/${userId}/`, userData);
   }
 
-  async deleteUser(userId: number): Promise<any> {
-    return this.delete(`/api/users/${userId}/`);
+  deleteUser(userId: number) {
+    return this.delete(`/users/${userId}/`);
   }
 
-  async updateUserScore(userId: number, scoreData: any): Promise<any> {
-    return this.post(`/api/users/${userId}/update_score/`, scoreData);
+  updateUserScore(userId: number, scoreData: any) {
+    return this.post(`/users/${userId}/update_score/`, scoreData);
   }
 
-  async changeUserPassword(userId: number, passwordData: any): Promise<any> {
-    return this.post(`/api/users/${userId}/change_password/`, passwordData);
+  changeUserPassword(userId: number, passwordData: any) {
+    return this.post(`/users/${userId}/change_password/`, passwordData);
   }
 
   // Error handling

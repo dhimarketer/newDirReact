@@ -27,6 +27,22 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   console.log('DEBUG: localStorage token:', !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN));
   console.log('=== END PROTECTED ROUTE DEBUG ===');
 
+  // Handle authentication redirects
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      console.log('DEBUG: User not authenticated, redirecting to login');
+      navigate(redirectTo, { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate, redirectTo]);
+
+  // Handle admin access redirects
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && requireAdmin && 
+        (!user?.is_staff && !user?.is_superuser && user?.user_type !== 'admin')) {
+      navigate('/', { replace: true });
+    }
+  }, [isLoading, isAuthenticated, requireAdmin, user, navigate]);
+
   // Show loading spinner while checking authentication
   if (isLoading) {
     return (
@@ -36,24 +52,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated) {
-      console.log('DEBUG: User not authenticated, redirecting to login');
-      navigate(redirectTo, { replace: true });
-    }
-  }, [isAuthenticated, navigate, redirectTo]);
-
-  // Check admin access if required
-  if (requireAdmin && (!user?.is_staff && !user?.is_superuser && user?.user_type !== 'admin')) {
-    useEffect(() => {
-      navigate('/', { replace: true });
-    }, [navigate]);
+  // Don't render anything while redirecting
+  if (!isAuthenticated) {
     return null;
   }
 
-  // Don't render anything while redirecting
-  if (!isAuthenticated) {
+  // Check admin access if required
+  if (requireAdmin && (!user?.is_staff && !user?.is_superuser && user?.user_type !== 'admin')) {
     return null;
   }
 

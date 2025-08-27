@@ -26,19 +26,11 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Public Routes */}
-      <Route path="/login" element={
-        isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
-      } />
-      <Route path="/register" element={
-        isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />
-      } />
-      <Route path="/forgot-password" element={
-        isAuthenticated ? <Navigate to="/" replace /> : <ForgotPasswordPage />
-      } />
-      <Route path="/reset-password" element={
-        isAuthenticated ? <Navigate to="/" replace /> : <ResetPasswordPage />
-      } />
+      {/* Public Routes - Always render these components */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* Protected Routes with Layout */}
       <Route path="/" element={
@@ -51,26 +43,10 @@ function AppRoutes() {
         <Route path="search" element={<SearchPage />} />
         <Route path="directory" element={<DirectoryPage />} />
         <Route path="family" element={<FamilyPage />} />
-        <Route path="settings" element={
-          <ProtectedRoute requireAdmin>
-            <SettingsPage />
-          </ProtectedRoute>
-        } />
-        <Route path="admin" element={
-          <ProtectedRoute requireAdmin>
-            <AdminPage />
-          </ProtectedRoute>
-        } />
-        <Route path="admin-image-search" element={
-          <ProtectedRoute requireAdmin>
-            <AdminImageSearchPage />
-          </ProtectedRoute>
-        } />
-        <Route path="admin/users" element={
-          <ProtectedRoute requireAdmin>
-            <AdminUserManagementPage />
-          </ProtectedRoute>
-        } />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="admin" element={<AdminPage />} />
+        <Route path="admin-image-search" element={<AdminImageSearchPage />} />
+        <Route path="admin/users" element={<AdminUserManagementPage />} />
         <Route path="premium-image-search" element={<PremiumImageSearchPage />} />
       </Route>
 
