@@ -387,139 +387,96 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 print("DEBUG: Transaction started successfully")
                 
-                # Find the family group to delete
                 if family_group_id:
-                    print(f"DEBUG: Looking up family group by ID: {family_group_id}")
+                    # Delete specific family group
                     try:
                         family_group = FamilyGroup.objects.get(id=family_group_id)
+                        print(f"DEBUG: Found family group: {family_group.name}")
+                        
+                        # Delete family members and relationships
+                        FamilyMember.objects.filter(family_group=family_group).delete()
+                        FamilyRelationship.objects.filter(family_group=family_group).delete()
+                        
+                        # Delete the family group itself
+                        family_group.delete()
+                        
+                        print(f"DEBUG: Successfully deleted family group {family_group_id}")
+                        
+                        return Response({
+                            'success': True,
+                            'message': f'Family group {family_group_id} deleted successfully'
+                        }, status=status.HTTP_200_OK)
+                        
                     except FamilyGroup.DoesNotExist:
-                        return Response(
-                            {'error': f'Family group with ID {family_group_id} not found'}, 
-                            status=status.HTTP_404_NOT_FOUND
-                        )
+                        return Response({
+                            'success': False,
+                            'error': f'Family group {family_group_id} not found'
+                        }, status=status.HTTP_404_NOT_FOUND)
+                        
                 else:
-                    print(f"DEBUG: Looking up family group by address: {address}, {island}")
-                    family_group = FamilyGroup.get_by_address(address, island)
-                    if not family_group:
-                        return Response(
-                            {'error': 'No family group found for this address'}, 
-                            status=status.HTTP_404_NOT_FOUND
-                        )
-                
-                print(f"DEBUG: Found family group: {family_group.id} - {family_group.name}")
-                
-                # Get family info before deletion for logging
-                family_name = family_group.name
-                family_address = family_group.address
-                family_island = family_group.island
-                member_count = family_group.members.count()
-                relationship_count = family_group.relationships.count()
-                
-                print(f"DEBUG: Family has {member_count} members and {relationship_count} relationships")
-                print(f"DEBUG: Family details - Name: {family_name}, Address: {family_address}, Island: {family_island}")
-                
-                # Store member information for confirmation (without deleting entries)
-                members_info = []
-                for member in family_group.members.all():
-                    print(f"DEBUG: Processing member: {member.entry.name} (PID: {member.entry.pid})")
-                    members_info.append({
-                        'entry_id': member.entry.pid,
-                        'name': member.entry.name,
-                        'contact': member.entry.contact,
-                        'address': member.entry.address,
-                        'island': member.entry.island
-                    })
-                
-                print(f"DEBUG: Stored info for {len(members_info)} members")
-                
-                # Clear family_group_id references in PhoneBookEntry records
-                print("DEBUG: Clearing family_group_id references in PhoneBookEntry records")
-                from dirReactFinal_directory.models import PhoneBookEntry
-                try:
-                    # First, let's check if there are any records to update
-                    records_to_update = PhoneBookEntry.objects.filter(family_group_id=family_group.id)
-                    print(f"DEBUG: Found {records_to_update.count()} PhoneBookEntry records to update")
+                    # Delete families by address and island
+                    families_to_delete = FamilyGroup.objects.filter(
+                        address__iexact=address,
+                        island__iexact=island
+                    )
                     
-                    if records_to_update.exists():
-                        updated_count = records_to_update.update(family_group_id=None)
-                        print(f"DEBUG: Updated {updated_count} PhoneBookEntry records")
+                    if not families_to_delete.exists():
+                        return Response({
+                            'success': False,
+                            'error': f'No family groups found for {address}, {island}'
+                        }, status=status.HTTP_404_NOT_FOUND)
+                    
+                    deleted_count = 0
+                    for family_group in families_to_delete:
+                        print(f"DEBUG: Deleting family group: {family_group.name}")
                         
-                        # Verify the update was successful
-                        remaining_refs = PhoneBookEntry.objects.filter(family_group_id=family_group.id).count()
-                        if remaining_refs > 0:
-                            print(f"DEBUG: Warning - {remaining_refs} PhoneBookEntry records still reference family group")
-                        else:
-                            print("DEBUG: All PhoneBookEntry references cleared successfully")
-                    else:
-                        print("DEBUG: No PhoneBookEntry records found to update")
+                        # Delete family members and relationships
+                        FamilyMember.objects.filter(family_group=family_group).delete()
+                        FamilyRelationship.objects.filter(family_group=family_group).delete()
                         
-                except Exception as e:
-                    print(f"DEBUG: Error updating PhoneBookEntry records: {str(e)}")
-                    raise Exception(f"Failed to clear family group references: {str(e)}")
-                
-                # Delete family associations (members and relationships) but NOT the phonebook entries
-                print("DEBUG: Deleting family members")
-                try:
-                    family_group.members.all().delete()
-                    print("DEBUG: Family members deleted successfully")
-                except Exception as e:
-                    print(f"DEBUG: Error deleting family members: {str(e)}")
-                    raise Exception(f"Failed to delete family members: {str(e)}")
-                
-                print("DEBUG: Deleting family relationships")
-                try:
-                    family_group.relationships.all().delete()
-                    print("DEBUG: Family relationships deleted successfully")
-                except Exception as e:
-                    print(f"DEBUG: Error deleting family relationships: {str(e)}")
-                    raise Exception(f"Failed to delete family relationships: {str(e)}")
-                
-                # Delete the family group itself
-                print("DEBUG: Deleting family group")
-                try:
-                    family_group.delete()
-                    print("DEBUG: Family group deleted successfully")
-                except Exception as e:
-                    print(f"DEBUG: Error deleting family group: {str(e)}")
-                    raise Exception(f"Failed to delete family group: {str(e)}")
-                
-                print("DEBUG: Family deletion completed successfully")
-                
-                return Response({
-                    'message': f'Successfully deleted family "{family_name}" at {family_address}, {family_island}',
-                    'details': {
-                        'family_name': family_name,
-                        'address': family_address,
-                        'island': family_island,
-                        'members_removed': member_count,
-                        'relationships_removed': relationship_count,
-                        'phonebook_entries_preserved': len(members_info),
-                        'preserved_members': members_info
-                    }
-                }, status=status.HTTP_200_OK)
-                
+                        # Delete the family group itself
+                        family_group.delete()
+                        deleted_count += 1
+                    
+                    print(f"DEBUG: Successfully deleted {deleted_count} family groups")
+                    
+                    return Response({
+                        'success': True,
+                        'message': f'Successfully deleted {deleted_count} family groups for {address}, {island}'
+                    }, status=status.HTTP_200_OK)
+                    
         except Exception as e:
-            import traceback
-            print(f"DEBUG: Exception occurred: {str(e)}")
-            print(f"DEBUG: Traceback: {traceback.format_exc()}")
+            print(f"ERROR: Failed to delete updated families: {str(e)}")
+            return Response({
+                'success': False,
+                'error': f'Failed to delete updated families: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['patch'])
+    def mark_manually_updated(self, request, pk=None):
+        """
+        2025-01-28: NEW - Mark family as manually updated by user
+        
+        This endpoint is called when the user makes manual changes to the family tree
+        to preserve those changes from being overwritten by automatic inference.
+        """
+        family_group = self.get_object()
+        
+        try:
+            # Mark the family as manually updated
+            family_group.mark_as_manually_updated()
             
-            # Provide more specific error information
-            error_message = str(e)
-            if "foreign key constraint" in error_message.lower():
-                error_message = "Database constraint violation - family group has active references"
-            elif "does not exist" in error_message.lower():
-                error_message = "Family group not found or already deleted"
-            elif "permission" in error_message.lower():
-                error_message = "Permission denied - insufficient privileges"
-            elif "database is locked" in error_message.lower():
-                error_message = "Database is locked - another operation may be in progress"
-            elif "timeout" in error_message.lower():
-                error_message = "Database operation timed out"
+            return Response({
+                'success': True,
+                'message': f'Family {family_group.name} marked as manually updated'
+            }, status=status.HTTP_200_OK)
             
-            return Response(
-                {'error': f'Failed to delete family: {error_message}'}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        except Exception as e:
+            print(f"ERROR: Failed to mark family as manually updated: {str(e)}")
+            return Response({
+                'success': False,
+                'error': f'Failed to mark family as manually updated: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class FamilyMemberViewSet(viewsets.ModelViewSet):
     """

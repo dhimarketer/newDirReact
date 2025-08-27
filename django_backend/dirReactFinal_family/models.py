@@ -15,6 +15,8 @@ class FamilyGroup(models.Model):
     address = models.CharField(max_length=255, null=True, blank=True, help_text="Address where this family lives")
     island = models.CharField(max_length=255, null=True, blank=True, help_text="Island where this family lives")
     is_public = models.BooleanField(default=False, help_text="Whether this family group is visible to all users")
+    # 2025-01-28: Added field to track if family has been manually updated by user
+    is_manually_updated = models.BooleanField(default=False, help_text="Whether this family has been manually updated by a user")
     created_by = models.ForeignKey('dirReactFinal_core.User', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -32,6 +34,11 @@ class FamilyGroup(models.Model):
     def get_member_count(self):
         """Get the number of members in this family group"""
         return self.members.count()
+    
+    def mark_as_manually_updated(self):
+        """2025-01-28: NEW - Mark this family as manually updated by user"""
+        self.is_manually_updated = True
+        self.save(update_fields=['is_manually_updated'])
     
     @classmethod
     def get_by_address(cls, address, island):
@@ -52,6 +59,7 @@ class FamilyGroup(models.Model):
         3. Parents to children shall have an age gap of at least 10 years
         4. People with no DOB are not considered parents
         5. Automatically creates family group and relationships
+        6. 2025-01-28: ENHANCED - Preserves manually updated families
         """
         from django.db import transaction
         from datetime import datetime
@@ -61,6 +69,14 @@ class FamilyGroup(models.Model):
         
         try:
             with transaction.atomic():
+                # Check if family group already exists
+                existing_family = cls.objects.filter(address=address, island=island).first()
+                
+                # 2025-01-28: ENHANCED - If family exists and has been manually updated, return it as-is
+                if existing_family and existing_family.is_manually_updated:
+                    logger.info(f"Family for {address}, {island} has been manually updated - preserving existing structure")
+                    return existing_family
+                
                 # Get all phonebook entries for this address
                 logger.info(f"Searching for entries with address='{address}' and island='{island}'")
                 
@@ -106,187 +122,191 @@ class FamilyGroup(models.Model):
                     defaults={
                         'name': f"Family at {address}",
                         'description': f"Family from {address}, {island} (auto-inferred)",
-                        'created_by': created_by
+                        'created_by': created_by,
+                        'is_manually_updated': False  # 2025-01-28: Set as auto-inferred
                     }
                 )
                 
-                # Clear existing members and relationships for this family
-                family_group.members.all().delete()
-                family_group.relationships.all().delete()
-                
-                # Add all entries as family members
-                for entry, age in entries_with_age:
-                    FamilyMember.objects.create(
-                        entry=entry,
-                        family_group=family_group,
-                        role_in_family='member'
-                    )
-                
-                # Identify potential parents (eldest male and female with DOB)
-                potential_parents = []
-                for entry, age in entries_with_age:
-                    if entry.gender and entry.DOB:
-                        potential_parents.append((entry, age))
-                
-                # Sort potential parents by age (eldest first)
-                potential_parents.sort(key=lambda x: x[1], reverse=True)
-                
-                # Find eldest male and female
-                eldest_male = None
-                eldest_female = None
-                
-                for entry, age in potential_parents:
-                    if entry.gender.lower() in ['male', 'm', '1'] and eldest_male is None:
-                        eldest_male = (entry, age)
-                    elif entry.gender.lower() in ['female', 'f', '2'] and eldest_female is None:
-                        eldest_female = (entry, age)
+                # 2025-01-28: ENHANCED - Only clear existing data if this is a new family or not manually updated
+                if not family_group.is_manually_updated:
+                    # Clear existing members and relationships for this family
+                    family_group.members.all().delete()
+                    family_group.relationships.all().delete()
                     
-                    if eldest_male and eldest_female:
-                        break
-                
-                # Create parent relationships
-                parents = []
-                if eldest_male:
-                    parents.append(eldest_male)
-                    # Update role to parent
-                    FamilyMember.objects.filter(
-                        entry=eldest_male[0],
-                        family_group=family_group
-                    ).update(role_in_family='parent')
-                
-                if eldest_female:
-                    parents.append(eldest_female)
-                    # Update role to parent
-                    FamilyMember.objects.filter(
-                        entry=eldest_female[0],
-                        family_group=family_group
-                    ).update(role_in_family='parent')
-                
-                # Create parent-child relationships based on age gap
-                for entry, age in entries_with_age:
-                    # Skip if this is a parent
-                    if any(entry.pid == parent[0].pid for parent in parents):
-                        continue
+                    # Add all entries as family members
+                    for entry, age in entries_with_age:
+                        FamilyMember.objects.create(
+                            entry=entry,
+                            family_group=family_group,
+                            role_in_family='member'
+                        )
                     
-                    # Find suitable parent(s) with at least 10 year age gap
-                    suitable_parents = []
-                    for parent_entry, parent_age in parents:
-                        age_gap = parent_age - age
-                        if age_gap >= 10:  # At least 10 year age gap
-                            suitable_parents.append(parent_entry)
+                    # Identify potential parents (eldest male and female with DOB)
+                    potential_parents = []
+                    for entry, age in entries_with_age:
+                        if entry.gender and entry.DOB:
+                            potential_parents.append((entry, age))
                     
-                    # Create parent-child relationships
-                    for parent_entry in suitable_parents:
-                        # Check if relationship already exists to avoid duplicates
-                        existing_rel = FamilyRelationship.objects.filter(
-                            person1=parent_entry,
-                            person2=entry,
-                            relationship_type='parent',
-                            family_group=family_group
-                        ).first()
+                    # Sort potential parents by age (eldest first)
+                    potential_parents.sort(key=lambda x: x[1], reverse=True)
+                    
+                    # Find eldest male and female
+                    eldest_male = None
+                    eldest_female = None
+                    
+                    for entry, age in potential_parents:
+                        if entry.gender.lower() in ['male', 'm', '1'] and eldest_male is None:
+                            eldest_male = (entry, age)
+                        elif entry.gender.lower() in ['female', 'f', '2'] and eldest_female is None:
+                            eldest_female = (entry, age)
                         
-                        if not existing_rel:
-                            # Create parent -> child relationship
-                            FamilyRelationship.objects.create(
+                        if eldest_male and eldest_female:
+                            break
+                    
+                    # Create parent relationships
+                    parents = []
+                    if eldest_male:
+                        parents.append(eldest_male)
+                        # Update role to parent
+                        FamilyMember.objects.filter(
+                            entry=eldest_male[0],
+                            family_group=family_group
+                        ).update(role_in_family='parent')
+                    
+                    if eldest_female:
+                        parents.append(eldest_female)
+                        # Update role to parent
+                        FamilyMember.objects.filter(
+                            entry=eldest_female[0],
+                            family_group=family_group
+                        ).update(role_in_family='parent')
+                    
+                    # Create parent-child relationships based on age gap
+                    for entry, age in entries_with_age:
+                        # Skip if this is a parent
+                        if any(entry.pid == parent[0].pid for parent in parents):
+                            continue
+                        
+                        # Find suitable parent(s) with at least 10 year age gap
+                        suitable_parents = []
+                        for parent_entry, parent_age in parents:
+                            age_gap = parent_age - age
+                            if age_gap >= 10:  # At least 10 year age gap
+                                suitable_parents.append(parent_entry)
+                        
+                        # Create parent-child relationships
+                        for parent_entry in suitable_parents:
+                            # Check if relationship already exists to avoid duplicates
+                            existing_rel = FamilyRelationship.objects.filter(
                                 person1=parent_entry,
                                 person2=entry,
                                 relationship_type='parent',
-                                family_group=family_group,
-                                notes=f"Auto-inferred: {parent_entry.name} -> {entry.name} (age gap: {parent_entry.get_age() - age} years)"
-                            )
-                        
-                        # Check if reverse relationship exists
-                        existing_reverse_rel = FamilyRelationship.objects.filter(
-                            person1=entry,
-                            person2=parent_entry,
-                            relationship_type='child',
-                            family_group=family_group
-                        ).first()
-                        
-                        if not existing_reverse_rel:
-                            # Create child -> parent relationship (reciprocal)
-                            FamilyRelationship.objects.create(
+                                family_group=family_group
+                            ).first()
+                            
+                            if not existing_rel:
+                                # Create parent -> child relationship
+                                FamilyRelationship.objects.create(
+                                    person1=parent_entry,
+                                    person2=entry,
+                                    relationship_type='parent',
+                                    family_group=family_group,
+                                    notes=f"Auto-inferred: {parent_entry.name} -> {entry.name} (age gap: {parent_entry.get_age() - age} years)"
+                                )
+                            
+                            # Check if reverse relationship exists
+                            existing_reverse_rel = FamilyRelationship.objects.filter(
                                 person1=entry,
                                 person2=parent_entry,
                                 relationship_type='child',
-                                family_group=family_group,
-                                notes=f"Auto-inferred: {entry.name} -> {parent_entry.name} (age gap: {parent_entry.get_age() - age} years)"
+                                family_group=family_group
+                            ).first()
+                            
+                            if not existing_reverse_rel:
+                                # Create child -> parent relationship (reciprocal)
+                                FamilyRelationship.objects.create(
+                                    person1=entry,
+                                    person2=parent_entry,
+                                    relationship_type='child',
+                                    family_group=family_group,
+                                    notes=f"Auto-inferred: {entry.name} -> {parent_entry.name} (age gap: {parent_entry.get_age() - age} years)"
+                                )
+                            
+                            # Update child role
+                            FamilyMember.objects.filter(
+                                entry=entry,
+                                family_group=family_group
+                            ).update(role_in_family='child')
+                    
+                    # Create sibling relationships for children
+                    children = FamilyMember.objects.filter(
+                        family_group=family_group,
+                        role_in_family='child'
+                    )
+                    
+                    if children.count() > 1:
+                        # Group children by their parents
+                        from collections import defaultdict
+                        parent_children = defaultdict(list)
+                        
+                        for child in children:
+                            # Find parents of this child
+                            parent_relationships = FamilyRelationship.objects.filter(
+                                person2=child.entry,
+                                relationship_type='parent',
+                                family_group=family_group
                             )
+                            
+                            for parent_rel in parent_relationships:
+                                parent_children[parent_rel.person1.pid].append(child.entry)
                         
-                        # Update child role
-                        FamilyMember.objects.filter(
-                            entry=entry,
-                            family_group=family_group
-                        ).update(role_in_family='child')
-                
-                # Create sibling relationships for children
-                children = FamilyMember.objects.filter(
-                    family_group=family_group,
-                    role_in_family='child'
-                )
-                
-                if children.count() > 1:
-                    # Group children by their parents
-                    from collections import defaultdict
-                    parent_children = defaultdict(list)
-                    
-                    for child in children:
-                        # Find parents of this child
-                        parent_relationships = FamilyRelationship.objects.filter(
-                            person2=child.entry,
-                            relationship_type='parent',
-                            family_group=family_group
-                        )
-                        
-                        for parent_rel in parent_relationships:
-                            parent_children[parent_rel.person1.pid].append(child.entry)
-                    
-                    # Create sibling relationships
-                    for parent_pid, children_list in parent_children.items():
-                        if len(children_list) > 1:
-                            # Create sibling relationships between all children of the same parent
-                            for i, child1 in enumerate(children_list):
-                                for child2 in children_list[i+1:]:
-                                    # Check if sibling relationship already exists
-                                    existing_sibling = FamilyRelationship.objects.filter(
-                                        person1=child1,
-                                        person2=child2,
-                                        relationship_type='sibling',
-                                        family_group=family_group
-                                    ).first()
-                                    
-                                    if not existing_sibling:
-                                        # Create bidirectional sibling relationships
-                                        FamilyRelationship.objects.create(
+                        # Create sibling relationships
+                        for parent_pid, children_list in parent_children.items():
+                            if len(children_list) > 1:
+                                # Create sibling relationships between all children of the same parent
+                                for i, child1 in enumerate(children_list):
+                                    for child2 in children_list[i+1:]:
+                                        # Check if sibling relationship already exists
+                                        existing_sibling = FamilyRelationship.objects.filter(
                                             person1=child1,
                                             person2=child2,
                                             relationship_type='sibling',
-                                            family_group=family_group,
-                                            notes=f"Auto-inferred: {child1.name} and {child2.name} are siblings"
-                                        )
-                                    
-                                    # Check if reverse relationship exists
-                                    existing_reverse_sibling = FamilyRelationship.objects.filter(
-                                        person1=child2,
-                                        person2=child1,
-                                        relationship_type='sibling',
-                                        family_group=family_group
-                                    ).first()
-                                    
-                                    if not existing_reverse_sibling:
-                                        FamilyRelationship.objects.create(
+                                            family_group=family_group
+                                        ).first()
+                                        
+                                        if not existing_sibling:
+                                            # Create bidirectional sibling relationships
+                                            FamilyRelationship.objects.create(
+                                                person1=child1,
+                                                person2=child2,
+                                                relationship_type='sibling',
+                                                family_group=family_group,
+                                                notes=f"Auto-inferred: {child1.name} and {child2.name} are siblings"
+                                            )
+                                        
+                                        # Check if reverse relationship exists
+                                        existing_reverse_sibling = FamilyRelationship.objects.filter(
                                             person1=child2,
                                             person2=child1,
                                             relationship_type='sibling',
-                                            family_group=family_group,
-                                            notes=f"Auto-inferred: {child2.name} and {child1.name} are siblings"
-                                        )
+                                            family_group=family_group
+                                        ).first()
+                                        
+                                        if not existing_reverse_sibling:
+                                            FamilyRelationship.objects.create(
+                                                person1=child2,
+                                                person2=child1,
+                                                relationship_type='sibling',
+                                                family_group=family_group,
+                                                notes=f"Auto-inferred: {child2.name} and {child1.name} are siblings"
+                                            )
+                else:
+                    logger.info(f"Family for {address}, {island} is manually updated - skipping auto-inference")
                 
                 print(f"DEBUG: Auto-inferred family for {address}, {island}")
                 print(f"DEBUG: Total members: {family_group.members.count()}")
                 print(f"DEBUG: Total relationships: {family_group.relationships.count()}")
-                print(f"DEBUG: Parents identified: {len(parents)}")
-                print(f"DEBUG: Children identified: {children.count()}")
+                print(f"DEBUG: Is manually updated: {family_group.is_manually_updated}")
                 
                 return family_group
                 

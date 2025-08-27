@@ -43,6 +43,20 @@ class FamilyService {
     await apiService.delete(`/family/groups/${id}/`);
   }
 
+  // 2025-01-28: NEW - Method to mark family as manually updated
+  async markFamilyAsManuallyUpdated(familyId: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await apiService.patch(`/family/groups/${familyId}/mark_manually_updated/`, {});
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error marking family as manually updated:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Failed to mark family as manually updated' 
+      };
+    }
+  }
+
   // Family Members
   async getFamilyMembers(familyId: number, params?: {
     page?: number;

@@ -52,7 +52,6 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   const [familyGroupData, setFamilyGroupData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isCreatingFamily, setIsCreatingFamily] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 1200, height: 800 });
   const [isResizing, setIsResizing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -172,14 +171,31 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
       console.log('DEBUG: Relationships array:', response.data?.relationships);
       console.log('=== END FAMILY TREE WINDOW DEBUG ===');
       
-      // 2025-01-28: NEW - Handle notFound flag to distinguish between missing family vs actual errors
+      // 2025-01-28: ENHANCED - If family not found, automatically create it
       if (response.notFound) {
-        // Family group doesn't exist - show create button
-        setFamilyMembers([]);
-        setFamilyRelationships([]);
-        setFamilyGroupExists(false);
-        setFamilyGroupData(null);
-        setError(null); // Clear any previous errors
+        console.log('Family not found - automatically creating family group for:', { address, island });
+        
+        try {
+          // Automatically create the family group
+          const createResponse = await familyService.createOrUpdateFamilyByAddress(address, island);
+          
+          if (createResponse.success && createResponse.data) {
+            console.log('Successfully created family group automatically');
+            // Fetch the newly created family data
+            await fetchFamilyMembers();
+            return;
+          } else {
+            console.error('Failed to automatically create family group:', createResponse.error);
+            setError(createResponse.error || 'Failed to create family group');
+            setFamilyGroupExists(false);
+            setFamilyGroupData(null);
+          }
+        } catch (createError) {
+          console.error('Error automatically creating family group:', createError);
+          setError('Failed to automatically create family group');
+          setFamilyGroupExists(false);
+          setFamilyGroupData(null);
+        }
         return;
       }
       
@@ -252,40 +268,35 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     }
   };
 
-  // Handle family group creation
-  const handleCreateFamilyGroup = async () => {
-    setIsCreatingFamily(true);
-    setError(null);
-    
-    try {
-      // 2025-01-28: Create family group for this address using the backend endpoint
-      const response = await familyService.createOrUpdateFamilyByAddress(address, island);
-      
-      if (response.success && response.data) {
-        // 2025-01-28: After creating family group, fetch family members again
-        await fetchFamilyMembers();
-      } else {
-        setError(response.error || 'Failed to create family group');
-      }
-    } catch (err) {
-      console.error('Error creating family group:', err);
-      setError('Failed to create family group');
-    } finally {
-      setIsCreatingFamily(false);
-    }
-  };
-
   // 2025-01-28: ENHANCED: Handle relationship changes from RelationshipManager
   const handleRelationshipChange = (updatedRelationships: FamilyRelationship[]) => {
     setFamilyRelationships(updatedRelationships);
-    // TODO: Save relationships to backend
+    // 2025-01-28: NEW - Mark family as manually updated when user makes changes
+    if (familyGroupData && familyGroupData.id) {
+      markFamilyAsManuallyUpdated(familyGroupData.id);
+    }
     console.log('Relationships updated:', updatedRelationships);
   };
 
   // 2025-01-28: ENHANCED: Handle family member changes (exclusions/inclusions)
   const handleFamilyMembersChange = (updatedMembers: FamilyMember[]) => {
     setFamilyMembers(updatedMembers);
+    // 2025-01-28: NEW - Mark family as manually updated when user makes changes
+    if (familyGroupData && familyGroupData.id) {
+      markFamilyAsManuallyUpdated(familyGroupData.id);
+    }
     console.log('Family members updated:', updatedMembers);
+  };
+  
+  // 2025-01-28: NEW - Function to mark family as manually updated
+  const markFamilyAsManuallyUpdated = async (familyId: number) => {
+    try {
+      // Call backend to mark family as manually updated
+      await familyService.markFamilyAsManuallyUpdated(familyId);
+      console.log('Family marked as manually updated');
+    } catch (error) {
+      console.error('Failed to mark family as manually updated:', error);
+    }
   };
 
   // 2025-01-28: ENHANCED: Toggle editing mode
@@ -371,13 +382,9 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
           ) : familyMembers.length === 0 ? (
             <div className="empty-state">
               <p>No family members found for this address.</p>
-              <button
-                onClick={handleCreateFamilyGroup}
-                className="create-family-btn"
-                disabled={isCreatingFamily}
-              >
-                {isCreatingFamily ? 'Creating...' : 'Create Family Group'}
-              </button>
+              <p className="text-sm text-gray-500 mt-2">
+                Family tree is being generated automatically...
+              </p>
             </div>
           ) : (
             <>
