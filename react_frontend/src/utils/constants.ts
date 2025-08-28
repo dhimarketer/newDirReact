@@ -1,27 +1,29 @@
 // 2025-01-27: Creating constants file for Phase 2 React frontend
+// 2025-01-28: Code review implementation - Using Vite environment variables for API configuration
 
 // API Configuration
 export const API_CONFIG = {
-  // 2025-01-28: FIXED - Use proxy during development, relative path in production
-  BASE_URL: window.location.hostname === 'localhost' && window.location.port === '3000' ? '/api' : '/api',
-  TIMEOUT: 30000,
-  RETRY_ATTEMPTS: 3,
-  RETRY_DELAY: 1000,
+  // 2025-01-28: IMPROVED - Using Vite environment variables instead of window.location.hostname
+  BASE_URL: import.meta.env.VITE_API_URL || '/api',
+  TIMEOUT: parseInt(import.meta.env.VITE_API_TIMEOUT || '45000'), // 2025-01-28: Increased timeout to 45s to prevent search timeouts
+  RETRY_ATTEMPTS: parseInt(import.meta.env.VITE_API_RETRY_ATTEMPTS || '3'),
+  RETRY_DELAY: parseInt(import.meta.env.VITE_API_RETRY_DELAY || '1000'),
 } as const;
 
 // 2025-01-28: DEBUG - Log the API config when constants are loaded
 console.log('=== CONSTANTS DEBUG ===');
 console.log('API_CONFIG.BASE_URL:', API_CONFIG.BASE_URL);
-console.log('Current location:', window.location.href);
+console.log('Environment:', import.meta.env.MODE);
+console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
 console.log('=== END CONSTANTS DEBUG ===');
 
 // Application Configuration
 export const APP_CONFIG = {
-  NAME: 'dirFinal',
-  VERSION: '2.0.0',
-  DESCRIPTION: 'Modern directory and family management application',
-  AUTHOR: 'dirFinal Team',
-  SUPPORT_EMAIL: 'support@dirfinal.com',
+  NAME: import.meta.env.VITE_APP_NAME || 'dirFinal',
+  VERSION: import.meta.env.VITE_APP_VERSION || '2.0.0',
+  DESCRIPTION: import.meta.env.VITE_APP_DESCRIPTION || 'Modern directory and family management application',
+  AUTHOR: import.meta.env.VITE_APP_AUTHOR || 'dirFinal Team',
+  SUPPORT_EMAIL: import.meta.env.VITE_APP_SUPPORT_EMAIL || 'support@dirfinal.com',
 } as const;
 
 // Pagination Configuration

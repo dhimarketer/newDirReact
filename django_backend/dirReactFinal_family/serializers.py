@@ -7,9 +7,15 @@ from .models import FamilyGroup, FamilyMember, FamilyRelationship
 
 class PhoneBookEntrySerializer(serializers.ModelSerializer):
     """Serializer for phone book entries in family context"""
+    age = serializers.SerializerMethodField()  # 2025-01-28: Added age field for reliable age calculation
+    
     class Meta:
         model = PhoneBookEntry
-        fields = ['pid', 'name', 'contact', 'island', 'address', 'party', 'DOB', 'gender']
+        fields = ['pid', 'name', 'contact', 'island', 'address', 'party', 'DOB', 'gender', 'age']  # 2025-01-28: Added age field
+    
+    def get_age(self, obj):
+        """2025-01-28: Get age using reliable backend calculation method"""
+        return obj.get_age()
 
 class FamilyGroupSerializer(serializers.ModelSerializer):
     """Basic serializer for family groups"""

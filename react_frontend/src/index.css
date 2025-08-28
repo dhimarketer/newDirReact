@@ -1066,6 +1066,12 @@ body {
   overflow: hidden;
   min-width: 800px;
   min-height: 600px;
+  width: var(--window-width, 800px);
+  height: var(--window-height, 600px);
+  left: var(--window-left, 50%);
+  top: var(--window-top, 50%);
+  /* 2025-01-28: FIXED - Remove transform to work with JavaScript positioning */
+  /* transform: translate(-50%, -50%); */
 }
 
 .family-tree-header {
@@ -2913,4 +2919,29 @@ body {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+}
+
+/* 2025-01-28: Added utility classes for cursor and pointer events */
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.pointer-events-none {
+  pointer-events: none;
+}
+
+/* 2025-01-28: Transform utilities for smooth transitions */
+.transform-gpu {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.transition-transform {
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+.duration-200 {
+  transition-duration: 200ms;
 }

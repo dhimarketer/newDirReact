@@ -121,7 +121,7 @@ const DirectoryStats: React.FC<DirectoryStatsProps> = ({ stats, isLoading = fals
                 <div className="flex items-center">
                   <div className="w-24 bg-gray-200 rounded-full h-2 mr-3">
                     <div 
-                      className="bg-blue-600 h-2 rounded-full" 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${(count / stats.total_entries) * 100}%` }}
                     ></div>
                   </div>
@@ -142,7 +142,7 @@ const DirectoryStats: React.FC<DirectoryStatsProps> = ({ stats, isLoading = fals
                 <div className="flex items-center">
                   <div className="w-24 bg-gray-200 rounded-full h-2 mr-3">
                     <div 
-                      className="bg-green-600 h-2 rounded-full" 
+                      className="bg-green-600 h-2 rounded-full transition-all duration-300" 
                       style={{ width: `${(count / stats.total_entries) * 100}%` }}
                     ></div>
                   </div>

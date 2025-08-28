@@ -90,17 +90,46 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
         childParentMap.has(member.entry.pid) && childParentMap.get(member.entry.pid)!.length > 0
       );
       
-      // If no clear parent-child relationships, fall back to original logic
+      // If no clear parent-child relationships, fall back to age-based logic
       if (parents.length === 0 && children.length === 0) {
-        const firstTwo = validMembers.slice(0, 2);
-        const rest = validMembers.slice(2);
-        return { 
-          parents: firstTwo, 
-          children: rest, 
-          parentChildMap, 
-          childParentMap, 
-          spouseMap 
-        };
+        // Fall back to age-based parent detection logic
+        const sortedByAge = [...validMembers].sort((a, b) => (b.entry.age || 0) - (a.entry.age || 0));
+        
+        if (sortedByAge.length > 0) {
+          const eldest = sortedByAge[0];
+          const eldestAge = eldest.entry.age || 0;
+          
+          // Simple age-based logic for fallback
+          const potentialParents: typeof validMembers = [];
+          const ageBasedChildren: typeof validMembers = [];
+          
+          for (let i = 1; i < sortedByAge.length; i++) {
+            const member = sortedByAge[i];
+            const memberAge = member.entry.age || 0;
+            const ageDifference = eldestAge - memberAge;
+            
+            if (ageDifference >= 10) {
+              if (potentialParents.length === 0) {
+                potentialParents.push(eldest);
+              }
+              ageBasedChildren.push(member);
+            } else {
+              ageBasedChildren.push(member);
+            }
+          }
+          
+          if (ageBasedChildren.length === 0) {
+            ageBasedChildren.push(eldest);
+          }
+          
+          return { 
+            parents: potentialParents.slice(0, 4),
+            children: ageBasedChildren.slice(0, 12),
+            parentChildMap, 
+            childParentMap, 
+            spouseMap 
+          };
+        }
       }
       
       return { 
@@ -113,9 +142,106 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
     }
     
     // Fallback to original logic if no relationships
-    const firstTwo = validMembers.slice(0, 2);
-    const rest = validMembers.slice(2);
-    return { parents: firstTwo, children: rest };
+    // 2025-01-28: ENHANCED - Use proven age-based parent detection logic instead of simple first-two logic
+    if (validMembers.length === 0) {
+      return { parents: [], children: [] };
+    }
+
+    // Sort members by age (eldest first) - using existing proven logic
+    const sortedByAge = [...validMembers].sort((a, b) => (b.entry.age || 0) - (a.entry.age || 0));
+    
+    // 2025-01-28: IMPLEMENTED - Use existing proven parent detection logic from FamilyModal.tsx
+    const potentialParents: typeof validMembers = [];
+    const children: typeof validMembers = [];
+    
+    if (sortedByAge.length > 0) {
+      const eldest = sortedByAge[0];
+      const eldestAge = eldest.entry.age || 0;
+      
+      // First pass: identify potential parents based on age differences (10 years threshold)
+      for (let i = 1; i < sortedByAge.length; i++) {
+        const member = sortedByAge[i];
+        const memberAge = member.entry.age || 0;
+        const ageDifference = eldestAge - memberAge;
+        
+        // If age difference is at least 10 years, consider eldest as potential parent
+        if (ageDifference >= 10) {
+          if (potentialParents.length === 0) {
+            potentialParents.push(eldest);
+          }
+          children.push(member);
+        } else {
+          // Age difference is less than 10 years - could be siblings or co-parents
+          // Don't assign as parent yet, add to children temporarily
+          children.push(member);
+        }
+      }
+      
+      // If no children were found with proper age difference, eldest might not be a parent
+      if (children.length === 0) {
+        children.push(eldest);
+      }
+    }
+    
+    // Second pass: look for additional potential parents among remaining members
+    if (potentialParents.length > 0 && children.length > 0) {
+      const remainingMembers = sortedByAge.filter(member => 
+        !potentialParents.includes(member) && !children.includes(member)
+      );
+      
+      for (const member of remainingMembers) {
+        const memberAge = member.entry.age || 0;
+        let canBeParent = true;
+        
+        // Check if this member can be a parent to all children
+        for (const child of children) {
+          const childAge = child.entry.age || 0;
+          const ageDifference = memberAge - childAge;
+          
+          // If age difference is less than 10 years, can't be a parent
+          if (ageDifference < 10) {
+            canBeParent = false;
+            break;
+          }
+        }
+        
+        if (canBeParent && potentialParents.length < 2) {
+          potentialParents.push(member);
+        } else {
+          children.push(member);
+        }
+      }
+    }
+    
+    // Third pass: if we still don't have 2 parents, look for co-parents among children
+    if (potentialParents.length === 1 && children.length > 0) {
+      const potentialCoParent = children.find(child => {
+        const childAge = child.entry.age || 0;
+        const parentAge = potentialParents[0].entry.age || 0;
+        const ageDifference = Math.abs(parentAge - childAge);
+        
+        // If age difference is small (likely co-parents), promote to parent
+        return ageDifference <= 5;
+      });
+      
+      if (potentialCoParent) {
+        potentialParents.push(potentialCoParent);
+        children.splice(children.indexOf(potentialCoParent), 1);
+      }
+    }
+    
+    // If we still don't have any parents identified, all members go to children
+    if (potentialParents.length === 0) {
+      children.push(...sortedByAge);
+    }
+    
+    return { 
+      parents: potentialParents.slice(0, 4), // Max 4 parents
+      children: children.slice(0, 12), // Max 12 children
+      parentChildMap: new Map(),
+      childParentMap: new Map(),
+      spouseMap: new Map()
+    };
   }, [familyMembers, relationships]);
 
   // Calculate tree dimensions
@@ -182,7 +308,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
         const parentX = calculateCenteredPosition(parentIndex, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2;
         const parentY = 50 + treeDimensions.nodeHeight;
         
-        childIds.forEach(childId => {
+        childIds.forEach((childId: number) => {
           const child = organizedMembers.children.find(c => c.entry.pid === childId);
           if (child) {
             const childIndex = organizedMembers.children.findIndex(c => c.entry.pid === childId);
@@ -208,7 +334,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
           const personX = calculateCenteredPosition(personIndex, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2;
           const personY = 50 + treeDimensions.nodeHeight / 2;
           
-          spouseIds.forEach(spouseId => {
+          spouseIds.forEach((spouseId: number) => {
             const spouse = organizedMembers.parents.find(p => p.entry.pid === spouseId);
             if (spouse && spouseId > personId) { // Only draw once per pair
               const spouseIndex = organizedMembers.parents.findIndex(p => p.entry.pid === spouseId);
@@ -229,11 +355,17 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
     return connections;
   }, [organizedMembers, treeDimensions]);
 
-  // Format age from DOB
-  const formatAge = (dob?: string): string => {
-    if (!dob) return '';
+  // Format age from DOB - 2025-01-28: Updated to use backend-calculated age for reliability
+  const formatAge = (member: any): string => {
+    // 2025-01-28: Use backend-calculated age if available (more reliable)
+    if (member.entry.age !== undefined && member.entry.age !== null) {
+      return member.entry.age.toString();
+    }
+    
+    // Fallback to DOB calculation only if age is not available
+    if (!member.entry.DOB) return '';
     try {
-      const birthDate = new Date(dob);
+      const birthDate = new Date(member.entry.DOB);
       const today = new Date();
       const age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -247,10 +379,9 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
     }
   };
 
-  // Format name with age suffix
-  const formatNameWithAge = (name: string, dob?: string): string => {
-    if (!dob) return name;
-    const age = formatAge(dob);
+  // Format name with age suffix - 2025-01-28: Updated to use backend-calculated age
+  const formatNameWithAge = (name: string, member: any): string => {
+    const age = formatAge(member);
     if (age === '') return name;
     return `${name} (${age})`;
   };
@@ -324,7 +455,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                       fontWeight="600"
                       fill="#8B4513"
                     >
-                      {formatNameWithAge(parent.entry.name, parent.entry.DOB)}
+                      {formatNameWithAge(parent.entry.name, parent)}
                     </text>
                     
                     {/* Parent contact */}
@@ -420,7 +551,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                       fontWeight="600"
                       fill="#8B4513"
                     >
-                      {formatNameWithAge(child.entry.name, child.entry.DOB)}
+                      {formatNameWithAge(child.entry.name, child)}
                     </text>
                     
                     {/* Child contact */}

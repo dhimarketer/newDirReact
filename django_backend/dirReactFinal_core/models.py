@@ -41,14 +41,60 @@ class User(AbstractUser):
         return f"{self.username} ({self.user_type})"
     
     def get_age(self):
-        """Calculate age from date of birth if available"""
+        """
+        2025-01-28: ENHANCED - Calculate age from date of birth using year only to avoid month/day swap errors
+        
+        Uses only the year part of the date to calculate age, which is more reliable
+        since month and day fields could have been swapped during data entry.
+        """
         if hasattr(self, 'profile') and self.profile.DOB:
             try:
-                dob = datetime.strptime(self.profile.DOB, '%d/%m/%Y')
+                from datetime import datetime
                 today = datetime.now()
-                age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-                return age
-            except:
+                current_year = today.year
+                dob_str = self.profile.DOB
+                
+                # Handle different date formats and extract year
+                if '/' in dob_str:
+                    # Format: DD/MM/YYYY or MM/DD/YYYY (ambiguous, so use year only)
+                    parts = dob_str.split('/')
+                    if len(parts) == 3:
+                        # Try to identify the year (should be the largest 4-digit number)
+                        year = None
+                        for part in parts:
+                            if len(part) == 4 and part.isdigit():
+                                year = int(part)
+                                break
+                        
+                        if year and 1900 <= year <= current_year:
+                            age = current_year - year
+                            return age
+                            
+                elif '-' in dob_str:
+                    # Format: YYYY-MM-DD or DD-MM-YYYY (ambiguous, so use year only)
+                    parts = dob_str.split('-')
+                    if len(parts) == 3:
+                        # Try to identify the year (should be the largest 4-digit number)
+                        year = None
+                        for part in parts:
+                            if len(part) == 4 and part.isdigit():
+                                year = int(part)
+                                break
+                        
+                        if year and 1900 <= year <= current_year:
+                            age = current_year - year
+                            return age
+                            
+                elif len(dob_str) == 4 and dob_str.isdigit():
+                    # Format: YYYY (year only)
+                    year = int(dob_str)
+                    if 1900 <= year <= current_year:
+                        age = current_year - year
+                        return age
+                        
+            except Exception as e:
+                # Log the error for debugging but don't fail
+                print(f"Error calculating age for DOB '{self.profile.DOB}': {str(e)}")
                 return None
         return None
 
@@ -162,3 +208,35 @@ class Island(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.atoll})"
+
+class Atoll(models.Model):
+    """Model to store Maldivian atoll information"""
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=10, blank=True, help_text="Short code for the atoll")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Atoll'
+        verbose_name_plural = 'Atolls'
+
+    def __str__(self):
+        return self.name
+
+class Party(models.Model):
+    """Model to store political party information"""
+    name = models.CharField(max_length=200, unique=True)
+    short_name = models.CharField(max_length=50, blank=True, help_text="Abbreviated party name")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Political Party'
+        verbose_name_plural = 'Political Parties'
+
+    def __str__(self):
+        return self.name

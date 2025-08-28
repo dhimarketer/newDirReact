@@ -99,6 +99,85 @@ class IslandService {
       atoll.toLowerCase() === term.toLowerCase()
     );
   }
+
+  /**
+   * Get island name by ID
+   */
+  async getIslandNameById(id: string | number): Promise<string | null> {
+    try {
+      const islands = await this.getIslands();
+      const island = islands.find(island => island.id.toString() === id.toString());
+      return island ? island.name : null;
+    } catch (error) {
+      console.error('Error getting island name by ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 2025-01-28: NEW - Find islands by partial name to help resolve island names
+   * This is useful when users search for "hithadhoo" instead of "s. hithadhoo"
+   */
+  async findIslandsByPartialName(partialName: string): Promise<Island[]> {
+    try {
+      const islands = await this.getIslands();
+      const normalizedPartial = partialName.toLowerCase().trim();
+      
+      return islands.filter(island => 
+        island.name.toLowerCase().includes(normalizedPartial) ||
+        island.name.toLowerCase().replace(/^[a-z]\.\s*/i, '').includes(normalizedPartial)
+      );
+    } catch (error) {
+      console.error('Error finding islands by partial name:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 2025-01-28: NEW - Get the best matching island name for a partial search
+   * Returns the most likely full island name for a partial search
+   */
+  async getBestIslandMatch(partialName: string): Promise<string | null> {
+    try {
+      // 2025-01-28: ENHANCED - Handle wildcard patterns like "*hithadhoo*"
+      let cleanPartialName = partialName;
+      if (partialName.includes('*')) {
+        cleanPartialName = partialName.replace(/\*/g, '').trim();
+        console.log('Cleaned wildcard pattern:', { from: partialName, to: cleanPartialName });
+      }
+      
+      const matches = await this.findIslandsByPartialName(cleanPartialName);
+      
+      if (matches.length === 0) {
+        console.log('No island matches found for:', cleanPartialName);
+        return null;
+      }
+      
+      if (matches.length === 1) {
+        console.log('Single island match found:', matches[0].name);
+        return matches[0].name;
+      }
+      
+      // If multiple matches, prioritize exact matches and shorter names
+      const exactMatches = matches.filter(island => 
+        island.name.toLowerCase().includes(cleanPartialName.toLowerCase())
+      );
+      
+      if (exactMatches.length > 0) {
+        // Return the shortest exact match (most specific)
+        const bestMatch = exactMatches.sort((a, b) => a.name.length - b.name.length)[0];
+        console.log('Best exact match found:', bestMatch.name);
+        return bestMatch.name;
+      }
+      
+      // Return the first match if no exact matches
+      console.log('Using first available match:', matches[0].name);
+      return matches[0].name;
+    } catch (error) {
+      console.error('Error getting best island match:', error);
+      return null;
+    }
+  }
 }
 
 export default new IslandService();

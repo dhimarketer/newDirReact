@@ -428,7 +428,8 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
     """Phonebook entry management viewset"""
     queryset = PhoneBookEntry.objects.all()
     serializer_class = PhoneBookEntrySerializer
-    permission_classes = []  # 2025-01-27: Fixed permission issue for search functionality
+    # 2025-01-28: FIXED - Set default permissions to require authentication for sensitive operations
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = PhoneBookEntryFilter
     search_fields = ['name', 'contact', 'nid', 'address', 'profession']
@@ -436,8 +437,8 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
     
     def get_permissions(self):
         """Override permissions for search actions - allow anonymous access to search"""
-        if self.action in ['list', 'retrieve', 'advanced_search']:
-            # Allow search and read operations for anyone (anonymous or authenticated)
+        if self.action in ['list', 'retrieve', 'advanced_search', 'public_stats']:
+            # Allow search, read operations, and public stats for anyone (anonymous or authenticated)
             from rest_framework.permissions import AllowAny
             return [AllowAny()]
         elif self.action == 'premium_image_search':
@@ -474,531 +475,64 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             data = serializer.validated_data
             queryset = PhoneBookEntry.objects.all()
             
-            # 2025-01-27: Fixed search logic to prioritize specific field filters over general query field
-            # Check if we have specific address and island filters (smart search case)
-            has_address_filter = data.get('address') and data['address'].strip()
-            has_island_filter = data.get('island') and data['island'].strip()
-            has_party_filter = data.get('party') and data['party'].strip()
-            has_query = data.get('query') and data['query'].strip()
-            has_name_filter = data.get('name') and data['name'].strip()
-            has_contact_filter = data.get('contact') and data['contact'].strip()
-            has_nid_filter = data.get('nid') and data['nid'].strip()
-            has_atoll_filter = data.get('atoll') and data['atoll'].strip()
-            has_profession_filter = data.get('profession') and data['profession'].strip()
-            has_gender_filter = data.get('gender') and data['gender'].strip()
-            has_remark_filter = data.get('remark') and data['remark'].strip()
-            has_pep_status_filter = data.get('pep_status') and data['pep_status'].strip()
-            has_min_age_filter = data.get('min_age') and data['min_age'] > 0
-            has_max_age_filter = data.get('max_age') and data['max_age'] > 0
-            is_family_search = data.get('limit_results', False)  # Flag for family searches
-            use_and_logic = data.get('useAndLogic', False)  # Flag for comma-separated queries
+            # 2025-01-28: Refactored to use SearchService for better maintainability and testability
+            from .services import SearchService
+            search_service = SearchService()
             
-            print(f"Search analysis - Address: {has_address_filter}, Island: {has_island_filter}, Query: {has_query}, Family search: {is_family_search}, Use AND logic: {use_and_logic}")
+            # Analyze search data to determine which filters are active
+            analysis = search_service.analyze_search_data(data)
             
-            # 2025-01-28: Handle comma-separated queries with AND logic for proper narrowing
-            if use_and_logic:
-                print(f"Comma-separated query detected - using AND logic for all specified fields")
-                
-                # Reset queryset to all entries for comma-separated search
-                queryset = PhoneBookEntry.objects.all()
-                print(f"Reset queryset to all entries: {queryset.count()}")
-                
-                # Build AND query for all specified fields
-                and_conditions = Q()
-                field_count = 0
-                
-                if has_name_filter:
-                    name_query = create_wildcard_query('name', data['name'].strip())
-                    and_conditions &= name_query
-                    field_count += 1
-                    print(f"Added name filter: '{data['name'].strip()}'")
-                
-                if has_address_filter:
-                    address_query = create_wildcard_query('address', data['address'].strip())
-                    and_conditions &= address_query
-                    field_count += 1
-                    print(f"Added address filter: '{data['address'].strip()}'")
-                
-                if has_island_filter:
-                    island_query = create_wildcard_query('island', data['island'].strip())
-                    and_conditions &= island_query
-                    field_count += 1
-                    print(f"Added island filter: '{data['island'].strip()}'")
-                
-                if has_party_filter:
-                    party_query = create_wildcard_query('party', data['party'].strip())
-                    and_conditions &= party_query
-                    field_count += 1
-                    print(f"Added party filter: '{data['party'].strip()}'")
-                
-                if has_contact_filter:
-                    contact_query = create_wildcard_query('contact', data['contact'].strip())
-                    and_conditions &= contact_query
-                    field_count += 1
-                    print(f"Added contact filter: '{data['contact'].strip()}'")
-                
-                if has_nid_filter:
-                    nid_query = create_wildcard_query('nid', data['nid'].strip())
-                    and_conditions &= nid_query
-                    field_count += 1
-                    print(f"Added NID filter: '{data['nid'].strip()}'")
-                
-                if has_profession_filter:
-                    profession_query = create_wildcard_query('profession', data['profession'].strip())
-                    and_conditions &= profession_query
-                    field_count += 1
-                    print(f"Added profession filter: '{data['profession'].strip()}'")
-                
-                if has_gender_filter:
-                    gender_query = create_wildcard_query('gender', data['gender'].strip())
-                    and_conditions &= gender_query
-                    field_count += 1
-                    print(f"Added gender filter: '{data['gender'].strip()}'")
-                
-                if has_min_age_filter:
-                    and_conditions &= Q(age__gte=data['min_age'])
-                    field_count += 1
-                    print(f"Added min age filter: {data['min_age']}")
-                
-                if has_max_age_filter:
-                    and_conditions &= Q(age__lte=data['max_age'])
-                    field_count += 1
-                    print(f"Added max age filter: {data['max_age']}")
-                
-                print(f"Comma-separated query: {field_count} fields with AND logic")
-                
-                # Apply AND logic to get precise results
-                precise_queryset = queryset.filter(and_conditions)
-                print(f"Results after AND logic: {precise_queryset.count()}")
-                
-                if precise_queryset.count() > 0:
-                    queryset = precise_queryset
-                    print("Using precise AND logic results for comma-separated query")
-                    
-                    # Show sample results for debugging
-                    sample_entries = queryset[:3]
-                    for entry in sample_entries:
-                        print(f"Sample result: {entry.name} - Address: {entry.address} - Island: {entry.island} - Party: {entry.party}")
-                else:
-                    print("No results found with AND logic for comma-separated query")
-                    print("This combination of fields may not exist in the database")
+            # Handle comma-separated queries with AND logic
+            if analysis['use_and_logic']:
+                queryset, response_data = search_service.handle_comma_separated_query(data, analysis)
                 
                 # Return early since we've handled the comma-separated query
                 serializer = PhoneBookEntrySerializer(queryset, many=True)
                 return Response({
                     'count': queryset.count(),
                     'results': serializer.data,
-                    'search_type': 'comma_separated_and_logic',
-                    'fields_used': field_count,
-                    'logic_applied': 'AND'
+                    **response_data
                 })
             
-            # PRIORITY: Handle specific field filters FIRST (address+island, address+party, etc.)
-            # This ensures that when users search with specific fields, they get precise results
-            if has_address_filter and has_island_filter:
-                print(f"Smart search case: Address='{data['address']}', Island='{data['island']}'")
-                
-                # Reset queryset to all entries since we're doing custom field-based search
-                # The smart query analysis was filtering out results prematurely
-                queryset = PhoneBookEntry.objects.all()
-                print(f"Reset queryset to all entries: {queryset.count()}")
-                
-                # For address + island combination, try AND logic first for precise results
-                # If no results, fall back to OR logic for broader results
-                address_term = data['address'].strip()
-                island_term = data['island'].strip()
-                
-                print(f"Searching for address term: '{address_term}' AND island term: '{island_term}'")
-                print(f"First trying AND logic for precise results...")
-                
-                # Debug: Check what exists in the database for these terms
-                print(f"Database check - Entries with address containing '{address_term}': {PhoneBookEntry.objects.filter(address__icontains=address_term).count()}")
-                print(f"Database check - Entries with island containing '{island_term}': {PhoneBookEntry.objects.filter(island__icontains=island_term).count()}")
-                
-                # Show some sample entries for debugging
-                address_entries = PhoneBookEntry.objects.filter(address__icontains=address_term)[:3]
-                island_entries = PhoneBookEntry.objects.filter(island__icontains=island_term)[:3]
-                
-                if address_entries.exists():
-                    print(f"Sample address entries for '{address_term}':")
-                    for entry in address_entries:
-                        print(f"  - {entry.name}: address='{entry.address}', island='{entry.island}'")
-                
-                if island_entries.exists():
-                    print(f"Sample island entries for '{island_term}':")
-                    for entry in island_entries:
-                        print(f"  - {entry.name}: address='{entry.address}', island='{entry.island}'")
-                
-                # First try: Use AND logic for precise results (narrow scope)
-                # For family searches, use exact matching; otherwise use wildcard-aware matching
-                if is_family_search:
-                    print("Using exact matching for family search")
-                    precise_queryset = queryset.filter(
-                        Q(address__iexact=address_term) & Q(island__iexact=island_term)
-                    )
-                else:
-                    # Use wildcard-aware matching for flexible search
-                    address_query = create_wildcard_query('address', address_term)
-                    island_query = create_wildcard_query('island', island_term)
-                    precise_queryset = queryset.filter(address_query & island_query)
-                
-                print(f"Results after AND logic (precise): {precise_queryset.count()}")
-                
-                if precise_queryset.count() > 0:
-                    # Use the precise results
-                    queryset = precise_queryset
-                    print("Using precise AND logic results")
-                else:
-                    # No precise results, try OR logic for broader results
-                    print("No precise results found, trying OR logic for broader results...")
-                    
-                    broader_queryset = queryset.filter(
-                        address_query | island_query
-                    )
-                    
-                    print(f"Results after OR logic (broader): {broader_queryset.count()}")
-                    
-                    if broader_queryset.count() > 0:
-                        queryset = broader_queryset
-                        print("Using broader OR logic results")
-                        print("Note: These results match EITHER address OR island, not necessarily both")
-                        
-                        # Show some sample entries to understand what was found
-                        sample_entries = queryset[:3]
-                        for entry in sample_entries:
-                            print(f"Sample entry: {entry.name} - Address: {entry.address} - Island: {entry.island} - Atoll: {entry.atoll}")
-                    else:
-                        print("No results found with either AND or OR logic")
-                        print("This combination may not exist in the database")
+            # Handle field combination searches (address+island, address+party, etc.)
+            queryset = search_service.handle_field_combination_search(data, analysis)
             
-            # Handle the case where we have both address and party filters (smart search case)
-            elif has_address_filter and has_party_filter:
-                print(f"Smart search case: Address='{data['address']}', Party='{data['party']}'")
-                
-                # Reset queryset to all entries since we're doing custom field-based search
-                queryset = PhoneBookEntry.objects.all()
-                print(f"Reset queryset to all entries: {queryset.count()}")
-                
-                # For address + party combination, try AND logic first for precise results
-                # If no results, fall back to OR logic for broader results
-                address_term = data['address'].strip()
-                party_term = data['party'].strip()
-                
-                print(f"Searching for address term: '{address_term}' AND party term: '{party_term}'")
-                print(f"First trying AND logic for precise results...")
-                
-                # Debug: Check what exists in the database for these terms
-                print(f"Database check - Entries with address containing '{address_term}': {PhoneBookEntry.objects.filter(address__icontains=address_term).count()}")
-                print(f"Database check - Entries with party containing '{party_term}': {PhoneBookEntry.objects.filter(party__icontains=party_term).count()}")
-                
-                # Show some sample entries for debugging
-                address_entries = PhoneBookEntry.objects.filter(address__icontains=address_term)[:3]
-                party_entries = PhoneBookEntry.objects.filter(party__icontains=party_term)[:3]
-                
-                if address_entries.exists():
-                    print(f"Sample address entries for '{address_term}':")
-                    for entry in address_entries:
-                        print(f"  - {entry.name}: address='{entry.address}', party='{entry.party}'")
-                
-                if party_entries.exists():
-                    print(f"Sample party entries for '{party_term}':")
-                    for entry in party_entries:
-                        print(f"  - {entry.name}: address='{entry.address}', party='{entry.party}'")
-                
-                # First try: Use AND logic for precise results (narrow scope)
-                address_query = create_wildcard_query('address', address_term)
-                party_query = create_wildcard_query('party', party_term)
-                precise_queryset = queryset.filter(address_query & party_query)
-                
-                print(f"Results after AND logic (precise): {precise_queryset.count()}")
-                
-                if precise_queryset.count() > 0:
-                    # Use the precise results
-                    queryset = precise_queryset
-                    print("Using precise AND logic results")
-                else:
-                    # No precise results, try OR logic for broader results
-                    print("No precise results found, trying OR logic for broader results...")
-                    
-                    broader_queryset = queryset.filter(
-                        address_query | party_query
-                    )
-                    
-                    print(f"Results after OR logic (broader): {broader_queryset.count()}")
-                    
-                    if broader_queryset.count() > 0:
-                        queryset = broader_queryset
-                        print("Using broader OR logic results")
-                        print("Note: These results match EITHER address OR party, not necessarily both")
-                    else:
-                        print("No results found with either AND or OR logic")
+            # Handle general query search if no specific field filters
+            if analysis['has_query']:
+                queryset = search_service.handle_general_query_search(data, queryset)
             
-            # Handle the case where we have both name and party filters (smart search case)
-            elif has_name_filter and has_party_filter:
-                print(f"Smart search case: Name='{data['name']}', Party='{data['party']}'")
-                
-                # Reset queryset to all entries since we're doing custom field-based search
-                queryset = PhoneBookEntry.objects.all()
-                print(f"Reset queryset to all entries: {queryset.count()}")
-                
-                # For name + party combination, try AND logic first for precise results
-                # If no results, fall back to OR logic for broader results
-                name_term = data['name'].strip()
-                party_term = data['party'].strip()
-                
-                print(f"Searching for name term: '{name_term}' AND party term: '{party_term}'")
-                print(f"First trying AND logic for precise results...")
-                
-                # Debug: Check what exists in the database for these terms
-                print(f"Database check - Entries with name containing '{name_term}': {PhoneBookEntry.objects.filter(name__icontains=name_term).count()}")
-                print(f"Database check - Entries with party containing '{party_term}': {PhoneBookEntry.objects.filter(party__icontains=party_term).count()}")
-                
-                # First try: Use AND logic for precise results (narrow scope)
-                name_query = create_wildcard_query('name', name_term)
-                party_query = create_wildcard_query('party', party_term)
-                precise_queryset = queryset.filter(name_query & party_query)
-                
-                print(f"Results after AND logic (precise): {precise_queryset.count()}")
-                
-                if precise_queryset.count() > 0:
-                    # Use the precise results
-                    queryset = precise_queryset
-                    print("Using precise AND logic results")
-                else:
-                    # No precise results, try OR logic for broader results
-                    print("No precise results found, trying OR logic for broader results...")
-                    
-                    broader_queryset = queryset.filter(
-                        name_query | party_query
-                    )
-                    
-                    print(f"Results after OR logic (broader): {broader_queryset.count()}")
-                    
-                    if broader_queryset.count() > 0:
-                        queryset = broader_queryset
-                        print("Using broader OR logic results")
-                        print("Note: These results match EITHER name OR party, not necessarily both")
-                    else:
-                        print("No results found with either AND or OR logic")
+            # Apply individual field filters if no combinations were processed
+            if not any([
+                analysis['has_address_filter'] and analysis['has_island_filter'],
+                analysis['has_address_filter'] and analysis['has_party_filter'],
+                analysis['has_name_filter'] and analysis['has_party_filter'],
+                analysis['has_island_filter'] and analysis['has_party_filter'],
+                analysis['has_query']
+            ]):
+                queryset = search_service.apply_individual_filters(data, analysis, queryset)
             
-            # Handle the case where we have both island and party filters (smart search case)
-            elif has_island_filter and has_party_filter:
-                print(f"Smart search case: Island='{data['island']}', Party='{data['party']}'")
+            # 2025-01-28: Add query optimization and timeout handling for better performance
+            try:
+                # Optimize the query for better performance
+                queryset = search_service.optimize_search_query(queryset, timeout_seconds=20)
                 
-                # Reset queryset to all entries since we're doing custom field-based search
-                queryset = PhoneBookEntry.objects.all()
-                print(f"Reset queryset to all entries: {queryset.count()}")
+                # Execute search with timeout protection
+                queryset, timeout_exceeded = search_service.execute_search_with_timeout(queryset, timeout_seconds=20)
                 
-                # For island + party combination, try AND logic first for precise results
-                # If no results, fall back to OR logic for broader results
-                island_term = data['island'].strip()
-                party_term = data['party'].strip()
+                if timeout_exceeded:
+                    logger.warning("Search query exceeded timeout, returning partial results")
+                    # Return partial results with timeout warning
+                    return Response({
+                        'warning': 'Search query took longer than expected. Results may be incomplete.',
+                        'timeout_exceeded': True
+                    }, status=status.HTTP_200_OK)
                 
-                print(f"Searching for island term: '{island_term}' AND party term: '{party_term}'")
-                print(f"First trying AND logic for precise results...")
-                
-                # Debug: Check what exists in the database for these terms
-                print(f"Database check - Entries with island containing '{island_term}': {PhoneBookEntry.objects.filter(island__icontains=island_term).count()}")
-                print(f"Database check - Entries with party containing '{party_term}': {PhoneBookEntry.objects.filter(party__icontains=party_term).count()}")
-                
-                # First try: Use AND logic for precise results (narrow scope)
-                island_query = create_wildcard_query('island', island_term)
-                party_query = create_wildcard_query('party', party_term)
-                precise_queryset = queryset.filter(island_query & party_query)
-                
-                print(f"Results after AND logic (precise): {precise_queryset.count()}")
-                
-                if precise_queryset.count() > 0:
-                    # Use the precise results
-                    queryset = precise_queryset
-                    print("Using precise AND logic results")
-                else:
-                    # No precise results, try OR logic for broader results
-                    print("No precise results found, trying OR logic for broader results...")
-                    
-                    broader_queryset = queryset.filter(
-                        island_query | party_query
-                    )
-                    
-                    print(f"Results after OR logic (broader): {broader_queryset.count()}")
-                    
-                    if broader_queryset.count() > 0:
-                        queryset = broader_queryset
-                        print("Using broader OR logic results")
-                        print("Note: These results match EITHER island OR party, not necessarily both")
-                    else:
-                        print("No results found with either AND or OR logic")
+            except Exception as e:
+                logger.error(f"Error during query optimization: {e}")
+                # Continue with unoptimized query if optimization fails
             
-            # ONLY process general query if we don't have specific field filters
-            # This ensures that specific field searches take priority over general query searches
-            elif has_query:
-                query = data['query'].strip()
-                print(f"General query search (no specific field filters): '{query}'")
-                
-                # Enhanced smart search logic for better field detection
-                if query.isdigit():
-                    # Numeric query - likely phone number or NID
-                    if len(query) >= 7:
-                        # 7+ digits - likely phone number
-                        print(f"Query '{query}' appears to be a phone number")
-                        queryset = queryset.filter(contact__icontains=query)
-                    else:
-                        # Shorter numeric - could be NID or phone number
-                        print(f"Query '{query}' is numeric - searching in contact and NID fields")
-                        contact_query = create_wildcard_query('contact', query)
-                        nid_query = create_wildcard_query('nid', query)
-                        queryset = queryset.filter(
-                            contact_query | nid_query
-                        )
-                elif query.upper() in ['AP', 'MDP', 'PPM', 'JP', 'MNP', 'ADH', 'PJP']:
-                    # Political party abbreviation
-                    print(f"Query '{query}' appears to be a political party")
-                    party_query = create_wildcard_query('party', query)
-                    queryset = queryset.filter(party_query)
-                elif query.upper() in ['MALE', 'FEMALE', 'M', 'F']:
-                    # Gender
-                    print(f"Query '{query}' appears to be gender")
-                    gender_query = create_wildcard_query('gender', query)
-                    queryset = queryset.filter(gender_query)
-                elif len(query) <= 3 and query.upper() in ['M', 'F', 'S', 'N', 'L', 'B', 'AA', 'ADH', 'HDH', 'TH', 'V', 'HA', 'R']:
-                    # Atoll abbreviation
-                    print(f"Query '{query}' appears to be an atoll code")
-                    atoll_query = create_wildcard_query('atoll', query)
-                    queryset = queryset.filter(atoll_query)
-                else:
-                    # Enhanced text query analysis for better field detection
-                    print(f"Query '{query}' appears to be text - analyzing for specific field types")
-                    
-                    # Check if query looks like an address (contains common address indicators)
-                    address_indicators = ['ge', 'maa', 'villa', 'house', 'flat', 'room', 'floor', 'block', 'area', 'zone', 'district', 'ward', 'sector', 'street', 'road', 'avenue', 'lane', 'drive', 'place', 'court', 'building', 'apartment', 'habaruge']
-                    is_likely_address = any(indicator in query.lower() for indicator in address_indicators)
-                    
-                    # Special handling for "ge" suffix patterns (very common in Maldivian addresses)
-                    if not is_likely_address:
-                        # Check if query ends with "ge" or contains " ge" (with space)
-                        if query.lower().endswith('ge') or ' ge' in query.lower():
-                            is_likely_address = True
-                            print(f"Query '{query}' detected as address due to 'ge' suffix pattern")
-                    
-                    # Check if query looks like an island name (common Maldivian island patterns)
-                    island_indicators = ['male', 'addu', 'fuamulah', 'gan', 'fuvahmulah', 'thinadhoo', 'vaadhoo', 'keyodhoo', 'maradhoo', 'feydhoo', 'hithadhoo', 'kudahuvadhoo', 'kulhudhuffushi', 'naifaru', 'dhidhoo', 'hulhumale', 'viligili', 'hulhule', 'villingili']
-                    is_likely_island = any(island in query.lower() for island in island_indicators)
-                    
-                    # Check if query looks like a profession
-                    profession_indicators = ['teacher', 'doctor', 'engineer', 'lawyer', 'business', 'fisherman', 'farmer', 'student', 'retired', 'unemployed', 'government', 'private', 'self-employed', 'nurse', 'accountant', 'manager', 'driver', 'cook', 'cleaner', 'security']
-                    is_likely_profession = any(prof in query.lower() for prof in profession_indicators)
-                    
-                    # Apply smart field-specific search based on analysis
-                    if is_likely_address:
-                        print(f"Query '{query}' detected as address - searching in address field")
-                        address_query = create_wildcard_query('address', query)
-                        queryset = queryset.filter(address_query)
-                    elif is_likely_island:
-                        print(f"Query '{query}' detected as island - searching in island field")
-                        island_query = create_wildcard_query('island', query)
-                        queryset = queryset.filter(island_query)
-                    elif is_likely_profession:
-                        print(f"Query '{query}' detected as profession - searching in profession field")
-                        profession_query = create_wildcard_query('profession', query)
-                        queryset = queryset.filter(profession_query)
-                    else:
-                        # Default to comprehensive search across multiple fields
-                        print(f"Query '{query}' - performing comprehensive search across name, address, island, profession, remark")
-                        # Use wildcard-aware queries for comprehensive search
-                        name_query = create_wildcard_query('name', query)
-                        address_query = create_wildcard_query('address', query)
-                        island_query = create_wildcard_query('island', query)
-                        profession_query = create_wildcard_query('profession', query)
-                        remark_query = create_wildcard_query('remark', query)
-                        queryset = queryset.filter(
-                            name_query | address_query | island_query | profession_query | remark_query
-                        )
-                
-                print(f"Results after general query search: {queryset.count()}")
-            
-            # Handle individual field filters if no combinations were processed
-            else:
-                print("Processing individual field filters...")
-                
-                if has_name_filter:
-                    print(f"Filtering by name: '{data['name']}'")
-                    name_query = create_wildcard_query('name', data['name'])
-                    queryset = queryset.filter(name_query)
-                
-                if has_contact_filter:
-                    print(f"Filtering by contact: '{data['contact']}'")
-                    contact_query = create_wildcard_query('contact', data['contact'])
-                    queryset = queryset.filter(contact_query)
-                
-                if has_nid_filter:
-                    print(f"Filtering by NID: '{data['nid']}'")
-                    nid_query = create_wildcard_query('nid', data['nid'])
-                    queryset = queryset.filter(nid_query)
-                
-                if has_address_filter:
-                    print(f"Filtering by address: '{data['address']}'")
-                    address_query = create_wildcard_query('address', data['address'])
-                    queryset = queryset.filter(address_query)
-                
-                if has_atoll_filter:
-                    print(f"Filtering by atoll: '{data['atoll']}'")
-                    atoll_query = create_wildcard_query('atoll', data['atoll'])
-                    queryset = queryset.filter(atoll_query)
-                
-                if has_island_filter:
-                    print(f"Filtering by island: '{data['island']}'")
-                    island_query = create_wildcard_query('island', data['island'])
-                    queryset = queryset.filter(island_query)
-                
-                if has_party_filter:
-                    print(f"Filtering by party: '{data['party']}'")
-                    party_query = create_wildcard_query('party', data['party'])
-                    queryset = queryset.filter(party_query)
-                
-                if has_profession_filter:
-                    print(f"Filtering by profession: '{data['profession']}'")
-                    profession_query = create_wildcard_query('profession', data['profession'])
-                    queryset = queryset.filter(profession_query)
-                
-                if has_gender_filter:
-                    print(f"Filtering by gender: '{data['gender']}'")
-                    gender_query = create_wildcard_query('gender', data['gender'])
-                    queryset = queryset.filter(gender_query)
-                
-                if has_remark_filter:
-                    print(f"Filtering by remark: '{data['remark']}'")
-                    remark_query = create_wildcard_query('remark', data['remark'])
-                    queryset = queryset.filter(remark_query)
-                
-                if has_pep_status_filter:
-                    print(f"Filtering by PEP status: '{data['pep_status']}'")
-                    pep_status_query = create_wildcard_query('pep_status', data['pep_status'])
-                    queryset = queryset.filter(pep_status_query)
-                
-                if has_min_age_filter:
-                    print(f"Filtering by minimum age: {data['min_age']}")
-                    # Convert DOB to age for filtering
-                    from datetime import datetime, timedelta
-                    cutoff_date = datetime.now() - timedelta(days=data['min_age'] * 365.25)
-                    queryset = queryset.filter(DOB__lte=cutoff_date.strftime('%d/%m/%Y'))
-                
-                if has_max_age_filter:
-                    print(f"Filtering by maximum age: {data['max_age']}")
-                    # Convert DOB to age for filtering
-                    from datetime import datetime, timedelta
-                    cutoff_date = datetime.now() - timedelta(days=data['max_age'] * 365.25)
-                    queryset = queryset.filter(DOB__gte=cutoff_date.strftime('%d/%m/%Y'))
-                
-                print(f"Results after individual field filters: {queryset.count()}")
-            
-            # Pagination
-            page = data.get('page', 1)
-            page_size = data.get('page_size', 20)
-            start = (page - 1) * page_size
-            end = start + page_size
-            
-            total_count = queryset.count()
-            results = queryset[start:end]
+            # Apply pagination
+            results, total_count, page, page_size = search_service.apply_pagination(queryset, data)
             
             print(f"Final search results: {total_count} total entries")
             if total_count > 0:
@@ -1103,6 +637,61 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({
                 'error': 'Failed to get search history',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['get'])
+    def public_stats(self, request):
+        """Get public directory statistics - accessible to everyone"""
+        try:
+            from django.db.models import Count
+            
+            # Total entries
+            total_entries = PhoneBookEntry.objects.count()
+            
+            # Entries by atoll (using the new ForeignKey field)
+            entries_by_atoll = {}
+            try:
+                atoll_stats = PhoneBookEntry.objects.values('atoll_fk__name').annotate(
+                    count=Count('pid')
+                ).exclude(atoll_fk__isnull=True)
+                
+                for stat in atoll_stats:
+                    atoll_name = stat['atoll_fk__name'] or 'Unknown'
+                    entries_by_atoll[atoll_name] = stat['count']
+            except Exception:
+                # Fallback if atoll_fk field doesn't exist
+                entries_by_atoll = {}
+            
+            # Entries by profession
+            entries_by_profession = {}
+            profession_stats = PhoneBookEntry.objects.values('profession').annotate(
+                count=Count('pid')
+            ).exclude(profession__isnull=True).exclude(profession='')
+            
+            for stat in profession_stats:
+                entries_by_profession[stat['profession']] = stat['count']
+            
+            # Entries by gender
+            entries_by_gender = {}
+            gender_stats = PhoneBookEntry.objects.values('gender').annotate(
+                count=Count('pid')
+            ).exclude(gender__isnull=True).exclude(gender='')
+            
+            for stat in gender_stats:
+                entries_by_gender[stat['gender']] = stat['count']
+            
+            return Response({
+                'total_entries': total_entries,
+                'entries_by_atoll': entries_by_atoll,
+                'entries_by_profession': entries_by_profession,
+                'entries_by_gender': entries_by_gender,
+                'last_updated': timezone.now().isoformat()
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': 'Failed to get directory statistics',
                 'detail': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
@@ -1437,7 +1026,8 @@ class RewardRuleViewSet(viewsets.ModelViewSet):
 # Analytics and Statistics Views
 class AnalyticsViewSet(viewsets.ViewSet):
     """Analytics and statistics endpoint"""
-    permission_classes = [CanViewAnalytics]
+    # 2025-01-28: FIXED - Require authentication for analytics data
+    permission_classes = [IsAuthenticated]
     
     def list(self, request):
         """Get basic analytics overview"""

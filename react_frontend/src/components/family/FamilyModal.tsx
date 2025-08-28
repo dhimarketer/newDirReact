@@ -148,6 +148,11 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
     console.log('Processing family members from entries:', entries);
     
     const sortedEntries = entries.sort((a, b) => {
+      // 2025-01-28: Use backend-calculated age for reliable sorting
+      if (a.age !== undefined && a.age !== null && b.age !== undefined && b.age !== null) {
+        return b.age - a.age;  // Sort by age (eldest first)
+      }
+      // Fallback to DOB calculation only if age is not available
       if (a.DOB && b.DOB) {
         const ageA = new Date().getFullYear() - new Date(a.DOB).getFullYear();
         const ageB = new Date().getFullYear() - new Date(b.DOB).getFullYear();
@@ -160,10 +165,17 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
 
     const familyMembers: FamilyMember[] = [];
     
-    const calculateAge = (dob?: string): number | null => {
-      if (!dob) return null;
+    // 2025-01-28: Updated to use backend-calculated age for reliability
+    const calculateAge = (entry: PhoneBookEntry): number | null => {
+      // 2025-01-28: Use backend-calculated age if available (more reliable)
+      if (entry.age !== undefined && entry.age !== null) {
+        return entry.age;
+      }
+      
+      // Fallback to DOB calculation only if age is not available
+      if (!entry.DOB) return null;
       try {
-        const birthDate = new Date(dob);
+        const birthDate = new Date(entry.DOB);
         if (isNaN(birthDate.getTime())) return null;
         const currentYear = new Date().getFullYear();
         const birthYear = birthDate.getFullYear();
@@ -173,12 +185,12 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
       }
     };
     
-    const membersWithAge = sortedEntries.filter(entry => calculateAge(entry.DOB) !== null);
-    const membersWithoutAge = sortedEntries.filter(entry => calculateAge(entry.DOB) === null);
+    const membersWithAge = sortedEntries.filter(entry => calculateAge(entry) !== null);
+    const membersWithoutAge = sortedEntries.filter(entry => calculateAge(entry) === null);
     
     const sortedMembersWithAge = membersWithAge.sort((a, b) => {
-      const ageA = calculateAge(a.DOB)!;
-      const ageB = calculateAge(b.DOB)!;
+      const ageA = calculateAge(a)!;
+      const ageB = calculateAge(b)!;
       return ageB - ageA;
     });
     
@@ -189,12 +201,12 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
     
     if (sortedMembersWithAge.length > 0) {
       const eldest = sortedMembersWithAge[0];
-      const eldestAge = calculateAge(eldest.DOB)!;
+      const eldestAge = calculateAge(eldest)!;
       
       // First pass: identify potential parents based on age differences
       for (let i = 1; i < sortedMembersWithAge.length; i++) {
         const member = sortedMembersWithAge[i];
-        const memberAge = calculateAge(member.DOB)!;
+        const memberAge = calculateAge(member)!;
         const ageDifference = eldestAge - memberAge;
         
         // If age difference is at least 15 years, consider eldest as potential parent
@@ -223,12 +235,12 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
       );
       
       for (const member of remainingMembers) {
-        const memberAge = calculateAge(member.DOB)!;
+        const memberAge = calculateAge(member)!;
         let canBeParent = true;
         
         // Check if this member can be a parent to all children
         for (const child of children) {
-          const childAge = calculateAge(child.DOB)!;
+          const childAge = calculateAge(child)!;
           const ageDifference = memberAge - childAge;
           
           // If age difference is less than 15 years, can't be a parent
@@ -249,8 +261,8 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
     // Third pass: if we still don't have 2 parents, look for co-parents among children
     if (potentialParents.length === 1 && children.length > 0) {
       const potentialCoParent = children.find(child => {
-        const childAge = calculateAge(child.DOB)!;
-        const parentAge = calculateAge(potentialParents[0].DOB)!;
+        const childAge = calculateAge(child)!;
+        const parentAge = calculateAge(potentialParents[0])!;
         const ageDifference = Math.abs(parentAge - childAge);
         
         // If age difference is small (likely co-parents), promote to parent

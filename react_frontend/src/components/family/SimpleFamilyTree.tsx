@@ -50,12 +50,27 @@ interface ConnectionLine {
   toY: number;
 }
 
+interface OrganizedMembers {
+  grandparents: FamilyMember[];
+  parents: FamilyMember[];
+  children: FamilyMember[];
+}
+
 const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({ 
   familyMembers, 
   relationships = [], 
   onRelationshipChange,
   isEditable = false 
 }) => {
+  console.log('🔍 SimpleFamilyTree Component Debug:');
+  console.log('Received familyMembers:', familyMembers);
+  console.log('Family members structure:', familyMembers.map(m => ({
+    entry: m.entry,
+    role: m.role,
+    relationship: m.relationship,
+    hasAge: m.entry?.age !== undefined && m.entry?.age !== null
+  })));
+
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -73,85 +88,147 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
   const NODE_SPACING = 200;
   const MARGIN = 40;
 
-  // Organize family members into 3 generations
+  // Organize family members into generations based on existing proven age detection logic
   const organizedMembers = useMemo(() => {
-    // 2025-01-28: DEBUG - Log incoming data structure
-    console.log('=== SIMPLE FAMILY TREE DEBUG ===');
-    console.log('DEBUG: familyMembers received:', familyMembers);
-    console.log('DEBUG: relationships received:', relationships);
-    console.log('DEBUG: First member structure:', familyMembers[0]);
-    console.log('DEBUG: First member entry:', familyMembers[0]?.entry);
-    console.log('DEBUG: First member pid:', familyMembers[0]?.entry?.pid);
-    console.log('=== END SIMPLE FAMILY TREE DEBUG ===');
-    
-    const organized = {
-      grandparents: [] as FamilyMember[],
-      parents: [] as FamilyMember[],
-      children: [] as FamilyMember[]
+    const organized: OrganizedMembers = {
+      grandparents: [],
+      parents: [],
+      children: []
     };
 
-    // 2025-01-27: FIXED - Added null checks for member.entry.pid to prevent TypeError
-    // Filter out members without valid pid before processing
+    // Filter out invalid members (must have age data)
     const validMembers = familyMembers.filter(member => 
-      member.entry && member.entry.pid !== undefined && member.entry.pid !== null
+      member.entry && 
+      member.entry.pid !== undefined && 
+      member.entry.pid !== null &&
+      member.entry.age !== undefined && 
+      member.entry.age !== null
     );
-    
-    console.log('DEBUG: Valid members after filtering:', validMembers);
-    console.log('DEBUG: Invalid members filtered out:', familyMembers.filter(member => 
-      !member.entry || member.entry.pid === undefined || member.entry.pid === null
-    ));
-    
-    // 2025-01-28: FIXED - Add early return if no valid members to prevent crashes
+
+    console.log('🔍 SimpleFamilyTree Debug - Parent Detection Logic:');
+    console.log('Total family members:', familyMembers.length);
+    console.log('Valid members with age:', validMembers.length);
+    console.log('Valid members:', validMembers.map(m => ({ name: m.entry.name, age: m.entry.age, pid: m.entry.pid })));
+
     if (validMembers.length === 0) {
-      console.log('DEBUG: No valid members found, returning empty organized structure');
+      console.log('❌ No valid members with age data found');
       return organized;
     }
 
-    // Analyze relationships to determine generations
-    const memberMap = new Map<string, FamilyMember>();
-    validMembers.forEach((member, index) => {
-      // 2025-01-28: FIXED - Use index as fallback when pid is 0 to ensure unique keys
-      const uniqueId = member.entry.pid !== 0 ? member.entry.pid.toString() : `member_${index}`;
-      memberMap.set(uniqueId, member);
-    });
-
-    // Find root members (those without parents)
-    const rootMembers = validMembers.filter(member => {
-      if (!member.entry.pid) return false;
-      const hasParent = relationships.some(rel => 
-        rel.relationship_type === 'parent' && 
-        rel.person2 === member.entry.pid
+    // Sort members by age (eldest first) - using existing proven logic
+    const sortedByAge = [...validMembers].sort((a, b) => (b.entry.age || 0) - (a.entry.age || 0));
+    console.log('📊 Sorted by age (eldest first):', sortedByAge.map(m => ({ name: m.entry.name, age: m.entry.age })));
+    
+    // 2025-01-28: IMPLEMENTED - Use existing proven parent detection logic from FamilyModal.tsx
+    const potentialParents: typeof validMembers = [];
+    const children: typeof validMembers = [];
+    
+    if (sortedByAge.length > 0) {
+      const eldest = sortedByAge[0];
+      const eldestAge = eldest.entry.age || 0;
+      console.log('👴 Eldest member:', { name: eldest.entry.name, age: eldestAge });
+      
+      // First pass: identify potential parents based on age differences (10 years threshold)
+      for (let i = 1; i < sortedByAge.length; i++) {
+        const member = sortedByAge[i];
+        const memberAge = member.entry.age || 0;
+        const ageDifference = eldestAge - memberAge;
+        
+        // If age difference is at least 10 years, consider eldest as potential parent
+        if (ageDifference >= 10) {
+          if (potentialParents.length === 0) {
+            potentialParents.push(eldest);
+          }
+          children.push(member);
+        } else {
+          // Age difference is less than 10 years - could be siblings or co-parents
+          // Don't assign as parent yet, add to children temporarily
+          children.push(member);
+        }
+      }
+      
+      // If no children were found with proper age difference, eldest might not be a parent
+      if (children.length === 0) {
+        children.push(eldest);
+      }
+    }
+    
+    console.log(`📋 After first pass: ${potentialParents.length} potential parents, ${children.length} children`);
+    console.log('Potential parents:', potentialParents.map(p => ({ name: p.entry.name, age: p.entry.age })));
+    console.log('Children:', children.map(c => ({ name: c.entry.name, age: c.entry.age })));
+    
+    // Second pass: look for additional potential parents among remaining members
+    if (potentialParents.length > 0 && children.length > 0) {
+      const remainingMembers = sortedByAge.filter(member => 
+        !potentialParents.includes(member) && !children.includes(member)
       );
-      return !hasParent;
-    });
-
-    // Find children of root members
-    const children = validMembers.filter(member => {
-      if (!member.entry.pid) return false;
-      const hasParent = relationships.some(rel => 
-        rel.relationship_type === 'parent' && 
-        rel.person2 === member.entry.pid
-      );
-      return hasParent;
-    });
-
-    // Find grandparents (parents of root members)
-    const grandparents = validMembers.filter(member => {
-      if (!member.entry.pid) return false;
-      const isGrandparent = relationships.some(rel => 
-        rel.relationship_type === 'grandparent' && 
-        rel.person1 === member.entry.pid
-      );
-      return isGrandparent;
-    });
-
-    // Assign to appropriate generation
-    organized.grandparents = grandparents.slice(0, 4); // Max 4 grandparents
-    organized.parents = rootMembers.slice(0, 6); // Max 6 parents
+      
+      console.log(`🔍 Second pass: checking ${remainingMembers.length} remaining members for additional parents`);
+      
+      for (const member of remainingMembers) {
+        const memberAge = member.entry.age || 0;
+        let canBeParent = true;
+        
+        // Check if this member can be a parent to all children
+        for (const child of children) {
+          const childAge = child.entry.age || 0;
+          const ageDifference = memberAge - childAge;
+          
+          // If age difference is less than 10 years, can't be a parent
+          if (ageDifference < 10) {
+            canBeParent = false;
+            break;
+          }
+        }
+        
+        if (canBeParent && potentialParents.length < 2) {
+          potentialParents.push(member);
+          console.log(`✅ ${member.entry.name} (${memberAge}) identified as additional parent`);
+        } else {
+          children.push(member);
+          console.log(`👶 ${member.entry.name} (${memberAge}) moved to children`);
+        }
+      }
+    }
+    
+    // Third pass: if we still don't have 2 parents, look for co-parents among children
+    if (potentialParents.length === 1 && children.length > 0) {
+      console.log(`🔍 Third pass: looking for co-parents among ${children.length} children`);
+      
+      const potentialCoParent = children.find(child => {
+        const childAge = child.entry.age || 0;
+        const parentAge = potentialParents[0].entry.age || 0;
+        const ageDifference = Math.abs(parentAge - childAge);
+        
+        console.log(`🔍 Checking ${child.entry.name} (${childAge}) as co-parent to ${potentialParents[0].entry.name} (${parentAge}) - age difference: ${ageDifference} years`);
+        
+        // If age difference is small (likely co-parents), promote to parent
+        return ageDifference <= 5;
+      });
+      
+      if (potentialCoParent) {
+        potentialParents.push(potentialCoParent);
+        children.splice(children.indexOf(potentialCoParent), 1);
+        console.log(`✅ ${potentialCoParent.entry.name} promoted to co-parent`);
+      }
+    }
+    
+    // If we still don't have any parents identified, all members go to children
+    if (potentialParents.length === 0) {
+      children.push(...sortedByAge);
+      console.log(`⚠️ No parents identified, all ${sortedByAge.length} members moved to children`);
+    }
+    
+    // Assign to appropriate generation using existing proven logic
+    organized.parents = potentialParents.slice(0, 4); // Max 4 parents
     organized.children = children.slice(0, 12); // Max 12 children
 
+    console.log(`🎯 Final organization: ${organized.parents.length} parents, ${organized.children.length} children`);
+    console.log('Final parents:', organized.parents.map(p => ({ name: p.entry.name, age: p.entry.age })));
+    console.log('Final children:', organized.children.map(c => ({ name: c.entry.name, age: c.entry.age })));
+
     return organized;
-  }, [familyMembers, relationships]);
+  }, [familyMembers]);
 
   // Calculate tree layout
   const treeLayout = useMemo(() => {
@@ -398,28 +475,33 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
     return baseStyle;
   }, []);
 
-  // Format age from DOB
-  const formatAge = useCallback((dob?: string): string => {
-    if (!dob) return '';
+  // Format age from DOB - 2025-01-28: Updated to use backend-calculated age for reliability
+  const formatAge = useCallback((member: any): string => {
+    // 2025-01-28: Use backend-calculated age if available (more reliable)
+    if (member.entry.age !== undefined && member.entry.age !== null) {
+      return member.entry.age.toString();
+    }
+    
+    // Fallback to DOB calculation only if age is not available
+    if (!member.entry.DOB) return '';
     try {
-      const birthDate = new Date(dob);
+      const birthDate = new Date(member.entry.DOB);
       const today = new Date();
       const age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
       
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        return age - 1;
+        return (age - 1).toString();
       }
-      return age;
+      return age.toString();
     } catch {
       return '';
     }
   }, []);
 
-  // Format name with age suffix
-  const formatNameWithAge = useCallback((name: string, dob?: string): string => {
-    if (!dob) return name;
-    const age = formatAge(dob);
+  // Format name with age suffix - 2025-01-28: Updated to use backend-calculated age
+  const formatNameWithAge = useCallback((name: string, member: any): string => {
+    const age = formatAge(member);
     if (age === '') return name;
     return `${name} (${age})`;
   }, [formatAge]);
@@ -527,10 +609,14 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
           width={svgDimensions.width}
           height={svgDimensions.height}
           viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}
-          style={{
-            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
+          className="transform-gpu transition-transform duration-200"
+          style={{ 
+            '--pan-x': `${panOffset.x}px`,
+            '--pan-y': `${panOffset.y}px`,
+            '--zoom-level': zoomLevel,
+            transform: `translate(var(--pan-x, 0px), var(--pan-y, 0px)) scale(var(--zoom-level, 1))`,
             transformOrigin: '0 0'
-          }}
+          } as React.CSSProperties}
         >
           {/* Connections */}
           <g className="connections">
@@ -570,7 +656,6 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
                 onClick={() => handleNodeClick(node.id)}
                 onMouseEnter={() => handleNodeHover(node.id)}
                 onMouseLeave={() => handleNodeHover(null)}
-                style={{ cursor: 'pointer' }}
               >
                 {/* Node background */}
                 <rect
@@ -593,7 +678,7 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
                   fontWeight="600"
                   fill="#1f2937"
                 >
-                  {formatNameWithAge(node.member.entry.name, node.member.entry.DOB)}
+                  {formatNameWithAge(node.member.entry.name, node.member.entry)}
                 </text>
                 
                 {/* Remove separate age display since it's now part of the name */}

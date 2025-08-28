@@ -24,6 +24,7 @@ export interface PhoneBookEntry {
   batch?: string;
   image_status?: string;
   family_group_id?: number;
+  age?: number;  // 2025-01-28: Added age field for reliable backend-calculated ages
 }
 
 export interface SearchFilters {

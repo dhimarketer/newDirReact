@@ -56,7 +56,13 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   const [isResizing, setIsResizing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [windowPosition, setWindowPosition] = useState({ x: 50, y: 50 });
+  // 2025-01-28: FIXED - Center the window on screen by default
+  const [windowPosition, setWindowPosition] = useState(() => {
+    // Calculate center position based on screen size
+    const centerX = Math.max(0, (window.innerWidth - 1200) / 2);
+    const centerY = Math.max(0, (window.innerHeight - 800) / 2);
+    return { x: centerX, y: centerY };
+  });
   
   // 2025-01-28: ENHANCED: Added state for editing mode
   const [isEditingMode, setIsEditingMode] = useState(false);
@@ -67,6 +73,44 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
 
   // Check if user is admin
   const isAdmin = user?.is_staff || user?.is_superuser || user?.user_type === 'admin';
+
+  // 2025-01-28: FIXED - Recalculate center position when window opens
+  useEffect(() => {
+    if (isOpen) {
+      const centerX = Math.max(0, (window.innerWidth - windowSize.width) / 2);
+      const centerY = Math.max(0, (window.innerHeight - windowSize.height) / 2);
+      
+      // 2025-01-28: ENHANCED - Ensure window stays within screen bounds
+      const maxX = window.innerWidth - windowSize.width;
+      const maxY = window.innerHeight - windowSize.height;
+      
+      const boundedX = Math.max(0, Math.min(centerX, maxX));
+      const boundedY = Math.max(0, Math.min(centerY, maxY));
+      
+      setWindowPosition({ x: boundedX, y: boundedY });
+    }
+  }, [isOpen, windowSize.width, windowSize.height]);
+
+  // 2025-01-28: ENHANCED - Handle window resize to keep family tree window centered
+  useEffect(() => {
+    const handleWindowResize = () => {
+      if (isOpen) {
+        const centerX = Math.max(0, (window.innerWidth - windowSize.width) / 2);
+        const centerY = Math.max(0, (window.innerHeight - windowSize.height) / 2);
+        
+        const maxX = window.innerWidth - windowSize.width;
+        const maxY = window.innerHeight - windowSize.height;
+        
+        const boundedX = Math.max(0, Math.min(centerX, maxX));
+        const boundedY = Math.max(0, Math.min(centerY, maxY));
+        
+        setWindowPosition({ x: boundedX, y: boundedY });
+      }
+    };
+
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, [isOpen, windowSize.width, windowSize.height]);
 
   // Handle window resize
   const handleResize = (e: React.MouseEvent) => {
@@ -146,15 +190,6 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
 
   // Fetch family members for the given address
   const fetchFamilyMembers = async () => {
-    // 2025-01-28: ADDED - Check if there's a valid token before making API call
-    const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-    if (!token) {
-      console.log('FamilyTreeWindow: No auth token found, cannot fetch family data');
-      setError('Please log in to view family information');
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
     
@@ -171,12 +206,13 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
       console.log('DEBUG: Relationships array:', response.data?.relationships);
       console.log('=== END FAMILY TREE WINDOW DEBUG ===');
       
-      // 2025-01-28: ENHANCED - If family not found, automatically create it
+      // 2025-01-28: ENHANCED - If family not found, always attempt to create it automatically
       if (response.notFound) {
-        console.log('Family not found - automatically creating family group for:', { address, island });
+        console.log('Family not found for:', { address, island });
+        console.log('Attempting to automatically create family group...');
         
         try {
-          // Automatically create the family group
+          // Always attempt to create the family group automatically
           const createResponse = await familyService.createOrUpdateFamilyByAddress(address, island);
           
           if (createResponse.success && createResponse.data) {
@@ -186,13 +222,15 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
             return;
           } else {
             console.error('Failed to automatically create family group:', createResponse.error);
-            setError(createResponse.error || 'Failed to create family group');
+            // 2025-01-28: UPDATED - Show more accurate message since backend now allows family creation for all addresses
+            setError('Unable to create family group automatically. This could be due to no phonebook entries found at this address, or a temporary system issue. Please try again or contact support if the problem persists.');
             setFamilyGroupExists(false);
             setFamilyGroupData(null);
           }
         } catch (createError) {
           console.error('Error automatically creating family group:', createError);
-          setError('Failed to automatically create family group');
+          // 2025-01-28: UPDATED - Show more accurate message since backend now allows family creation for all addresses
+          setError('Unable to create family group due to a system error. Please try again or contact support if the problem persists.');
           setFamilyGroupExists(false);
           setFamilyGroupData(null);
         }
@@ -233,7 +271,8 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
             batch: member.entry?.batch || '',
             image_status: member.entry?.image_status || '',
             family_group_id: member.entry?.family_group_id || undefined,
-            nid: member.entry?.nid || undefined
+            nid: member.entry?.nid || undefined,
+            age: member.entry?.age || undefined  // 2025-01-28: FIXED - Add age field to preserve backend-calculated ages
           },
           role: member.role_in_family || member.role || 'other',
           relationship: member.relationship || ''
@@ -328,11 +367,11 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
         ref={windowRef}
         className="family-tree-window"
         style={{
-          width: `${windowSize.width}px`,
-          height: `${windowSize.height}px`,
-          left: `${windowPosition.x}px`,
-          top: `${windowPosition.y}px`
-        }}
+          '--window-width': `${windowSize.width}px`,
+          '--window-height': `${windowSize.height}px`,
+          '--window-left': `${windowPosition.x}px`,
+          '--window-top': `${windowPosition.y}px`
+        } as React.CSSProperties}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Window Header */}

@@ -62,7 +62,8 @@ class DirectoryService {
    */
   async getDirectoryStats(): Promise<DirectoryStats> {
     try {
-      const response = await apiService.get<DirectoryStats>(`/analytics/directory_stats/`);
+      // 2025-01-28: FIXED - Use public stats endpoint that doesn't require authentication
+      const response = await apiService.get<DirectoryStats>(`/phonebook/public_stats/`);
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to get directory stats');

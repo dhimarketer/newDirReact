@@ -84,11 +84,17 @@ const FamilyPage: React.FC = () => {
     const processedFamilies: DetectedFamily[] = [];
     
     familyGroups.forEach(family => {
-      // Helper function to calculate age from DOB
-      const calculateAge = (dob?: string): number | null => {
-        if (!dob) return null;
+      // 2025-01-28: Updated to use backend-calculated age for reliability
+      const calculateAge = (entry: PhoneBookEntry): number | null => {
+        // 2025-01-28: Use backend-calculated age if available (more reliable)
+        if (entry.age !== undefined && entry.age !== null) {
+          return entry.age;
+        }
+        
+        // Fallback to DOB calculation only if age is not available
+        if (!entry.DOB) return null;
         try {
-          const birthDate = new Date(dob);
+          const birthDate = new Date(entry.DOB);
           if (isNaN(birthDate.getTime())) return null;
           const currentYear = new Date().getFullYear();
           const birthYear = birthDate.getFullYear();
@@ -99,13 +105,13 @@ const FamilyPage: React.FC = () => {
       };
       
       // Separate members with and without age
-      const membersWithAge = family.members.filter(member => calculateAge(member.DOB) !== null);
-      const membersWithoutAge = family.members.filter(member => calculateAge(member.DOB) === null);
+      const membersWithAge = family.members.filter(member => calculateAge(member) !== null);
+      const membersWithoutAge = family.members.filter(member => calculateAge(member) === null);
       
       // Sort members with age by age (eldest first)
       const sortedMembersWithAge = membersWithAge.sort((a, b) => {
-        const ageA = calculateAge(a.DOB)!;
-        const ageB = calculateAge(b.DOB)!;
+        const ageA = calculateAge(a)!;
+        const ageB = calculateAge(b)!;
         return ageB - ageA;
       });
       
@@ -118,12 +124,12 @@ const FamilyPage: React.FC = () => {
       // Start with the eldest member as a potential parent
       if (sortedMembersWithAge.length > 0) {
         const eldest = sortedMembersWithAge[0];
-        const eldestAge = calculateAge(eldest.DOB)!;
+        const eldestAge = calculateAge(eldest)!;
         
         // Check if other members could be children of the eldest
         for (let i = 1; i < sortedMembersWithAge.length; i++) {
           const member = sortedMembersWithAge[i];
-          const memberAge = calculateAge(member.DOB)!;
+          const memberAge = calculateAge(member)!;
           const ageDifference = eldestAge - memberAge;
           
           // If age difference is at least 15 years, consider eldest as parent
@@ -153,12 +159,12 @@ const FamilyPage: React.FC = () => {
         );
         
         for (const member of remainingMembers) {
-          const memberAge = calculateAge(member.DOB)!;
+          const memberAge = calculateAge(member)!;
           let canBeParent = true;
           
           // Check if this member can be a parent to all children
           for (const child of children) {
-            const childAge = calculateAge(child.DOB)!;
+            const childAge = calculateAge(child)!;
             const ageDifference = memberAge - childAge;
             
             // If age difference is less than 15 years, can't be a parent
@@ -179,8 +185,8 @@ const FamilyPage: React.FC = () => {
       // Third pass: if we still don't have 2 parents, look for co-parents among children
       if (potentialParents.length === 1 && children.length > 0) {
         const potentialCoParent = children.find(child => {
-          const childAge = calculateAge(child.DOB)!;
-          const parentAge = calculateAge(potentialParents[0].DOB)!;
+          const childAge = calculateAge(child)!;
+          const parentAge = calculateAge(potentialParents[0])!;
           const ageDifference = Math.abs(parentAge - childAge);
           
           // If age difference is small (likely co-parents), promote to parent

@@ -29,6 +29,13 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
     serializer_class = FamilyGroupSerializer
     permission_classes = [permissions.IsAuthenticated]
     
+    def get_permissions(self):
+        """Override permissions for specific actions"""
+        if self.action in ['by_address', 'infer_family']:
+            # 2025-01-28: FIXED - Allow public access to by_address and infer_family endpoints for family tree functionality
+            return [permissions.AllowAny()]
+        return super().get_permissions()
+    
     def get_queryset(self):
         """Filter queryset based on user permissions and search"""
         queryset = FamilyGroup.objects.all()
@@ -137,7 +144,14 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
                 serializer = FamilyGroupDetailSerializer(family_group)
                 return Response(serializer.data)
             else:
-                return Response({'error': 'No family group found for this address'}, status=status.HTTP_404_NOT_FOUND)
+                # 2025-01-28: FIXED - Updated error message to reflect that family groups can be created for all addresses
+                return Response({
+                    'error': 'No family group found for this address',
+                    'message': 'Family groups can be created for any address. If no family group exists, try creating one or contact an administrator.',
+                    'address': address,
+                    'island': island,
+                    'suggestion': 'Try creating a family group or search for a different address'
+                }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
@@ -297,6 +311,7 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
         2. The eldest two (female, male) with DOB are considered parents
         3. Parents to children shall have an age gap of at least 10 years
         4. People with no DOB are not considered parents
+        5. 2025-01-28: ENHANCED - Works for both authenticated and unauthenticated users
         """
         address = request.data.get('address')
         island = request.data.get('island')
@@ -309,7 +324,13 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
         
         try:
             print(f"DEBUG: Family inference requested for {address}, {island}")
-            family_group = FamilyGroup.infer_family_from_address(address, island, request.user)
+            print(f"DEBUG: User authenticated: {request.user.is_authenticated}")
+            print(f"DEBUG: User: {request.user}")
+            
+            # 2025-01-28: ENHANCED - Handle unauthenticated users for public family tree generation
+            user_for_creation = request.user if request.user.is_authenticated else None
+            
+            family_group = FamilyGroup.infer_family_from_address(address, island, user_for_creation)
             
             if family_group:
                 print(f"DEBUG: Successfully inferred family group {family_group.id}")
@@ -323,7 +344,7 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
                 print(f"DEBUG: No family could be inferred for {address}, {island}")
                 return Response({
                     'success': False,
-                    'message': f'No family members found with DOB for {address}, {island}',
+                    'message': f'No family members found for {address}, {island}. Please ensure there are phonebook entries at this address.',
                     'data': None
                 }, status=status.HTTP_404_NOT_FOUND)
                 

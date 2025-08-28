@@ -460,7 +460,8 @@ class FamilyService {
                 batch: member.entry?.batch || '',
                 image_status: member.entry?.image_status || '',
                 family_group_id: member.entry?.family_group_id || undefined,
-                nid: member.entry?.nid || undefined
+                nid: member.entry?.nid || undefined,
+                age: member.entry?.age || undefined  // 2025-01-28: FIXED - Add age field from backend
               },
               role: member.role_in_family || member.role || 'other',
               relationship: member.relationship || ''

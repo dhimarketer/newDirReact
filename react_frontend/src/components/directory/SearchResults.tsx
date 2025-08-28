@@ -10,6 +10,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useAuth } from '../../store/authStore';
 import { getUserType, getVisibleFields } from '../../utils/searchFieldUtils';
 import FamilyTreeWindow from '../family/FamilyTreeWindow';
+import islandService from '../../services/islandService';
 
 interface SearchResultsProps {
   results: PhoneBookEntry[];
@@ -20,6 +21,7 @@ interface SearchResultsProps {
   onPageSizeChange: (pageSize: number) => void;
   onExport: () => void;
   isLoading?: boolean;
+  searchFilters?: SearchParams;  // 2025-01-28: Add search filters to preserve island parameter
 }
 
 const SearchResults: React.FC<SearchResultsProps> = ({
@@ -30,7 +32,8 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   onPageChange,
   onPageSizeChange,
   onExport,
-  isLoading = false
+  isLoading = false,
+  searchFilters  // 2025-01-28: Add search filters parameter
 }) => {
   const { user } = useAuth();
   const { adminSearchFieldSettings, fetchAdminSearchFieldSettings } = useSettingsStore();
@@ -94,11 +97,64 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   };
 
   // Handle address click to show family tree window
-  const handleAddressClick = (address: string, island: string) => {
+  const handleAddressClick = async (address: string, island: string) => {
     console.log('Address clicked:', { address, island }); // 2025-01-28: Debug logging for address click
+    
+    // 2025-01-28: FIXED - Prioritize island from search result entry since it contains correct ForeignKey data
+    // The search filters may contain wildcard patterns, but the search result has the actual island relationship
+    let islandToUse = island;
+    
+    if (searchFilters?.island && searchFilters.island.trim()) {
+      // Log what we're getting from search filters for debugging
+      console.log('Search filters island (may contain wildcards):', searchFilters.island);
+      console.log('Using island from search result entry (correct ForeignKey data):', island);
+    } else {
+      // Fallback to island from search result entry
+      console.log('Using island from search result entry:', island);
+    }
+    
+    // 2025-01-28: ENHANCED - Resolve island name from search result entry (which has correct ForeignKey data)
+    let islandName = islandToUse;
+    
+    // Convert island ID to island name if it's a numeric ID (from ForeignKey relationship)
+    if (islandToUse && !isNaN(Number(islandToUse))) {
+      try {
+        const resolvedIslandName = await islandService.getIslandNameById(islandToUse);
+        if (resolvedIslandName) {
+          islandName = resolvedIslandName;
+          console.log('Converted island ID to name:', { id: islandToUse, name: islandName });
+        } else {
+          console.warn('Could not resolve island ID to name:', islandToUse);
+        }
+      } catch (error) {
+        console.error('Error converting island ID to name:', error);
+        // Fall back to using the original island value
+      }
+    } else if (islandToUse && islandToUse.trim()) {
+      // If it's already a string (island name), use it directly
+      console.log('Using island name directly:', islandToUse);
+      islandName = islandToUse;
+    }
+    
+    console.log('Final resolved island name:', islandName);
+    
     setSelectedAddress(address);
-    setSelectedIsland(island);
+    setSelectedIsland(islandName);
     setFamilyTreeWindowOpen(true);
+  };
+
+  // 2025-01-28: NEW - Check if address has DOB data for family tree availability
+  const hasDOBData = (entry: PhoneBookEntry): boolean => {
+    return !!(entry.DOB && entry.DOB !== 'None' && entry.DOB.trim() !== '');
+  };
+
+  // 2025-01-28: NEW - Get tooltip text for address click
+  const getAddressTooltip = (entry: PhoneBookEntry): string => {
+    if (hasDOBData(entry)) {
+      return 'Click to view family tree';
+    } else {
+      return 'Family tree not available - no date of birth (DOB) data for this person';
+    }
   };
 
   // Get field value for display
@@ -154,15 +210,32 @@ const SearchResults: React.FC<SearchResultsProps> = ({
 
     // Special handling for address field - make it clickable
     if (field.field_name === 'address' && entry.island) {
-      return (
-        <button
-          onClick={() => handleAddressClick(value, entry.island || '')}
-          className="text-sm text-blue-400 hover:text-blue-300 underline cursor-pointer truncate-text"
-          title={`Click to view family at ${value}, ${entry.island}`}
-        >
-          {value}
-        </button>
-      );
+      const hasDOB = hasDOBData(entry);
+      const tooltipText = getAddressTooltip(entry);
+      
+      if (hasDOB) {
+        // Address has DOB data - make it clickable for family tree
+        return (
+          <button
+            onClick={() => handleAddressClick(value, entry.island || '')}
+            className="text-sm text-blue-400 hover:text-blue-300 underline cursor-pointer truncate-text"
+            title={tooltipText}
+          >
+            {value}
+          </button>
+        );
+      } else {
+        // Address has no DOB data - show as non-clickable with info tooltip
+        return (
+          <div 
+            className="text-sm text-gray-500 truncate-text cursor-help"
+            title={tooltipText}
+          >
+            {value}
+            <span className="ml-1 text-xs text-gray-400">(no family tree)</span>
+          </div>
+        );
+      }
     }
 
     return (
@@ -232,8 +305,9 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                 {displayFields.map((field) => (
                   <th 
                     key={field.field_name}
-                    className="px-6 py-4 text-left text-xs font-semibold text-blue-700 uppercase tracking-wider"
-                    style={{ minWidth: field.field_name === 'name' ? '200px' : '150px' }}
+                    className={`px-6 py-4 text-left text-xs font-semibold text-blue-700 uppercase tracking-wider ${
+                      field.field_name === 'name' ? 'min-w-[200px]' : 'min-w-[150px]'
+                    }`}
                   >
                     {field.field_label}
                   </th>

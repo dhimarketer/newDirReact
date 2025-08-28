@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, UserPermission, EventLog, RewardSetting, Island
+from .models import User, UserPermission, EventLog, RewardSetting, Island, Atoll, Party
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
@@ -57,6 +57,52 @@ class IslandAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Basic Information', {
             'fields': ('name', 'atoll', 'island_type')
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ('created_at', 'updated_at')
+
+@admin.register(Atoll)
+class AtollAdmin(admin.ModelAdmin):
+    list_display = ['name', 'code', 'is_active', 'created_at']
+    list_filter = ['is_active']
+    search_fields = ['name', 'code']
+    ordering = ['name']
+    list_per_page = 50
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'code')
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ('created_at', 'updated_at')
+
+@admin.register(Party)
+class PartyAdmin(admin.ModelAdmin):
+    list_display = ['name', 'short_name', 'is_active', 'created_at']
+    list_filter = ['is_active']
+    search_fields = ['name', 'short_name']
+    ordering = ['name']
+    list_per_page = 50
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'short_name')
         }),
         ('Status', {
             'fields': ('is_active',)

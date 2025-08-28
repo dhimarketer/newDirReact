@@ -219,6 +219,13 @@ const SearchBar: React.FC<SearchBarProps> = ({
                 title="Smart Search: Use commas for structured queries, wildcards, or field-specific searches"
                 aria-label="Search directory entries"
               />
+              
+              {/* Loading indicator for long searches */}
+              {isLoading && (
+                <div className="absolute right-16 top-1/2 transform -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                </div>
+              )}
 
               
               {/* Clear search button when there's text */}

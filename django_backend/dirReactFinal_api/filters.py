@@ -8,6 +8,7 @@ from dirReactFinal_core.models import User, EventLog
 from dirReactFinal_family.models import FamilyGroup
 from dirReactFinal_moderation.models import PendingChange
 from dirReactFinal_api.utils import create_wildcard_query
+from dirReactFinal_core.models import Atoll, Island, Party
 
 class PhoneBookEntryFilter(django_filters.FilterSet):
     """Advanced filter for phonebook entries"""
@@ -29,9 +30,9 @@ class PhoneBookEntryFilter(django_filters.FilterSet):
     
     # Demographics filters
     gender = django_filters.ChoiceFilter(choices=[
-        ('Male', 'Male'),
-        ('Female', 'Female'),
-        ('Other', 'Other')
+        ('M', 'Male'),
+        ('F', 'Female'),
+        ('O', 'Other')
     ])
     profession = django_filters.CharFilter(lookup_expr='icontains')
     
@@ -63,8 +64,10 @@ class PhoneBookEntryFilter(django_filters.FilterSet):
     min_age = django_filters.NumberFilter(method='filter_min_age', label='Minimum Age')
     max_age = django_filters.NumberFilter(method='filter_max_age', label='Maximum Age')
     
-    # Party filter
-    party = django_filters.CharFilter(lookup_expr='icontains')
+    # Location and party filters - 2025-01-28: Updated to use foreign key relationships
+    atoll = django_filters.ModelChoiceFilter(queryset=Atoll.objects.filter(is_active=True))
+    island = django_filters.ModelChoiceFilter(queryset=Island.objects.filter(is_active=True))
+    party = django_filters.ModelChoiceFilter(queryset=Party.objects.filter(is_active=True))
     
     # PEP status filter
     pep_status = django_filters.ChoiceFilter(choices=[

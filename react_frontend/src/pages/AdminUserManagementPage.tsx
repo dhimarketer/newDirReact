@@ -86,37 +86,16 @@ const Modal: React.FC<{
   };
 
   return createPortal(
-    <div 
-      className="fixed inset-0 z-[99999] overflow-y-auto"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 99999,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)'
-      }}
-    >
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-75">
       <div className="flex min-h-full items-center justify-center p-4">
-        <div 
-          className={`relative w-full ${sizeClasses[size]} transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all`}
-          style={{
-            zIndex: 100000,
-            position: 'relative',
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-          }}
-        >
+        <div className={`relative w-full ${sizeClasses[size]} transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all`}>
           {/* Header */}
           <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium text-gray-900">{title}</h3>
               <button
                 onClick={onClose}
-                className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                style={{ zIndex: 100001 }}
+                className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 z-10"
               >
                 <span className="sr-only">Close</span>
                 <XCircle className="h-6 w-6" />

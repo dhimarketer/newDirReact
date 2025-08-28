@@ -1251,15 +1251,24 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
   // 2025-01-28: Render family member node
   const renderNode = (node: TreeNode) => {
     const { member } = node;
-    const age = member.entry.DOB ? new Date().getFullYear() - new Date(member.entry.DOB).getFullYear() : null;
+    // 2025-01-28: Use backend-calculated age for reliability instead of JavaScript date parsing
+    const age = member.entry.age !== undefined && member.entry.age !== null 
+      ? member.entry.age 
+      : (member.entry.DOB ? new Date().getFullYear() - new Date(member.entry.DOB).getFullYear() : null);
     const isSelected = selectedNode === node.id;
     const isPending = pendingRelationship?.fromNode === node.id;
     
-    // Format name with age suffix
-    const formatNameWithAge = (name: string, dob?: string): string => {
-      if (!dob) return name;
+    // Format name with age suffix - 2025-01-28: Updated to use backend-calculated age
+    const formatNameWithAge = (name: string, member: any): string => {
+      // 2025-01-28: Use backend-calculated age if available (more reliable)
+      if (member.entry.age !== undefined && member.entry.age !== null) {
+        return `${name} (${member.entry.age})`;
+      }
+      
+      // Fallback to DOB calculation only if age is not available
+      if (!member.entry.DOB) return name;
       try {
-        const birthDate = new Date(dob);
+        const birthDate = new Date(member.entry.DOB);
         const today = new Date();
         const calculatedAge = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -1286,7 +1295,7 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
           stroke={isPending ? "#f59e0b" : isSelected ? "#2563eb" : "#3b82f6"}
           strokeWidth={isPending ? "3" : isSelected ? "3" : "2"}
           filter="drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
-          style={{ cursor: 'pointer' }}
+          className="cursor-pointer"
           onClick={() => handleNodeClick(node.id)}
           onMouseEnter={(e) => {
             e.currentTarget.style.opacity = '0.8';
@@ -1305,7 +1314,7 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
           fontWeight="600"
           fill="#1f2937"
         >
-          {formatNameWithAge(member.entry.name || 'Unknown', member.entry.DOB)}
+          {formatNameWithAge(member.entry.name || 'Unknown', member)}
         </text>
         
         {/* Remove separate age display since it's now part of the name */}
@@ -1353,7 +1362,7 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
           textAnchor="middle"
           fontSize="8"
           fill="#6b7280"
-          style={{ pointerEvents: 'none' }}
+          className="pointer-events-none"
         >
           {editingMode ? 'Click to select' : 'Click to edit'}
         </text>
@@ -1370,7 +1379,7 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
             stroke="#10b981"
             strokeWidth="1"
             strokeDasharray="3,3"
-            style={{ pointerEvents: 'none' }}
+            className="pointer-events-none"
           />
         )}
       </g>
@@ -1650,14 +1659,15 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
           width={svgDimensions.width}
           height={svgDimensions.height}
           viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}
+          className="family-tree-svg transform-gpu transition-transform duration-200"
           style={{
-            transform: `scale(${zoomLevel})`,
+            '--zoom-level': zoomLevel,
+            transform: `scale(var(--zoom-level, 1))`,
             transformOrigin: 'top left',
             maxWidth: '100%',
             height: 'auto',
             overflow: 'visible'
-          }}
-          className="family-tree-svg"
+          } as React.CSSProperties}
         >
           {/* 2025-01-28: Arrow marker for connections */}
           <defs>

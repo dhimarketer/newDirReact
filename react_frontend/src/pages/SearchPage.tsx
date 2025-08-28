@@ -34,11 +34,20 @@ const SearchPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchStartTime, setSearchStartTime] = useState<number | null>(null);
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
 
   // Perform search with current filters
   const performSearch = async (searchParams: SearchParams) => {
     setIsLoading(true);
+    setSearchStartTime(Date.now());
+    setShowTimeoutWarning(false);
     console.log('SearchPage: performSearch called with params:', searchParams);
+    
+    // 2025-01-28: Add timeout warning for long searches
+    const timeoutWarningTimer = setTimeout(() => {
+      setShowTimeoutWarning(true);
+    }, 15000); // Show warning after 15 seconds
     
     try {
       const response: SearchResponse = await directoryService.searchEntries(searchParams);
@@ -69,6 +78,9 @@ const SearchPage: React.FC = () => {
       setTotalCount(0);
     } finally {
       setIsLoading(false);
+      setSearchStartTime(null);
+      setShowTimeoutWarning(false);
+      clearTimeout(timeoutWarningTimer);
     }
   };
 
@@ -190,6 +202,15 @@ const SearchPage: React.FC = () => {
             filters={filters}
             isLoading={isLoading}
           />
+          
+          {/* Timeout warning for long searches */}
+          {showTimeoutWarning && isLoading && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
+              <p className="text-yellow-800 text-sm">
+                ⏱️ Search is taking longer than expected. This is normal for complex searches with our large database.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Simple search tips */}
@@ -210,6 +231,7 @@ const SearchPage: React.FC = () => {
             onPageSizeChange={handlePageSizeChange}
             onExport={handleExport}
             isLoading={isLoading}
+            searchFilters={filters}  // 2025-01-28: Pass search filters to preserve island parameter
           />
         </div>
       ) : filters.query && !isLoading ? (
