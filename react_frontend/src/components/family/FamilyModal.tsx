@@ -203,77 +203,94 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
       const eldest = sortedMembersWithAge[0];
       const eldestAge = calculateAge(eldest)!;
       
-      // First pass: identify potential parents based on age differences
+      // Step 1: Eldest person becomes parent if they have 10+ year gap to everyone else
+      let eldestCanBeParent = true;
       for (let i = 1; i < sortedMembersWithAge.length; i++) {
         const member = sortedMembersWithAge[i];
         const memberAge = calculateAge(member)!;
         const ageDifference = eldestAge - memberAge;
         
-        // If age difference is at least 15 years, consider eldest as potential parent
-        if (ageDifference >= 15) {
-          if (potentialParents.length === 0) {
-            potentialParents.push(eldest);
-          }
-          children.push(member);
-        } else {
-          // Age difference is less than 15 years - could be siblings or co-parents
-          // Don't assign as parent yet, add to children temporarily
-          children.push(member);
+        if (ageDifference < 10) {
+          eldestCanBeParent = false;
+          break;
         }
       }
       
-      // If no children were found with proper age difference, eldest might not be a parent
-      if (children.length === 0) {
+      if (eldestCanBeParent) {
+        potentialParents.push(eldest);
+        // Add all other members as children
+        for (let i = 1; i < sortedMembersWithAge.length; i++) {
+          children.push(sortedMembersWithAge[i]);
+        }
+        console.log(`✅ ${eldest.name} (${eldestAge}) identified as first parent`);
+      } else {
+        // Eldest cannot be a parent, add to children
         children.push(eldest);
+        console.log(`⚠️ ${eldest.name} (${eldestAge}) cannot be parent - age gap too small`);
       }
     }
     
-    // Second pass: look for additional potential parents among remaining members
-    if (potentialParents.length > 0 && children.length > 0) {
-      const remainingMembers = sortedMembersWithAge.filter(member => 
-        !potentialParents.includes(member) && !children.includes(member)
+    // Step 2: Find second parent (different gender) with 10+ year gap to all remaining members
+    if (potentialParents.length === 1) {
+      const firstParent = potentialParents[0];
+      const firstParentGender = firstParent.gender;
+      
+      console.log(`🔍 Looking for second parent (different gender from ${firstParent.name})`);
+      
+      // Look for second parent among remaining members AND children
+      const allRemainingMembers = sortedMembersWithAge.filter(member => 
+        !potentialParents.includes(member)
       );
       
-      for (const member of remainingMembers) {
+      let bestSecondParent = null;
+      
+      for (const member of allRemainingMembers) {
         const memberAge = calculateAge(member)!;
-        let canBeParent = true;
+        const memberGender = member.gender;
         
-        // Check if this member can be a parent to all children
-        for (const child of children) {
-          const childAge = calculateAge(child)!;
-          const ageDifference = memberAge - childAge;
+        // Must be different gender from first parent
+        if (firstParentGender && memberGender && firstParentGender === memberGender) {
+          console.log(`❌ ${member.name} (${memberAge}) - same gender as first parent`);
+          continue;
+        }
+        
+        // Must have 10+ year gap to all other remaining members (excluding first parent and self)
+        let canBeParent = true;
+        for (const otherMember of allRemainingMembers) {
+          if (otherMember === member) continue; // Skip self
           
-          // If age difference is less than 15 years, can't be a parent
-          if (ageDifference < 15) {
+          const otherAge = calculateAge(otherMember)!;
+          const ageDifference = memberAge - otherAge;
+          
+          if (ageDifference < 10) {
             canBeParent = false;
+            console.log(`❌ ${member.name} (${memberAge}) cannot be parent to ${otherMember.name} (${otherAge}) - gap: ${ageDifference} years`);
             break;
           }
         }
         
-        if (canBeParent && potentialParents.length < 2) {
-          potentialParents.push(member);
-        } else {
-          children.push(member);
+        if (canBeParent) {
+          bestSecondParent = member;
+          console.log(`✅ ${member.name} (${memberAge}) identified as second parent (different gender)`);
+          break;
         }
+      }
+      
+      if (bestSecondParent) {
+        potentialParents.push(bestSecondParent);
+        console.log(`💑 ${bestSecondParent.name} added as second parent`);
+      } else {
+        console.log(`❌ No suitable second parent found`);
       }
     }
     
-    // Third pass: if we still don't have 2 parents, look for co-parents among children
-    if (potentialParents.length === 1 && children.length > 0) {
-      const potentialCoParent = children.find(child => {
-        const childAge = calculateAge(child)!;
-        const parentAge = calculateAge(potentialParents[0])!;
-        const ageDifference = Math.abs(parentAge - childAge);
-        
-        // If age difference is small (likely co-parents), promote to parent
-        return ageDifference <= 5;
-      });
-      
-      if (potentialCoParent) {
-        potentialParents.push(potentialCoParent);
-        children.splice(children.indexOf(potentialCoParent), 1);
-      }
-    }
+    // Now assign all remaining members to children
+    const allRemainingMembers = sortedMembersWithAge.filter(member => 
+      !potentialParents.includes(member)
+    );
+    children.push(...allRemainingMembers);
+    
+    // Old third pass logic removed - now handled in Step 2 above
     
     // Add members without age to children (as per user requirement)
     children.push(...membersWithoutAge);

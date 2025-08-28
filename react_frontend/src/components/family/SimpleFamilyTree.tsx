@@ -2,6 +2,7 @@
 // 2025-01-28: Implements 3-level hierarchy limit (grandparents → parents → children)
 // 2025-01-28: Clean grid-based layout algorithm with optimized SVG rendering
 // 2025-01-28: Clear visual hierarchy and responsive design
+// 2025-01-29: FIXED - Container fitting issues to prevent clipping and ensure all family members are visible
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { PhoneBookEntry } from '../../types/directory';
@@ -77,18 +78,106 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [autoFitApplied, setAutoFitApplied] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Constants for tree layout
-  const NODE_WIDTH = 180;
-  const NODE_HEIGHT = 80;
-  const LEVEL_SPACING = 120;
-  const NODE_SPACING = 200;
-  const MARGIN = 40;
+  // 2025-01-29: ENHANCED - Dynamic sizing based on container and family size
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+  
+  // Constants for tree layout - now dynamic based on container size
+  const getLayoutConstants = useCallback(() => {
+    const baseWidth = Math.min(containerSize.width * 0.8, 200);
+    // 2025-01-29: ENHANCED - Increased base height to accommodate wrapped text
+    const baseHeight = Math.min(containerSize.height * 0.12, 120);
+    const baseSpacing = Math.min(containerSize.width * 0.15, 150);
+    const baseLevelSpacing = Math.min(containerSize.height * 0.15, 120);
+    
+    return {
+      NODE_WIDTH: Math.max(baseWidth, 120),
+      NODE_HEIGHT: Math.max(baseHeight, 80), // Increased minimum height for wrapped text
+      NODE_SPACING: Math.max(baseSpacing, 100),
+      LEVEL_SPACING: Math.max(baseLevelSpacing, 80),
+      MARGIN: Math.max(containerSize.width * 0.05, 30)
+    };
+  }, [containerSize]);
 
-  // Organize family members into generations based on existing proven age detection logic
+  // 2025-01-29: ADDED - Container size observer for responsive layout
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        setContainerSize({ width, height });
+        // Reset auto-fit when container size changes
+        setAutoFitApplied(false);
+      }
+    });
+    
+    resizeObserver.observe(containerRef.current);
+    
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // 2025-01-29: ENHANCED - Auto-fit functionality to ensure all content is visible
+  const applyAutoFit = useCallback((nodes: TreeNode[]) => {
+    if (!svgRef.current || nodes.length === 0) return;
+    
+    const svg = svgRef.current;
+    const svgRect = svg.getBoundingClientRect();
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    
+    if (!containerRect) return;
+    
+    // Calculate the bounding box of all nodes
+    const minX = Math.min(...nodes.map(n => n.x));
+    const maxX = Math.max(...nodes.map(n => n.x + n.width));
+    const minY = Math.min(...nodes.map(n => n.y));
+    const maxY = Math.max(...nodes.map(n => n.y + n.height));
+    
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    // 2025-01-29: FIXED - Calculate scale to fit content within container with proper margins
+    const margin = 100; // Ensure 100px margin on all sides
+    const availableWidth = containerRect.width - (margin * 2);
+    const availableHeight = containerRect.height - (margin * 2);
+    
+    const scaleX = availableWidth / contentWidth;
+    const scaleY = availableHeight / contentHeight;
+    const scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 100%
+    
+    // 2025-01-29: FIXED - Calculate center offset to properly center content
+    const scaledContentWidth = contentWidth * scale;
+    const scaledContentHeight = contentHeight * scale;
+    
+    const centerX = (containerRect.width - scaledContentWidth) / 2;
+    const centerY = (containerRect.height - scaledContentHeight) / 2;
+    
+    // Apply transformations with proper centering
+    setZoomLevel(scale);
+    setPanOffset({
+      x: centerX - minX * scale,
+      y: centerY - minY * scale
+    });
+    
+    setAutoFitApplied(true);
+    
+    console.log('🔍 Auto-fit applied:', {
+      contentWidth,
+      contentHeight,
+      containerWidth: containerRect.width,
+      containerHeight: containerRect.height,
+      scale,
+      centerX,
+      centerY,
+      panOffset: { x: centerX - minX * scale, y: centerY - minY * scale }
+    });
+  }, []);
+
+  // 2025-01-29: ENHANCED - Organize family members into generations using proven 3-pass parent detection logic with 10-year age gap threshold
   const organizedMembers = useMemo(() => {
     const organized: OrganizedMembers = {
       grandparents: [],
@@ -98,78 +187,70 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
 
     // Filter out invalid members (must have age data)
     const validMembers = familyMembers.filter(member => 
-      member.entry && 
-      member.entry.pid !== undefined && 
-      member.entry.pid !== null &&
-      member.entry.age !== undefined && 
-      member.entry.age !== null
+      member.entry.age !== undefined && member.entry.age !== null
     );
 
-    console.log('🔍 SimpleFamilyTree Debug - Parent Detection Logic:');
-    console.log('Total family members:', familyMembers.length);
-    console.log('Valid members with age:', validMembers.length);
-    console.log('Valid members:', validMembers.map(m => ({ name: m.entry.name, age: m.entry.age, pid: m.entry.pid })));
-
     if (validMembers.length === 0) {
-      console.log('❌ No valid members with age data found');
+      console.log('⚠️ No members with age data found');
       return organized;
     }
 
-    // Sort members by age (eldest first) - using existing proven logic
-    const sortedByAge = [...validMembers].sort((a, b) => (b.entry.age || 0) - (a.entry.age || 0));
-    console.log('📊 Sorted by age (eldest first):', sortedByAge.map(m => ({ name: m.entry.name, age: m.entry.age })));
-    
-    // 2025-01-28: IMPLEMENTED - Use existing proven parent detection logic from FamilyModal.tsx
-    const potentialParents: typeof validMembers = [];
-    const children: typeof validMembers = [];
-    
+    // Sort by age (oldest first)
+    const sortedByAge = [...validMembers].sort((a, b) => 
+      (b.entry.age || 0) - (a.entry.age || 0)
+    );
+
+    console.log(`🎯 Processing ${sortedByAge.length} members with age data`);
+    console.log('Age distribution:', sortedByAge.map(m => ({ name: m.entry.name, age: m.entry.age })));
+
+    const potentialParents: FamilyMember[] = [];
+    const children: FamilyMember[] = [];
+
+    // First pass: identify true parents based on significant age gaps to ALL potential children
     if (sortedByAge.length > 0) {
+      // Start with the assumption that the eldest might be a parent
       const eldest = sortedByAge[0];
       const eldestAge = eldest.entry.age || 0;
-      console.log('👴 Eldest member:', { name: eldest.entry.name, age: eldestAge });
       
-      // First pass: identify potential parents based on age differences (10 years threshold)
+      // Check if eldest can be a parent to ALL other members
+      let eldestCanBeParent = true;
       for (let i = 1; i < sortedByAge.length; i++) {
         const member = sortedByAge[i];
         const memberAge = member.entry.age || 0;
         const ageDifference = eldestAge - memberAge;
         
-        // If age difference is at least 10 years, consider eldest as potential parent
-        if (ageDifference >= 10) {
-          if (potentialParents.length === 0) {
-            potentialParents.push(eldest);
-          }
-          children.push(member);
-        } else {
-          // Age difference is less than 10 years - could be siblings or co-parents
-          // Don't assign as parent yet, add to children temporarily
-          children.push(member);
+        // If age difference is less than 10 years, eldest cannot be a parent
+        if (ageDifference < 10) {
+          eldestCanBeParent = false;
+          break;
         }
       }
       
-      // If no children were found with proper age difference, eldest might not be a parent
-      if (children.length === 0) {
+      if (eldestCanBeParent) {
+        potentialParents.push(eldest);
+        // Add all other members as children
+        for (let i = 1; i < sortedByAge.length; i++) {
+          children.push(sortedByAge[i]);
+        }
+        console.log(`✅ ${eldest.entry.name} (${eldestAge}) identified as parent to all children`);
+      } else {
+        // Eldest cannot be a parent, add to children
         children.push(eldest);
+        console.log(`⚠️ ${eldest.entry.name} (${eldestAge}) cannot be parent - age gap too small`);
       }
     }
-    
-    console.log(`📋 After first pass: ${potentialParents.length} potential parents, ${children.length} children`);
-    console.log('Potential parents:', potentialParents.map(p => ({ name: p.entry.name, age: p.entry.age })));
-    console.log('Children:', children.map(c => ({ name: c.entry.name, age: c.entry.age })));
-    
-    // Second pass: look for additional potential parents among remaining members
+
+    // Second pass: look for additional parents among remaining members
     if (potentialParents.length > 0 && children.length > 0) {
       const remainingMembers = sortedByAge.filter(member => 
         !potentialParents.includes(member) && !children.includes(member)
       );
       
-      console.log(`🔍 Second pass: checking ${remainingMembers.length} remaining members for additional parents`);
-      
       for (const member of remainingMembers) {
         const memberAge = member.entry.age || 0;
         let canBeParent = true;
         
-        // Check if this member can be a parent to all children
+        // Check if this member can be a parent to ALL children
         for (const child of children) {
           const childAge = child.entry.age || 0;
           const ageDifference = memberAge - childAge;
@@ -177,6 +258,7 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
           // If age difference is less than 10 years, can't be a parent
           if (ageDifference < 10) {
             canBeParent = false;
+            console.log(`❌ ${member.entry.name} (${memberAge}) cannot be parent to ${child.entry.name} (${childAge}) - age gap: ${ageDifference} years`);
             break;
           }
         }
@@ -186,40 +268,77 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
           console.log(`✅ ${member.entry.name} (${memberAge}) identified as additional parent`);
         } else {
           children.push(member);
-          console.log(`👶 ${member.entry.name} (${memberAge}) moved to children`);
+          console.log(`👶 ${member.entry.name} (${memberAge}) classified as child`);
         }
       }
     }
-    
-    // Third pass: if we still don't have 2 parents, look for co-parents among children
+
+    // Third pass: look for second parent among children based on age gap to remaining children
+    // 2025-01-29: FIXED - Second parent should have 10+ year gap to children, not to first parent
     if (potentialParents.length === 1 && children.length > 0) {
-      console.log(`🔍 Third pass: looking for co-parents among ${children.length} children`);
+      const firstParent = potentialParents[0];
+      const firstParentGender = firstParent.entry.gender;
       
-      const potentialCoParent = children.find(child => {
+      console.log(`🔍 Third pass: Looking for second parent among ${children.length} children`);
+      console.log(`   First parent: ${firstParent.entry.name} (${firstParent.entry.age}) - gender: ${firstParentGender || 'unknown'}`);
+      
+      // Look for second parent among children
+      // Second parent should have 10+ year age gap to the remaining children
+      let bestSecondParent = null;
+      let maxValidChildren = 0;
+      
+      for (const child of children) {
         const childAge = child.entry.age || 0;
-        const parentAge = potentialParents[0].entry.age || 0;
-        const ageDifference = Math.abs(parentAge - childAge);
+        const childGender = child.entry.gender;
         
-        console.log(`🔍 Checking ${child.entry.name} (${childAge}) as co-parent to ${potentialParents[0].entry.name} (${parentAge}) - age difference: ${ageDifference} years`);
+        console.log(`   Checking ${child.entry.name} (${childAge}) - gender: ${childGender || 'unknown'}`);
         
-        // If age difference is small (likely co-parents), promote to parent
-        return ageDifference <= 5;
-      });
+        // Check if this person could be a parent to the remaining children
+        const remainingChildren = children.filter(c => c !== child);
+        let validChildrenCount = 0;
+        
+        for (const otherChild of remainingChildren) {
+          const otherChildAge = otherChild.entry.age || 0;
+          const gapToOtherChild = childAge - otherChildAge;
+          
+          if (gapToOtherChild >= 10) {
+            validChildrenCount++;
+            console.log(`     ✅ Can be parent to ${otherChild.entry.name} (${otherChildAge}) - gap: ${gapToOtherChild} years`);
+          } else {
+            console.log(`     ❌ Cannot be parent to ${otherChild.entry.name} (${otherChildAge}) - gap: ${gapToOtherChild} years`);
+          }
+        }
+        
+        console.log(`   📊 ${child.entry.name} can be parent to ${validChildrenCount}/${remainingChildren.length} remaining children`);
+        
+        // Prefer different gender from first parent, but accept same gender if no better option
+        const isDifferentGender = firstParentGender && childGender && firstParentGender !== childGender;
+        const genderBonus = isDifferentGender ? 1 : 0;
+        const totalScore = validChildrenCount + genderBonus;
+        
+        if (validChildrenCount > 0 && totalScore > maxValidChildren) {
+          maxValidChildren = totalScore;
+          bestSecondParent = child;
+          console.log(`   🎯 New best second parent: ${child.entry.name} (score: ${totalScore})`);
+        }
+      }
       
-      if (potentialCoParent) {
-        potentialParents.push(potentialCoParent);
-        children.splice(children.indexOf(potentialCoParent), 1);
-        console.log(`✅ ${potentialCoParent.entry.name} promoted to co-parent`);
+      if (bestSecondParent) {
+        potentialParents.push(bestSecondParent);
+        children.splice(children.indexOf(bestSecondParent), 1);
+        console.log(`💑 ${bestSecondParent.entry.name} promoted to second parent (can parent ${maxValidChildren} children)`);
+      } else {
+        console.log(`   ❌ No suitable second parent found`);
       }
     }
-    
+
     // If we still don't have any parents identified, all members go to children
     if (potentialParents.length === 0) {
       children.push(...sortedByAge);
       console.log(`⚠️ No parents identified, all ${sortedByAge.length} members moved to children`);
     }
     
-    // Assign to appropriate generation using existing proven logic
+    // Assign to appropriate generation using proven logic
     organized.parents = potentialParents.slice(0, 4); // Max 4 parents
     organized.children = children.slice(0, 12); // Max 12 children
 
@@ -230,20 +349,34 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
     return organized;
   }, [familyMembers]);
 
-  // Calculate tree layout
+  // 2025-01-29: ENHANCED - Dynamic layout calculation with container-aware positioning
   const treeLayout = useMemo(() => {
     const nodes: TreeNode[] = [];
     const connections: ConnectionLine[] = [];
     
     let nodeId = 0;
+    const layout = getLayoutConstants();
 
-    // Position grandparents (top level)
-    const grandparentCount = organizedMembers.grandparents.length;
-    const grandparentStartX = (grandparentCount * NODE_SPACING) / 2;
+    // 2025-01-29: FIXED - Calculate total width needed for each level with proper spacing
+    const grandparentWidth = Math.max(organizedMembers.grandparents.length * layout.NODE_SPACING, layout.NODE_WIDTH);
+    const parentWidth = Math.max(organizedMembers.parents.length * layout.NODE_SPACING, layout.NODE_WIDTH);
+    
+    // 2025-01-29: FIXED - Calculate children layout with proper row handling
+    const maxChildrenPerRow = Math.max(1, Math.floor((containerSize.width - 100) / layout.NODE_SPACING));
+    const childRows = Math.ceil(organizedMembers.children.length / maxChildrenPerRow);
+    const maxRowWidth = Math.min(organizedMembers.children.length, maxChildrenPerRow) * layout.NODE_SPACING;
+
+    // 2025-01-29: FIXED - Center each level within the container with proper margins
+    const centerX = containerSize.width / 2;
+    const leftMargin = Math.max(layout.MARGIN, 50); // Ensure minimum left margin
+    const rightMargin = Math.max(layout.MARGIN, 50); // Ensure minimum right margin
+
+    // 2025-01-29: FIXED - Position grandparents (top level) with proper centering
+    const grandparentStartX = centerX - (grandparentWidth / 2) + (layout.NODE_WIDTH / 2);
     
     organizedMembers.grandparents.forEach((member, index) => {
-      const x = grandparentStartX - (index * NODE_SPACING) + MARGIN;
-      const y = MARGIN;
+      const x = grandparentStartX + (index * layout.NODE_SPACING);
+      const y = layout.MARGIN;
       
       nodes.push({
         id: `node_${nodeId++}`,
@@ -252,18 +385,17 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
         member,
         level: 0,
         generation: 'grandparent',
-        width: NODE_WIDTH,
-        height: NODE_HEIGHT
+        width: layout.NODE_WIDTH,
+        height: layout.NODE_HEIGHT
       });
     });
 
-    // Position parents (middle level)
-    const parentCount = organizedMembers.parents.length;
-    const parentStartX = (parentCount * NODE_SPACING) / 2;
+    // 2025-01-29: FIXED - Position parents (middle level) with proper centering
+    const parentStartX = centerX - (parentWidth / 2) + (layout.NODE_WIDTH / 2);
     
     organizedMembers.parents.forEach((member, index) => {
-      const x = parentStartX - (index * NODE_SPACING) + MARGIN;
-      const y = MARGIN + LEVEL_SPACING;
+      const x = parentStartX + (index * layout.NODE_SPACING);
+      const y = layout.MARGIN + layout.LEVEL_SPACING;
       
       nodes.push({
         id: `node_${nodeId++}`,
@@ -272,20 +404,23 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
         member,
         level: 1,
         generation: 'parent',
-        width: NODE_WIDTH,
-        height: NODE_HEIGHT
+        width: layout.NODE_WIDTH,
+        height: layout.NODE_HEIGHT
       });
     });
 
-    // Position children (bottom level)
-    const childrenPerRow = 6;
-    const childRows = Math.ceil(organizedMembers.children.length / childrenPerRow);
-    
+    // 2025-01-29: FIXED - Position children (bottom level) with proper grid layout and centering
     organizedMembers.children.forEach((member, index) => {
-      const row = Math.floor(index / childrenPerRow);
-      const col = index % childrenPerRow;
-      const x = (col * NODE_SPACING) + MARGIN;
-      const y = MARGIN + (2 * LEVEL_SPACING) + (row * (NODE_HEIGHT + 20));
+      const row = Math.floor(index / maxChildrenPerRow);
+      const col = index % maxChildrenPerRow;
+      
+      // Calculate actual width of this specific row
+      const actualRowWidth = Math.min(organizedMembers.children.length - (row * maxChildrenPerRow), maxChildrenPerRow) * layout.NODE_SPACING;
+      const rowStartX = centerX - (actualRowWidth / 2) + (layout.NODE_WIDTH / 2);
+      
+      const x = rowStartX + (col * layout.NODE_SPACING);
+      // 2025-01-29: ENHANCED - Increased row spacing to accommodate taller nodes
+      const y = layout.MARGIN + (2 * layout.LEVEL_SPACING) + (row * (layout.NODE_HEIGHT + 30));
       
       nodes.push({
         id: `node_${nodeId++}`,
@@ -294,8 +429,8 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
         member,
         level: 2,
         generation: 'child',
-        width: NODE_WIDTH,
-        height: NODE_HEIGHT
+        width: layout.NODE_WIDTH,
+        height: layout.NODE_HEIGHT
       });
     });
 
@@ -319,26 +454,50 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
     });
 
     return { nodes, connections };
-  }, [organizedMembers, relationships]);
+  }, [organizedMembers, relationships, getLayoutConstants, containerSize]);
 
-  // Calculate SVG dimensions
+  // 2025-01-29: ENHANCED - Dynamic SVG dimensions that adapt to content and container
   const svgDimensions = useMemo(() => {
     if (treeLayout.nodes.length === 0) {
-      return { width: 800, height: 600 };
+      return { width: containerSize.width, height: containerSize.height };
     }
 
+    const minX = Math.min(...treeLayout.nodes.map(n => n.x));
     const maxX = Math.max(...treeLayout.nodes.map(n => n.x + n.width));
+    const minY = Math.min(...treeLayout.nodes.map(n => n.y));
     const maxY = Math.max(...treeLayout.nodes.map(n => n.y + n.height));
     
-    return {
-      width: Math.max(800, maxX + MARGIN),
-      height: Math.max(600, maxY + MARGIN)
-    };
-  }, [treeLayout]);
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    // 2025-01-29: FIXED - Ensure SVG is wide enough to contain all content with proper margins
+    const requiredWidth = Math.max(containerSize.width, contentWidth + 200); // Add 200px margin
+    const requiredHeight = Math.max(containerSize.height, contentHeight + 200); // Add 200px margin
+    
+    // Ensure minimum dimensions for usability
+    const width = Math.max(requiredWidth, 1200);
+    const height = Math.max(requiredHeight, 800);
+    
+    return { width, height };
+  }, [treeLayout, containerSize]);
+
+  // 2025-01-29: ENHANCED - Auto-apply fit on first load for large families
+  useEffect(() => {
+    if (familyMembers.length > 0 && !autoFitApplied) {
+      // Small delay to ensure container is properly sized and tree layout is calculated
+      const timer = setTimeout(() => {
+        if (treeLayout.nodes.length > 0) {
+          console.log('🔍 Auto-applying fit for family with', familyMembers.length, 'members');
+          applyAutoFit(treeLayout.nodes);
+        }
+      }, 200); // Increased delay to ensure proper rendering
+      return () => clearTimeout(timer);
+    }
+  }, [familyMembers.length, autoFitApplied, applyAutoFit, treeLayout.nodes]);
 
   // Handle zoom
   const handleZoom = useCallback((delta: number) => {
-    setZoomLevel(prev => Math.max(0.5, Math.min(2, prev + delta * 0.1)));
+    setZoomLevel(prev => Math.max(0.3, Math.min(3, prev + delta * 0.1)));
   }, []);
 
   // Handle pan start
@@ -374,6 +533,13 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
     setHoveredNode(nodeId);
   }, []);
 
+  // 2025-01-29: ENHANCED - Reset view function
+  const resetView = useCallback(() => {
+    setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
+    setAutoFitApplied(false);
+  }, []);
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -390,8 +556,13 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
             break;
           case '0':
             e.preventDefault();
-            setZoomLevel(1);
-            setPanOffset({ x: 0, y: 0 });
+            resetView();
+            break;
+          case 'f':
+            e.preventDefault();
+            if (treeLayout.nodes.length > 0) {
+              applyAutoFit(treeLayout.nodes);
+            }
             break;
         }
       }
@@ -399,7 +570,7 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleZoom]);
+  }, [handleZoom, resetView, applyAutoFit]);
 
   // Handle mouse wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -499,111 +670,78 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
     }
   }, []);
 
-  // Format name with age suffix - 2025-01-28: Updated to use backend-calculated age
-  const formatNameWithAge = useCallback((name: string, member: any): string => {
-    const age = formatAge(member);
-    if (age === '') return name;
-    return `${name} (${age})`;
+  // Format name with age
+  const formatNameWithAge = useCallback((name: string, entry: any): string => {
+    const age = formatAge({ entry });
+    return age ? `${name} (${age})` : name;
   }, [formatAge]);
 
-  // Format contact number
+  // Format contact information
   const formatContact = useCallback((contact: string): string => {
-    if (contact.length === 7) {
-      return `${contact.slice(0, 3)}-${contact.slice(3, 5)}-${contact.slice(5)}`;
-    }
-    return contact;
+    if (!contact) return 'No contact';
+    if (contact.length <= 12) return contact;
+    return contact.substring(0, 12) + '...';
   }, []);
 
-  // Early return if no family members
-  if (!familyMembers || familyMembers.length === 0) {
+  // 2025-01-29: ENHANCED - Render with improved container fitting
+  if (familyMembers.length === 0) {
     return (
-      <div className="family-tree-empty-state">
-        <div className="text-center p-8">
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">No Family Members Found</h3>
-          <p className="text-gray-500 mb-4">
-            No family members have been added yet. Click "Edit Family Tree" to add members.
-          </p>
-          <div className="text-sm text-gray-400">
-            <p>Debug Info:</p>
-            <p>Family Members: {familyMembers?.length || 0}</p>
-            <p>Relationships: {relationships?.length || 0}</p>
-            <p>Is Editable: {isEditable ? 'Yes' : 'No'}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Early return if no valid members after filtering
-  if (organizedMembers.grandparents.length === 0 && 
-      organizedMembers.parents.length === 0 && 
-      organizedMembers.children.length === 0) {
-    return (
-      <div className="family-tree-empty-state">
-        <div className="text-center p-8">
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">No Valid Family Members</h3>
-          <p className="text-gray-500 mb-4">
-            Family members were found but could not be organized into generations.
-          </p>
-          <div className="text-sm text-gray-400">
-            <p>Debug Info:</p>
-            <p>Total Members: {familyMembers.length}</p>
-            <p>Valid Members: {familyMembers.filter(m => m.entry && m.entry.pid !== undefined && m.entry.pid !== null).length}</p>
-            <p>Relationships: {relationships.length}</p>
-          </div>
+      <div className="simple-family-tree-container" ref={containerRef}>
+        <div className="simple-family-tree-empty">
+          <p>No family members found</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div 
-      ref={containerRef}
-      className="simple-family-tree-container"
-      onMouseDown={handlePanStart}
-      onMouseMove={handlePanMove}
-      onMouseUp={handlePanEnd}
-      onMouseLeave={handlePanEnd}
-      onWheel={handleWheel}
-    >
+    <div className="simple-family-tree-container" ref={containerRef}>
       {/* Controls */}
       <div className="simple-family-tree-controls">
         <div className="control-group">
-          <button 
-            onClick={() => handleZoom(1)}
-            title="Zoom In (Ctrl/Cmd + +)"
+          <button
             className="control-button"
-          >
-            +
-          </button>
-          <button 
             onClick={() => handleZoom(-1)}
-            title="Zoom Out (Ctrl/Cmd + -)"
-            className="control-button"
+            title="Zoom Out"
           >
-            −
+            ➖
           </button>
-          <button 
-            onClick={() => {
-              setZoomLevel(1);
-              setPanOffset({ x: 0, y: 0 });
-            }}
-            title="Reset View (Ctrl/Cmd + 0)"
+          <span className="zoom-level">{Math.round(zoomLevel * 100)}%</span>
+          <button
             className="control-button"
+            onClick={() => handleZoom(1)}
+            title="Zoom In"
           >
-            ⌂
+            ➕
           </button>
         </div>
         
-        <div className="generation-info">
+        <div className="control-group">
+          <button
+            className="control-button"
+            onClick={resetView}
+            title="Reset View"
+          >
+            🔄
+          </button>
+          <button
+            className="control-button fit-button"
+            onClick={() => applyAutoFit(treeLayout.nodes)}
+            title="Fit to View (Ctrl/Cmd + F)"
+          >
+            ⤢
+          </button>
+        </div>
+        
+        <div className="generation-badges">
           <span className="generation-badge grandparent">Grandparents: {organizedMembers.grandparents.length}</span>
           <span className="generation-badge parent">Parents: {organizedMembers.parents.length}</span>
           <span className="generation-badge child">Children: {organizedMembers.children.length}</span>
         </div>
       </div>
 
-      {/* SVG Container */}
-      <div className="svg-container">
+      {/* SVG Container - 2025-01-29: ENHANCED with proper overflow handling */}
+      <div className="svg-container" style={{ overflow: 'auto', width: '100%', height: '100%' }}>
         <svg
           ref={svgRef}
           width={svgDimensions.width}
@@ -617,6 +755,11 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
             transform: `translate(var(--pan-x, 0px), var(--pan-y, 0px)) scale(var(--zoom-level, 1))`,
             transformOrigin: '0 0'
           } as React.CSSProperties}
+          onMouseDown={handlePanStart}
+          onMouseMove={handlePanMove}
+          onMouseUp={handlePanEnd}
+          onMouseLeave={handlePanEnd}
+          onWheel={handleWheel}
         >
           {/* Connections */}
           <g className="connections">
@@ -645,6 +788,22 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
             >
               <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280" />
             </marker>
+            
+            {/* 2025-01-29: ADDED - Masks for each node to ensure complete content clipping */}
+            {treeLayout.nodes.map((node, index) => (
+              <mask key={`mask_${node.id}_${index}`} id={`mask_${node.id}_${index}`}>
+                <rect x="0" y="0" width="100%" height="100%" fill="white"/>
+                <rect
+                  x={node.x}
+                  y={node.y}
+                  width={node.width}
+                  height={node.height}
+                  rx="8"
+                  ry="8"
+                  fill="black"
+                />
+              </mask>
+            ))}
           </defs>
 
           {/* Nodes */}
@@ -656,6 +815,7 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
                 onClick={() => handleNodeClick(node.id)}
                 onMouseEnter={() => handleNodeHover(node.id)}
                 onMouseLeave={() => handleNodeHover(null)}
+                mask={`url(#mask_${node.id}_${index})`}
               >
                 {/* Node background */}
                 <rect
@@ -669,53 +829,73 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
                 />
                 
                 {/* Node content */}
+                {/* 2025-01-29: FIXED - Use SVG text with proper clipping and truncation */}
                 <text
                   x={node.x + node.width / 2}
-                  y={node.y + 20}
+                  y={node.y + 25}
                   textAnchor="middle"
                   className="node-name"
                   fontSize="12"
                   fontWeight="600"
                   fill="#1f2937"
+                  style={{
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden'
+                  }}
                 >
-                  {formatNameWithAge(node.member.entry.name, node.member.entry)}
+                  <title>{formatNameWithAge(node.member.entry.name, node.member.entry)}</title>
+                  {/* Truncate text if it's too long */}
+                  {formatNameWithAge(node.member.entry.name, node.member.entry).length > 15 
+                    ? formatNameWithAge(node.member.entry.name, node.member.entry).substring(0, 15) + '...'
+                    : formatNameWithAge(node.member.entry.name, node.member.entry)
+                  }
                 </text>
                 
-                {/* Remove separate age display since it's now part of the name */}
-                
+                {/* Role label */}
                 <text
                   x={node.x + node.width / 2}
-                  y={node.y + 35}
+                  y={node.y + 40}
                   textAnchor="middle"
                   className="node-role"
                   fontSize="10"
                   fill="#6b7280"
                 >
+                  <title>{node.member.role}</title>
                   {node.member.role}
                 </text>
                 
+                {/* Contact info - truncated */}
                 <text
                   x={node.x + node.width / 2}
-                  y={node.y + 50}
+                  y={node.y + 55}
                   textAnchor="middle"
                   className="node-contact"
                   fontSize="9"
                   fill="#9ca3af"
                 >
-                  {node.member.entry.contact ? formatContact(node.member.entry.contact) : 'No contact'}
+                  <title>{node.member.entry.contact ? formatContact(node.member.entry.contact) : 'No contact'}</title>
+                  {(() => {
+                    const contact = node.member.entry.contact ? formatContact(node.member.entry.contact) : 'No contact';
+                    return contact.length > 12 ? contact.substring(0, 12) + '...' : contact;
+                  })()}
                 </text>
                 
+                {/* Address - truncated */}
                 <text
                   x={node.x + node.width / 2}
-                  y={node.y + 65}
+                  y={node.y + 68}
                   textAnchor="middle"
                   className="node-address"
                   fontSize="8"
                   fill="#9ca3af"
                 >
-                  {node.member.entry.address}
+                  <title>{node.member.entry.address || 'No address'}</title>
+                  {(() => {
+                    const address = node.member.entry.address || 'No address';
+                    return address.length > 14 ? address.substring(0, 14) + '...' : address;
+                  })()}
                 </text>
-              </g>
+                </g>
             ))}
           </g>
         </svg>
@@ -726,7 +906,7 @@ const SimpleFamilyTree: React.FC<SimpleFamilyTreeProps> = ({
         <p>
           <strong>Controls:</strong> 
           Drag to pan • Scroll to zoom • Click nodes to select • 
-          Ctrl/Cmd + 0 to reset view
+          Ctrl/Cmd + 0 to reset view • Ctrl/Cmd + F to fit to view
         </p>
       </div>
     </div>

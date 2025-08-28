@@ -52,15 +52,16 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   const [familyGroupData, setFamilyGroupData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [windowSize, setWindowSize] = useState({ width: 1200, height: 800 });
+  // 2025-01-29: FIXED - Increased default window size to accommodate family tree content
+  const [windowSize, setWindowSize] = useState({ width: 1400, height: 900 });
   const [isResizing, setIsResizing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   // 2025-01-28: FIXED - Center the window on screen by default
   const [windowPosition, setWindowPosition] = useState(() => {
     // Calculate center position based on screen size
-    const centerX = Math.max(0, (window.innerWidth - 1200) / 2);
-    const centerY = Math.max(0, (window.innerHeight - 800) / 2);
+    const centerX = Math.max(0, (window.innerWidth - 1400) / 2);
+    const centerY = Math.max(0, (window.innerHeight - 900) / 2);
     return { x: centerX, y: centerY };
   });
   
@@ -98,6 +99,7 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
         const centerX = Math.max(0, (window.innerWidth - windowSize.width) / 2);
         const centerY = Math.max(0, (window.innerHeight - windowSize.height) / 2);
         
+        // 2025-01-28: ENHANCED - Ensure window stays within screen bounds after resize
         const maxX = window.innerWidth - windowSize.width;
         const maxY = window.innerHeight - windowSize.height;
         
@@ -338,6 +340,47 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     }
   };
 
+  // 2025-01-29: NEW - Function to delete family group and clear saved relationships
+  const handleDeleteFamily = async () => {
+    if (!familyGroupData?.id) {
+      console.error('No family group ID available for deletion');
+      return;
+    }
+
+    // Confirm deletion with user
+    if (!window.confirm('Are you sure you want to delete this family group? This will remove all saved family relationships but keep individual members and their data intact. The family tree will be regenerated automatically.')) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      console.log('Deleting family group:', familyGroupData.id);
+      
+      // Call backend to delete the family group
+      await familyService.deleteFamilyGroup(familyGroupData.id);
+      
+      console.log('Family group deleted successfully');
+      
+      // Clear local state
+      setFamilyMembers([]);
+      setFamilyRelationships([]);
+      setFamilyGroupExists(false);
+      setFamilyGroupData(null);
+      
+      // Show success message
+      setError(null);
+      
+      // Automatically regenerate family tree
+      console.log('Regenerating family tree with corrected logic...');
+      await fetchFamilyMembers();
+    } catch (error) {
+      console.error('Failed to delete family group:', error);
+      setError(`Failed to delete family group: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // 2025-01-28: ENHANCED: Toggle editing mode
   const toggleEditingMode = () => {
     setIsEditingMode(!isEditingMode);
@@ -388,6 +431,17 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
           </div>
           
           <div className="family-tree-controls">
+            {/* 2025-01-29: NEW - Added Delete Family button to clear saved relationships */}
+            {familyGroupExists && (
+              <button
+                onClick={handleDeleteFamily}
+                className="delete-family-btn"
+                title="Delete saved family relationships (keeps individual members)"
+              >
+                🗑️ Delete Family
+              </button>
+            )}
+            
             {/* 2025-01-28: ENHANCED: Added Edit Family Tree button */}
             <button
               onClick={toggleEditingMode}
