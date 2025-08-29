@@ -14,6 +14,7 @@ export { default as CreateFamilyGroupModal } from './CreateFamilyGroupModal';
 export { default as AddFamilyMemberModal } from './AddFamilyMemberModal';
 export { default as DeleteUpdatedFamilyModal } from './DeleteUpdatedFamilyModal';  // 2025-01-28: Added for deleting updated families
 export { default as FamilyTreeWindow } from './FamilyTreeWindow';  // 2025-01-28: NEW - Dedicated family tree window component
-export { default as SimpleFamilyTree } from './SimpleFamilyTree';  // 2025-01-28: NEW - Simplified family tree visualization component
+
 export { default as RelationshipManager } from './RelationshipManager';  // 2025-01-28: NEW - Streamlined relationship management component
 export { default as ClassicFamilyTree } from './ClassicFamilyTree';
+export { default as FamilyTreeDownloadButton } from './FamilyTreeDownloadButton';  // 2025-01-29: NEW - Download button for family tree graphics

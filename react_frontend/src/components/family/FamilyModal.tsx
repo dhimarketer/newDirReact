@@ -3,11 +3,12 @@
 // 2025-01-27: Fixed styling issues to ensure graphics display properly
 // 2025-01-28: ENHANCED: Added multi-generational family tree support by fetching existing relationships
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { PhoneBookEntry } from '../../types/directory';
 import FamilyTreeVisualization from './FamilyTreeVisualization';
 import FamilyTreeEditor from './FamilyTreeEditor';
+import FamilyTreeDownloadButton from './FamilyTreeDownloadButton';
 import { STORAGE_KEYS } from '../../utils/constants';
 import { useAuthStore } from '../../store/authStore';
 import { familyService } from '../../services/familyService';
@@ -37,6 +38,7 @@ interface FamilyRelationship {
 
 const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, island }) => {
   const { user } = useAuthStore();
+  const svgRef = useRef<SVGSVGElement>(null);
   
   // 2025-01-28: DEBUG: Log initial state
   console.log('FamilyModal initial render:', { 
@@ -1011,11 +1013,24 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
                             <strong>All Members:</strong> {familyMembers.map(m => formatNameWithAge(m.entry.name, m.entry.DOB)).join(', ')}
                           </div>
                           
+                          {/* 2025-01-29: NEW - Download button for family tree */}
+                          {familyMembers.length > 0 && (
+                            <div className="mb-4 flex justify-end">
+                              <FamilyTreeDownloadButton
+                                svgRef={svgRef as React.RefObject<SVGSVGElement>}
+                                familyName={`${address}_${island}`}
+                                variant="outline"
+                                size="sm"
+                              />
+                            </div>
+                          )}
+                          
                           <FamilyTreeVisualization 
                             familyMembers={familyMembers} 
                             relationships={familyRelationships}
                             onRelationshipChange={handleRelationshipChange} 
-                            isEditable={true} 
+                            isEditable={true}
+                            svgRef={svgRef as React.RefObject<SVGSVGElement>}
                           />
                         </>
                       )}

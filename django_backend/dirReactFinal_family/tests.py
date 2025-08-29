@@ -1,5 +1,6 @@
 # 2025-01-28: Tests for family functionality including delete_updated_families
 
+import pytest
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -7,9 +8,11 @@ from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from .models import FamilyGroup, FamilyMember, FamilyRelationship
 from dirReactFinal_directory.models import PhoneBookEntry
+from dirReactFinal_core.models import Island
 
 User = get_user_model()
 
+@pytest.mark.django_db
 class DeleteUpdatedFamiliesTestCase(APITestCase):
     """
     Test cases for the delete_updated_families functionality
@@ -34,29 +37,32 @@ class DeleteUpdatedFamiliesTestCase(APITestCase):
             is_superuser=False
         )
         
+        # Create test island first
+        self.male_island = Island.objects.create(name='Male', atoll='Male')
+        
         # Create test phonebook entries
         self.entry1 = PhoneBookEntry.objects.create(
             pid=1001,
             name='John Doe',
-            phone='1234567890',
+            contact='1234567890',
             address='123 Main St',
-            island='Male'
+            island=self.male_island
         )
         
         self.entry2 = PhoneBookEntry.objects.create(
             pid=1002,
             name='Jane Doe',
-            phone='0987654321',
+            contact='0987654321',
             address='123 Main St',
-            island='Male'
+            island=self.male_island
         )
         
         self.entry3 = PhoneBookEntry.objects.create(
             pid=1003,
             name='Baby Doe',
-            phone='5555555555',
+            contact='5555555555',
             address='123 Main St',
-            island='Male'
+            island=self.male_island
         )
         
         # Create test family group
@@ -249,16 +255,16 @@ class DeleteUpdatedFamiliesTestCase(APITestCase):
         entry3_after = PhoneBookEntry.objects.get(pid=1003)
         
         self.assertEqual(entry1_after.name, original_entry1.name)
-        self.assertEqual(entry1_after.phone, original_entry1.phone)
+        self.assertEqual(entry1_after.contact, original_entry1.contact)
         self.assertEqual(entry1_after.address, original_entry1.address)
         self.assertEqual(entry1_after.island, original_entry1.island)
         
         self.assertEqual(entry2_after.name, original_entry2.name)
-        self.assertEqual(entry2_after.phone, original_entry2.phone)
+        self.assertEqual(entry2_after.contact, original_entry2.contact)
         self.assertEqual(entry2_after.address, original_entry2.address)
         self.assertEqual(entry2_after.island, original_entry2.island)
         
         self.assertEqual(entry3_after.name, original_entry3.name)
-        self.assertEqual(entry3_after.phone, original_entry3.phone)
+        self.assertEqual(entry3_after.contact, original_entry3.contact)
         self.assertEqual(entry3_after.address, original_entry3.address)
         self.assertEqual(entry3_after.island, original_entry3.island)

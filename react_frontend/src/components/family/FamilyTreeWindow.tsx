@@ -10,6 +10,7 @@ import { useAuthStore } from '../../store/authStore';
 import { familyService } from '../../services/familyService';
 import ClassicFamilyTree from './ClassicFamilyTree';
 import RelationshipManager from './RelationshipManager';
+import FamilyTreeDownloadButton from './FamilyTreeDownloadButton';
 import { PhoneBookEntry } from '../../types/directory';
 
 interface FamilyTreeWindowProps {
@@ -68,9 +69,13 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   // 2025-01-28: ENHANCED: Added state for editing mode
   const [isEditingMode, setIsEditingMode] = useState(false);
   
+  // 2025-01-29: NEW - State for multi-row layout toggle
+  const [useMultiRowLayout, setUseMultiRowLayout] = useState(false);
+  
   const windowRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const resizeHandleRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
 
   // Check if user is admin
   const isAdmin = user?.is_staff || user?.is_superuser || user?.user_type === 'admin';
@@ -442,6 +447,26 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
               </button>
             )}
             
+            {/* 2025-01-29: NEW - Multi-row layout toggle button - Always visible for better UX */}
+            <button
+              onClick={() => setUseMultiRowLayout(!useMultiRowLayout)}
+              className={`multi-row-toggle-btn ${useMultiRowLayout ? 'active' : ''}`}
+              title={useMultiRowLayout ? 'Switch to single-row layout' : 'Switch to multi-row layout (prevents horizontal clipping)'}
+              style={{ display: 'flex', visibility: 'visible', opacity: 1 }}
+            >
+              {useMultiRowLayout ? '📐 Single Row' : '📐 Multi Row'}
+            </button>
+            
+            {/* 2025-01-29: NEW - Added Download Family Tree button */}
+            {familyGroupExists && familyMembers.length > 0 && (
+              <FamilyTreeDownloadButton
+                svgRef={svgRef as React.RefObject<SVGSVGElement>}
+                familyName={`${address}_${island}`}
+                variant="outline"
+                size="sm"
+              />
+            )}
+            
             {/* 2025-01-28: ENHANCED: Added Edit Family Tree button */}
             <button
               onClick={toggleEditingMode}
@@ -495,6 +520,8 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                 <ClassicFamilyTree
                   familyMembers={familyMembers}
                   relationships={familyRelationships}
+                  useMultiRowLayout={useMultiRowLayout}
+                  svgRef={svgRef as React.RefObject<SVGSVGElement>}
                 />
               )}
             </>

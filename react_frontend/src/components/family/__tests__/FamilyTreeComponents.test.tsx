@@ -1,5 +1,5 @@
 // 2025-01-28: NEW - Comprehensive test suite for family tree components
-// 2025-01-28: Tests FamilyTreeWindow, SimpleFamilyTree, and RelationshipManager integration
+// 2025-01-28: Tests FamilyTreeWindow, ClassicFamilyTree, and RelationshipManager integration
 // 2025-01-28: Ensures proper data flow and component interaction
 // 2025-01-28: ENHANCED - Added tests for new features: family exclusion, new family creation, family deletion
 
@@ -7,7 +7,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import FamilyTreeWindow from '../FamilyTreeWindow';
-import SimpleFamilyTree from '../SimpleFamilyTree';
+import ClassicFamilyTree from '../ClassicFamilyTree';
 import RelationshipManager from '../RelationshipManager';
 import { useAuthStore } from '../../../store/authStore';
 import { familyService } from '../../../services/familyService';
@@ -255,14 +255,12 @@ describe('Family Tree Components Integration', () => {
     });
   });
 
-  describe('SimpleFamilyTree', () => {
+  describe('ClassicFamilyTree', () => {
     it('renders family tree with correct hierarchy', () => {
       render(
-        <SimpleFamilyTree
+        <ClassicFamilyTree
           familyMembers={mockFamilyMembers}
           relationships={mockRelationships}
-          onRelationshipChange={vi.fn()}
-          isEditable={true}
         />
       );
 
@@ -273,11 +271,9 @@ describe('Family Tree Components Integration', () => {
 
     it('shows generation badges with correct counts', () => {
       render(
-        <SimpleFamilyTree
+        <ClassicFamilyTree
           familyMembers={mockFamilyMembers}
           relationships={mockRelationships}
-          onRelationshipChange={vi.fn()}
-          isEditable={true}
         />
       );
 
@@ -287,11 +283,9 @@ describe('Family Tree Components Integration', () => {
 
     it('displays relationship connections', () => {
       render(
-        <SimpleFamilyTree
+        <ClassicFamilyTree
           familyMembers={mockFamilyMembers}
           relationships={mockRelationships}
-          onRelationshipChange={vi.fn()}
-          isEditable={true}
         />
       );
 
@@ -301,11 +295,9 @@ describe('Family Tree Components Integration', () => {
 
     it('handles empty family members gracefully', () => {
       render(
-        <SimpleFamilyTree
+        <ClassicFamilyTree
           familyMembers={[]}
           relationships={[]}
-          onRelationshipChange={vi.fn()}
-          isEditable={true}
         />
       );
 
@@ -314,17 +306,15 @@ describe('Family Tree Components Integration', () => {
 
     it('shows zoom controls', () => {
       render(
-        <SimpleFamilyTree
+        <ClassicFamilyTree
           familyMembers={mockFamilyMembers}
           relationships={mockRelationships}
-          onRelationshipChange={vi.fn()}
-          isEditable={true}
         />
       );
 
-      expect(screen.getByTitle('Zoom In (Ctrl/Cmd + +)')).toBeInTheDocument();
-      expect(screen.getByTitle('Zoom Out (Ctrl/Cmd + -)')).toBeInTheDocument();
-      expect(screen.getByTitle('Reset View (Ctrl/Cmd + 0)')).toBeInTheDocument();
+      // Note: ClassicFamilyTree doesn't have zoom controls, so we'll test basic rendering instead
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getByText('Jane Doe')).toBeInTheDocument();
     });
   });
 
@@ -827,11 +817,9 @@ describe('Family Tree Components Integration', () => {
       const startTime = performance.now();
       
       render(
-        <SimpleFamilyTree
+        <ClassicFamilyTree
           familyMembers={largeFamilyMembers}
           relationships={[]}
-          onRelationshipChange={vi.fn()}
-          isEditable={true}
         />
       );
 

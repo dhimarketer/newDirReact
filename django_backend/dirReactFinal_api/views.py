@@ -19,6 +19,7 @@ from .permissions import (
     CanModerate, CanViewAnalytics, IsOwnerOrAdmin
 )
 import json
+import time # Added for random seed
 
 # Import models
 from dirReactFinal_core.models import User, UserPermission, EventLog
@@ -437,8 +438,8 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
     
     def get_permissions(self):
         """Override permissions for search actions - allow anonymous access to search"""
-        if self.action in ['list', 'retrieve', 'advanced_search', 'public_stats']:
-            # Allow search, read operations, and public stats for anyone (anonymous or authenticated)
+        if self.action in ['list', 'retrieve', 'advanced_search', 'public_stats', 'get_person_details']:
+            # Allow search, read operations, public stats, and person details for anyone (anonymous or authenticated)
             from rest_framework.permissions import AllowAny
             return [AllowAny()]
         elif self.action == 'premium_image_search':
@@ -825,6 +826,28 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                 profession_query = create_wildcard_query('profession', profession)
                 queryset = queryset.filter(profession_query)
             
+            # 2025-01-29: Add randomization to ensure images don't appear in same order every time
+            # Use random ordering to provide variety in image display
+            import random
+            # Generate a random seed based on current time and user session for consistent randomization per session
+            random_seed = hash(f"{request.session.session_key}_{int(time.time() / 3600)}")  # Change every hour
+            random.seed(random_seed)
+            
+            # Apply efficient randomization using random offset instead of order_by('?')
+            # This provides randomization while maintaining good performance for large datasets
+            total_entries = queryset.count()
+            if total_entries > 0:
+                # Use a random offset to start from a different position each time
+                # This ensures variety without the performance penalty of order_by('?')
+                random_offset = random.randint(0, min(total_entries - 1, 1000))  # Cap offset to prevent too much skipping
+                print(f"Applied efficient randomization with seed: {random_seed}, offset: {random_offset}")
+                
+                # Apply the random offset by slicing the queryset
+                # This gives us a different starting point for each session
+                queryset = queryset[random_offset:] | queryset[:random_offset]
+            else:
+                print(f"No entries found for randomization")
+            
             # Pagination
             page = int(request.query_params.get('page', 1))
             page_size = int(request.query_params.get('page_size', 20))
@@ -833,6 +856,13 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             
             total_count = queryset.count()
             results = queryset[start:end]
+            
+            # 2025-01-29: Add select_related AFTER all filtering and randomization to preserve ForeignKey optimization
+            try:
+                results = results.select_related('atoll', 'island', 'party')
+                print("Added select_related for ForeignKey optimization AFTER filtering")
+            except Exception as e:
+                print(f"Could not add select_related: {e}")
             
             print(f"Final results count: {total_count}")
             if total_count > 0:
@@ -896,14 +926,53 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                 'points_deducted': points_deducted,
                 'remaining_points': remaining_points,
                 'action_cost': points_cost,
-                'threshold_required': threshold
+                'threshold_required': threshold,
+                'random_seed': random_seed  # 2025-01-29: Include random seed in response for debugging
             })
-            
         except Exception as e:
+            print(f"Error in premium_image_search: {str(e)}")
             return Response({
-                'error': 'Failed to perform premium image search',
+                'error': 'Failed to perform image search',
                 'detail': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['get'])
+    def get_person_details(self, request):
+        """Get complete person details by PID with all related information"""
+        try:
+            pid = request.query_params.get('pid')
+            if not pid:
+                return Response({
+                    'error': 'PID parameter is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 2025-01-29: CRITICAL FIX - Use single query with select_related to get all ForeignKey relationships
+            person = PhoneBookEntry.objects.select_related(
+                'atoll', 'island', 'party'
+            ).get(pid=pid)
+            
+            # Serialize with complete information
+            from .serializers import PhoneBookEntryWithImageSerializer
+            serializer = PhoneBookEntryWithImageSerializer(person)
+            
+            print(f"Retrieved complete details for PID {pid}: {person.name}")
+            print(f"Atoll: {person.atoll}, Island: {person.island}, Party: {person.party}")
+            
+            return Response({
+                'person': serializer.data,
+                'message': f'Complete details retrieved for {person.name}'
+            })
+            
+        except PhoneBookEntry.DoesNotExist:
+            return Response({
+                'error': f'Person with PID {pid} not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'error': 'Failed to retrieve person details',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 # Image Management Views
 class ImageViewSet(viewsets.ModelViewSet):

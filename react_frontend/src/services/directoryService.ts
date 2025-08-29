@@ -161,6 +161,9 @@ class DirectoryService {
     total_with_images: number;
   }> {
     try {
+      console.log('=== PREMIUM IMAGE SEARCH DEBUG ===');
+      console.log('Making API call to premium_image_search with params:', params);
+      
       const response = await apiService.get<{
         results: PhoneBookEntryWithImage[];
         total_count: number;
@@ -170,12 +173,46 @@ class DirectoryService {
         pep_count: number;
         total_with_images: number;
       }>(`${this.baseUrl}/premium_image_search/`, { params });
+      
+      console.log('API Response received:', response);
+      console.log('Response data:', response.data);
+      console.log('Results count:', response.data.results?.length || 0);
+      if (response.data.results && response.data.results.length > 0) {
+        console.log('First result sample:', response.data.results[0]);
+      }
+      console.log('=== END PREMIUM IMAGE SEARCH DEBUG ===');
+      
       return response.data;
     } catch (error: any) {
+      console.error('Premium image search error:', error);
+      console.error('Error response:', error.response);
       if (error.response?.status === 403 && error.response?.data?.code === 'PREMIUM_REQUIRED') {
         throw new Error('Premium feature. Upgrade your account to access image search.');
       }
       throw new Error(error.response?.data?.message || 'Failed to perform premium image search');
+    }
+  }
+
+  /**
+   * Get complete person details by PID
+   */
+  async getPersonDetails(pid: number): Promise<PhoneBookEntryWithImage> {
+    try {
+      console.log('=== GET PERSON DETAILS DEBUG ===');
+      console.log('Fetching details for PID:', pid);
+      
+      const response = await apiService.get<{ person: PhoneBookEntryWithImage }>(
+        `${this.baseUrl}/get_person_details/`, 
+        { params: { pid } }
+      );
+      
+      console.log('Person details response:', response.data);
+      console.log('=== END GET PERSON DETAILS DEBUG ===');
+      
+      return response.data.person;
+    } catch (error: any) {
+      console.error('Failed to get person details:', error);
+      throw new Error(error.response?.data?.message || 'Failed to get person details');
     }
   }
 }

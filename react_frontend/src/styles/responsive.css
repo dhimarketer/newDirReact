@@ -1,0 +1,364 @@
+/* 2025-01-29: REFACTORED - Responsive design and mobile layout styles */
+
+/* ========================================
+   MOBILE RESPONSIVE LAYOUT
+   ======================================== */
+
+/* Mobile responsive layout */
+@media (max-width: 1024px) {
+  .sidebar-container {
+    transform: translateX(-100%);
+  }
+  
+  .sidebar-container.sidebar-open {
+    transform: translateX(0);
+  }
+  
+  .main-content {
+    margin-left: 0;
+  }
+  
+  .main-content.sidebar-open {
+    margin-left: 0;
+  }
+}
+
+/* ========================================
+   FAMILY TREE RESPONSIVE STYLES
+   ======================================== */
+
+/* Responsive design for family tree window controls */
+@media (max-width: 800px) {
+  .family-tree-controls {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: wrap !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .family-tree-controls button {
+    width: auto !important;
+    justify-content: center !important;
+    min-width: fit-content !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .family-tree-controls > * {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+}
+
+/* Responsive design for family tree window */
+@media (max-width: 768px) {
+  .family-tree-window {
+    min-width: 95vw;
+    min-height: 80vh;
+    margin: 10px;
+  }
+  
+  .family-tree-header {
+    padding: 6px 12px;
+  }
+  
+  .family-tree-title h2 {
+    font-size: 1rem;
+  }
+  
+  .family-tree-controls {
+    gap: 4px !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .family-tree-controls button {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .family-tree-controls > * {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .edit-family-btn {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+  
+  .family-members-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========================================
+   SIMPLE FAMILY TREE RESPONSIVE STYLES
+   ======================================== */
+
+/* Responsive design for simple family tree */
+@media (max-width: 768px) {
+  .simple-family-tree-container {
+    min-height: 300px;
+  }
+  
+  .simple-family-tree-controls {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .control-group {
+    justify-content: center;
+  }
+  
+  .generation-badges {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .generation-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+  
+  .svg-container {
+    min-height: 250px;
+  }
+}
+
+/* ========================================
+   FAMILY MEMBERS GRID RESPONSIVE STYLES
+   ======================================== */
+
+/* Family member grid responsive styles */
+@media (max-width: 1200px) {
+  .family-members-grid.medium-family {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+  
+  .family-members-grid.large-family {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.375rem;
+    padding: 0.375rem;
+  }
+  
+  .family-members-grid.extra-large-family {
+    grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
+    gap: 0.25rem;
+    padding: 0.25rem;
+  }
+  
+  .family-members-grid.ultra-large-family {
+    grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
+    gap: 0.25rem;
+    padding: 0.25rem;
+  }
+  
+  .family-members-grid.extreme-family {
+    grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
+    gap: 0.125rem;
+    padding: 0.125rem;
+  }
+  
+  .family-members-grid.mega-family {
+    grid-template-columns: repeat(auto-fill, minmax(55px, 1fr));
+    gap: 0.125rem;
+    padding: 0.125rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .family-members-grid.medium-family {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+  
+  .family-members-grid.large-family {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 0.375rem;
+    padding: 0.375rem;
+  }
+  
+  .family-members-grid.extra-large-family {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.25rem;
+    padding: 0.25rem;
+  }
+  
+  .family-members-grid.ultra-large-family {
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 0.25rem;
+    padding: 0.25rem;
+  }
+  
+  .family-members-grid.extreme-family {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 0.125rem;
+    padding: 0.125rem;
+  }
+  
+  .family-members-grid.mega-family {
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+    gap: 0.125rem;
+    padding: 0.125rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .family-members-grid.medium-family {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.375rem;
+    padding: 0.375rem;
+  }
+  
+  .family-members-grid.large-family {
+    grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
+    gap: 0.25rem;
+    padding: 0.25rem;
+  }
+  
+  .family-members-grid.extra-large-family {
+    grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
+    gap: 0.25rem;
+    padding: 0.25rem;
+  }
+  
+  .family-members-grid.ultra-large-family {
+    grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
+    gap: 0.25rem;
+    padding: 0.25rem;
+  }
+  
+  .family-members-grid.extreme-family {
+    grid-template-columns: repeat(auto-fill, minmax(55px, 1fr));
+    gap: 0.125rem;
+    padding: 0.125rem;
+  }
+  
+  .family-members-grid.mega-family {
+    grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+    gap: 0.125rem;
+    padding: 0.125rem;
+  }
+}
+
+/* ========================================
+   HIGH DPI DISPLAY SUPPORT
+   ======================================== */
+
+/* High DPI Displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .family-tree-window {
+    border-radius: 12px;
+  }
+  
+  .family-tree-window-header {
+    border-radius: 12px 12px 0 0;
+  }
+  
+  .control-button {
+    border-width: 0.5px;
+  }
+  
+  .generation-badge {
+    border-width: 0.5px;
+  }
+  
+  .svg-container svg {
+    shape-rendering: geometricPrecision;
+    text-rendering: optimizeLegibility;
+  }
+  
+  .connections path,
+  .connections line {
+    shape-rendering: geometricPrecision;
+  }
+  
+  .family-node rect {
+    shape-rendering: geometricPrecision;
+  }
+}
+
+/* ========================================
+   PRINT STYLES
+   ======================================== */
+
+/* Print styles for family trees */
+@media print {
+  .simple-family-tree-controls,
+  .simple-family-tree-instructions {
+    display: none;
+  }
+  
+  .svg-container {
+    overflow: visible;
+  }
+  
+  .svg-container svg {
+    max-width: none;
+    max-height: none;
+  }
+}
+
+/* ========================================
+   ACCESSIBILITY AND PERFORMANCE
+   ======================================== */
+
+/* Enhanced family tree text styling for better readability */
+.multi-row-name,
+.multi-row-contact,
+.multi-row-address {
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+}
+
+.multi-row-name {
+  font-weight: 600;
+  text-shadow: 1px 1px 3px rgba(255, 255, 255, 0.9);
+}
+
+.multi-row-connection {
+  opacity: 0.8;
+  filter: drop-shadow(0 1px 2px rgba(139, 69, 19, 0.3));
+}
+
+/* Drag and drop functionality styling */
+.child-node rect,
+.parent-node rect {
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.child-node rect:hover,
+.parent-node rect:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 8px rgba(139, 69, 19, 0.3);
+}
+
+.child-node rect:active,
+.parent-node rect:active {
+  cursor: grabbing !important;
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(139, 69, 19, 0.4);
+}
+
+/* Visual feedback for dragged elements */
+.child-node.dragging rect,
+.parent-node.dragging rect {
+  opacity: 0.8;
+  filter: drop-shadow(0 8px 16px rgba(139, 69, 19, 0.6));
+}

@@ -91,4 +91,13 @@ export interface PhoneBookEntryWithImage extends PhoneBookEntry {
   image_filename?: string;
   image_upload_date?: string;
   pep_status_display?: string;
+  // 2025-01-29: Added fields for ForeignKey relationship names
+  atoll_name?: string;
+  island_name?: string;
+  party_name?: string;
+  // 2025-01-29: Added additional fields for complete profile information
+  batch?: string;
+  change_status?: string;
+  requested_by?: string;
+  family_group_id?: number;
 }

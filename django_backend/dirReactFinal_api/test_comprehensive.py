@@ -1,5 +1,5 @@
-# 2025-01-27: Comprehensive API test suite for dirReactFinal
-# Tests all API endpoints with proper coverage, security, and performance testing
+# 2025-01-27: Comprehensive API tests for dirReactFinal
+# Tests all API endpoints with proper authentication and permissions
 
 import pytest
 import json
@@ -14,7 +14,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from datetime import timedelta
 
-from dirReactFinal_core.models import User, UserPermission, EventLog
+from dirReactFinal_core.models import User, UserPermission, Atoll, Island, Party
 from dirReactFinal_directory.models import PhoneBookEntry, Image
 from dirReactFinal_family.models import FamilyGroup, FamilyMember
 from dirReactFinal_moderation.models import PendingChange, PhotoModeration
@@ -25,48 +25,60 @@ User = get_user_model()
 
 @pytest.mark.api
 @pytest.mark.comprehensive
+@pytest.mark.django_db
 class ComprehensiveAPITest(APITestCase):
-    """Comprehensive API test suite covering all endpoints"""
+    """Base test class for comprehensive API testing"""
     
     def setUp(self):
         """Set up comprehensive test data"""
-        # Create test users with different permission levels
-        self.admin_user = TestUtils.create_test_user('admin')
-        self.premium_user = TestUtils.create_test_user('premium')
-        self.basic_user = TestUtils.create_test_user('basic')
+        # Create test users
+        self.admin_user = User.objects.create_user(
+            username='admin',
+            email='admin@test.com',
+            password='testpass123',
+            user_type='admin',
+            is_staff=True,
+            is_superuser=True
+        )
         
-        # Create user permissions
-        self.create_user_permissions()
+        self.premium_user = User.objects.create_user(
+            username='premium',
+            email='premium@test.com',
+            password='testpass123',
+            user_type='premium'
+        )
         
-        # Create test data
-        self.create_test_data()
+        self.basic_user = User.objects.create_user(
+            username='basic',
+            email='basic@test.com',
+            password='testpass123',
+            user_type='basic'
+        )
         
-        # Set up API clients
+        # Create API clients
         self.admin_client = APIClient()
         self.premium_client = APIClient()
         self.basic_client = APIClient()
         self.anonymous_client = APIClient()
         
+        # Create test data
+        self.create_test_data()
+        
+        # Set up permissions
+        self.setup_permissions()
+        
         # Authenticate clients
         self.authenticate_clients()
     
-    def create_user_permissions(self):
-        """Create comprehensive user permissions"""
+    def setup_permissions(self):
+        """Set up user permissions for testing"""
         permissions_data = [
-            # Basic user permissions
             {'user_type': 'basic', 'module': 'directory', 'can_read': True, 'can_write': True, 'can_delete': False, 'can_admin': False},
             {'user_type': 'basic', 'module': 'family', 'can_read': True, 'can_write': True, 'can_delete': False, 'can_admin': False},
-            {'user_type': 'basic', 'module': 'scoring', 'can_read': True, 'can_write': True, 'can_delete': False, 'can_admin': False},
-            
-            # Premium user permissions
             {'user_type': 'premium', 'module': 'directory', 'can_read': True, 'can_write': True, 'can_delete': True, 'can_admin': False},
             {'user_type': 'premium', 'module': 'family', 'can_read': True, 'can_write': True, 'can_delete': True, 'can_admin': False},
-            {'user_type': 'premium', 'module': 'scoring', 'can_read': True, 'can_write': True, 'can_delete': True, 'can_admin': False},
-            
-            # Admin user permissions
             {'user_type': 'admin', 'module': 'directory', 'can_read': True, 'can_write': True, 'can_delete': True, 'can_admin': True},
             {'user_type': 'admin', 'module': 'family', 'can_read': True, 'can_write': True, 'can_delete': True, 'can_admin': True},
-            {'user_type': 'admin', 'module': 'scoring', 'can_read': True, 'can_write': True, 'can_delete': True, 'can_admin': True},
             {'user_type': 'admin', 'module': 'moderation', 'can_read': True, 'can_write': True, 'can_delete': True, 'can_admin': True},
         ]
         
@@ -75,25 +87,34 @@ class ComprehensiveAPITest(APITestCase):
     
     def create_test_data(self):
         """Create comprehensive test data"""
+        # Create Atoll, Island, and Party objects first
+        self.male_atoll = Atoll.objects.create(name='Male')
+        self.addu_atoll = Atoll.objects.create(name='Addu')
+        
+        self.male_island = Island.objects.create(name='Male City', atoll='Male')
+        self.hithadhoo_island = Island.objects.create(name='Hithadhoo', atoll='Addu')
+        
+        self.test_party = Party.objects.create(name='Test Party', short_name='TP')
+        
         # Create phonebook entries
         self.contact1 = PhoneBookEntry.objects.create(
             name='John Doe',
             contact='7771234',
             address='123 Main Street',
-            atoll='Male',
-            island='Male City',
-            status='active',
-            created_by=self.basic_user
+            atoll=self.male_atoll,
+            island=self.male_island,
+            party=self.test_party,
+            status='active'
         )
         
         self.contact2 = PhoneBookEntry.objects.create(
             name='Jane Smith',
             contact='7775678',
             address='456 Oak Avenue',
-            atoll='Addu',
-            island='Hithadhoo',
-            status='active',
-            created_by=self.premium_user
+            atoll=self.addu_atoll,
+            island=self.hithadhoo_island,
+            party=self.test_party,
+            status='active'
         )
         
         # Create family groups
@@ -160,6 +181,7 @@ class ComprehensiveAPITest(APITestCase):
 
 @pytest.mark.api
 @pytest.mark.directory
+@pytest.mark.django_db
 class DirectoryAPITest(ComprehensiveAPITest):
     """Test cases for directory API endpoints"""
     
@@ -276,6 +298,7 @@ class DirectoryAPITest(ComprehensiveAPITest):
 
 @pytest.mark.api
 @pytest.mark.family
+@pytest.mark.django_db
 class FamilyAPITest(ComprehensiveAPITest):
     """Test cases for family API endpoints"""
     
@@ -339,6 +362,7 @@ class FamilyAPITest(ComprehensiveAPITest):
 
 @pytest.mark.api
 @pytest.mark.scoring
+@pytest.mark.django_db
 class ScoringAPITest(ComprehensiveAPITest):
     """Test cases for scoring API endpoints"""
     
@@ -385,6 +409,7 @@ class ScoringAPITest(ComprehensiveAPITest):
 
 @pytest.mark.api
 @pytest.mark.moderation
+@pytest.mark.django_db
 class ModerationAPITest(ComprehensiveAPITest):
     """Test cases for moderation API endpoints"""
     
@@ -421,6 +446,7 @@ class ModerationAPITest(ComprehensiveAPITest):
 
 @pytest.mark.api
 @pytest.mark.security
+@pytest.mark.django_db
 class SecurityAPITest(ComprehensiveAPITest):
     """Test cases for API security"""
     
@@ -478,6 +504,7 @@ class SecurityAPITest(ComprehensiveAPITest):
 
 @pytest.mark.api
 @pytest.mark.performance
+@pytest.mark.django_db
 class PerformanceAPITest(ComprehensiveAPITest):
     """Test cases for API performance"""
     
@@ -531,6 +558,7 @@ class PerformanceAPITest(ComprehensiveAPITest):
 
 @pytest.mark.api
 @pytest.mark.integration
+@pytest.mark.django_db
 class IntegrationAPITest(ComprehensiveAPITest):
     """Integration tests for API workflows"""
     
@@ -622,6 +650,7 @@ class IntegrationAPITest(ComprehensiveAPITest):
 
 @pytest.mark.api
 @pytest.mark.edge_case
+@pytest.mark.django_db
 class EdgeCaseAPITest(ComprehensiveAPITest):
     """Test cases for edge cases and boundary conditions"""
     
@@ -689,6 +718,7 @@ class EdgeCaseAPITest(ComprehensiveAPITest):
 
 @pytest.mark.api
 @pytest.mark.smoke
+@pytest.mark.django_db
 class SmokeTestAPITest(ComprehensiveAPITest):
     """Smoke tests for critical API functionality"""
     

@@ -27,6 +27,7 @@ interface FamilyTreeVisualizationProps {
   relationships?: FamilyRelationship[]; // 2025-01-28: Added actual family relationships
   onRelationshipChange?: (relationships: FamilyRelationship[]) => void; // 2025-01-28: Callback for relationship updates
   isEditable?: boolean; // 2025-01-28: Whether the tree can be edited
+  svgRef?: React.RefObject<SVGSVGElement>; // 2025-01-29: NEW - Reference to SVG element for download functionality
 }
 
 interface TreeNode {
@@ -67,7 +68,8 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
   familyMembers, 
   relationships = [], 
   onRelationshipChange,
-  isEditable = false 
+  isEditable = false,
+  svgRef
 }) => {
   const [nodes, setNodes] = useState<TreeNode[]>([]);
   const [connections, setConnections] = useState<ConnectionLine[]>([]);
@@ -85,7 +87,7 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
   const [isFittingToView, setIsFittingToView] = useState(false);
   const [fitToViewSuccess, setFitToViewSuccess] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
+  const localSvgRef = useRef<SVGSVGElement>(null);
   const resizeTimeout = useRef<number | null>(null);
   const isCalculating = useRef(false);
 
@@ -1655,7 +1657,7 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
       {/* 2025-01-28: Family tree visualization */}
       <div className="family-tree-content">
         <svg
-          ref={svgRef}
+          ref={svgRef || localSvgRef}
           width={svgDimensions.width}
           height={svgDimensions.height}
           viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}

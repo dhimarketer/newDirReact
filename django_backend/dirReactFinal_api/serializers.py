@@ -106,6 +106,10 @@ class PhoneBookEntryWithImageSerializer(serializers.ModelSerializer):
     image_filename = serializers.SerializerMethodField()
     image_upload_date = serializers.SerializerMethodField()
     pep_status_display = serializers.SerializerMethodField()
+    # 2025-01-29: Added methods to handle ForeignKey relationships
+    atoll_name = serializers.SerializerMethodField()
+    island_name = serializers.SerializerMethodField()
+    party_name = serializers.SerializerMethodField()
     
     class Meta:
         model = PhoneBookEntry
@@ -114,12 +118,32 @@ class PhoneBookEntryWithImageSerializer(serializers.ModelSerializer):
             'street', 'ward', 'party', 'DOB', 'status', 'remark', 
             'email', 'gender', 'extra', 'profession', 'pep_status',
             'age', 'image_url', 'image_filename', 'image_upload_date',
-            'pep_status_display'
+            'pep_status_display', 'atoll_name', 'island_name', 'party_name',
+            'batch', 'change_status', 'requested_by', 'family_group_id'
         ]
         read_only_fields = ['pid']  # pid is the primary key
     
     def get_age(self, obj):
         return obj.get_age()
+    
+    # 2025-01-29: Added methods to extract names from ForeignKey relationships
+    def get_atoll_name(self, obj):
+        """Extract atoll name from ForeignKey relationship"""
+        if obj.atoll:
+            return obj.atoll.name
+        return None
+    
+    def get_island_name(self, obj):
+        """Extract island name from ForeignKey relationship"""
+        if obj.island:
+            return obj.island.name
+        return None
+    
+    def get_party_name(self, obj):
+        """Extract party name from ForeignKey relationship"""
+        if obj.party:
+            return obj.party.name
+        return None
     
     def get_image_url(self, obj):
         # Check if entry has an image status and return the URL

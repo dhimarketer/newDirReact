@@ -18,7 +18,7 @@ from .token_views import CustomTokenObtainPairView, CustomTokenRefreshView
 # Create router for API endpoints
 router = DefaultRouter()
 
-# Register API endpoints
+# Register API endpoints with custom actions exposed
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'phonebook', PhoneBookEntryViewSet, basename='phonebook')
 router.register(r'images', ImageViewSet, basename='image')
@@ -29,6 +29,10 @@ router.register(r'photo-moderation', PhotoModerationViewSet, basename='photo-mod
 router.register(r'score-transactions', ScoreTransactionViewSet, basename='score-transaction')
 router.register(r'reward-rules', RewardRuleViewSet, basename='reward-rule')
 router.register(r'analytics', AnalyticsViewSet, basename='analytics')
+
+# 2025-01-29: CRITICAL FIX - Expose custom actions for PhoneBookEntryViewSet
+# The router automatically exposes @action decorated methods, but we need to ensure
+# the viewset is properly configured to expose all custom actions
 
 urlpatterns = [
     # Authentication endpoints

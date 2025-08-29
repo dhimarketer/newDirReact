@@ -1,0 +1,1050 @@
+/* 2025-01-29: REFACTORED - Family tree and relationship management styles */
+
+/* ========================================
+   FAMILY TREE WINDOW STYLES
+   ======================================== */
+
+/* Family Tree Window Overlay */
+.family-tree-window-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.family-tree-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.family-tree-window {
+  position: fixed;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 1000px;
+  min-height: 700px;
+  width: var(--window-width, 1200px);
+  height: var(--window-height, 800px);
+  left: var(--window-left, 50%);
+  top: var(--window-top, 50%);
+}
+
+.family-tree-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 8px 12px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  cursor: move;
+  user-select: none;
+  min-height: 50px !important;
+  max-height: 60px !important;
+}
+
+.family-tree-title h2 {
+  margin: 0 !important;
+  font-size: 1rem !important;
+  font-weight: 600;
+  line-height: 1.2 !important;
+}
+
+.family-tree-subtitle {
+  font-size: 0.75rem !important;
+  opacity: 0.9;
+  margin-top: 1px !important;
+  line-height: 1.1 !important;
+}
+
+.family-tree-controls {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-end !important;
+  min-height: 40px !important;
+  padding: 4px 8px !important;
+  overflow: visible !important;
+  position: relative !important;
+}
+
+/* Ensure all buttons in family tree controls are visible and properly spaced */
+.family-tree-controls button,
+.family-tree-controls .download-dropdown {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  margin: 0 !important;
+  padding: 6px 10px !important;
+  height: 30px !important;
+  min-width: fit-content !important;
+  white-space: nowrap !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+}
+
+/* Force visibility for all buttons in family tree controls */
+.family-tree-controls > * {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Ensure multi-row toggle button is always visible */
+.multi-row-toggle-btn {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  padding: 6px 10px !important;
+  border: 2px solid #10b981 !important;
+  background: #ffffff !important;
+  color: #10b981 !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  min-width: 110px !important;
+  height: 30px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  z-index: 1000 !important;
+  box-sizing: border-box !important;
+}
+
+/* Force the toggle button to be visible even if parent containers have overflow hidden */
+.family-tree-controls .multi-row-toggle-btn {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: static !important;
+  z-index: 1000 !important;
+}
+
+/* Style the download button component specifically */
+.family-tree-controls .relative {
+  display: inline-block !important;
+}
+
+/* Download button base styles */
+.download-btn {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 6px 10px !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+  white-space: nowrap !important;
+  min-width: fit-content !important;
+  height: 30px !important;
+  border: none !important;
+  font-size: 0.75rem !important;
+}
+
+/* Download format toggle button */
+.download-format-toggle {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 6px 8px !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+  height: 30px !important;
+  border: 1px solid #d1d5db !important;
+  background: #f9fafb !important;
+  color: #374151 !important;
+  font-size: 0.75rem !important;
+  margin-left: 4px !important;
+}
+
+.download-format-toggle:hover {
+  background: #f3f4f6 !important;
+  border-color: #9ca3af !important;
+}
+
+.download-format-toggle:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
+
+.download-btn-primary {
+  background: #3b82f6 !important;
+  color: white !important;
+}
+
+.download-btn-primary:hover {
+  background: #2563eb !important;
+}
+
+.download-btn-secondary {
+  background: #6b7280 !important;
+  color: white !important;
+}
+
+.download-btn-secondary:hover {
+  background: #4b5563 !important;
+}
+
+.download-btn-outline {
+  background: transparent !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+.download-btn-outline:hover {
+  background: #f9fafb !important;
+}
+
+.download-btn-sm {
+  padding: 4px 8px !important;
+  font-size: 0.75rem !important;
+  height: 28px !important;
+}
+
+.download-btn-md {
+  padding: 6px 10px !important;
+  font-size: 0.75rem !important;
+  height: 30px !important;
+}
+
+.download-btn-lg {
+  padding: 8px 12px !important;
+  font-size: 0.875rem !important;
+  height: 32px !important;
+}
+
+/* Download dropdown styles */
+.download-dropdown {
+  position: absolute !important;
+  right: 0 !important;
+  top: 100% !important;
+  margin-top: 4px !important;
+  width: 128px !important;
+  background: white !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid #e5e7eb !important;
+  z-index: 50 !important;
+}
+
+.download-dropdown-open {
+  display: block !important;
+}
+
+.download-dropdown-closed {
+  display: none !important;
+}
+
+.download-dropdown-option {
+  width: 100% !important;
+  text-align: left !important;
+  padding: 6px 12px !important;
+  font-size: 0.75rem !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  color: #374151 !important;
+  transition: background-color 0.2s !important;
+}
+
+.download-dropdown-option:hover {
+  background: #f3f4f6 !important;
+}
+
+.download-dropdown-option-active {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+}
+
+.download-dropdown-divider {
+  border-top: 1px solid #f3f4f6 !important;
+  padding-top: 4px !important;
+  margin-top: 4px !important;
+}
+
+.download-dropdown-download-btn {
+  width: 100% !important;
+  text-align: center !important;
+  padding: 6px 12px !important;
+  font-size: 0.75rem !important;
+  background: #3b82f6 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 4px !important;
+  margin: 0 8px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  transition: background-color 0.2s !important;
+}
+
+.download-dropdown-download-btn:hover {
+  background: #2563eb !important;
+}
+
+.download-dropdown-download-btn:disabled {
+  background: #9ca3af !important;
+  cursor: not-allowed !important;
+}
+
+.edit-family-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex !important;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  min-width: fit-content;
+  height: 30px;
+  font-weight: 500;
+}
+
+.edit-family-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.edit-family-btn.active {
+  background: #dc2626;
+}
+
+.edit-family-btn.active:hover {
+  background: #b91c1b;
+}
+
+.delete-family-btn {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex !important;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  min-width: fit-content;
+  height: 30px;
+  font-weight: 500;
+}
+
+.delete-family-btn:hover {
+  background: #b91c1b;
+  transform: translateY(-1px);
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.family-tree-content {
+  flex: 1;
+  padding: 12px;
+  overflow: auto;
+  background: #f8fafc;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: #dc2626;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  text-align: center;
+}
+
+.create-family-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.create-family-btn:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.create-family-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  cursor: se-resize;
+  background: linear-gradient(-45deg, transparent 30%, #cbd5e1 30%, #cbd5e1 40%, transparent 40%);
+}
+
+.resize-handle:hover {
+  background: linear-gradient(-45deg, transparent 30%, #94a3b8 30%, #94a3b8 40%, transparent 40%);
+}
+
+/* ========================================
+   SIMPLE FAMILY TREE STYLES
+   ======================================== */
+
+.simple-family-tree-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #f8fafc;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+}
+
+.svg-container {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+  background: #ffffff;
+  border-radius: 0 0 8px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+  min-width: 0;
+  min-height: 0;
+}
+
+.svg-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.svg-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+
+.svg-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+  border: 2px solid #f1f5f9;
+}
+
+.svg-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.svg-container svg {
+  display: block;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+}
+
+.family-node {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.family-node:hover {
+  filter: brightness(1.1);
+}
+
+.family-node.selected {
+  filter: brightness(1.2) drop-shadow(0 0 8px rgba(220, 38, 38, 0.6));
+}
+
+.node-name {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  dominant-baseline: middle;
+}
+
+.node-role {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 500;
+  dominant-baseline: middle;
+}
+
+.node-contact, .node-address {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 400;
+  dominant-baseline: middle;
+}
+
+.simple-family-tree-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #666;
+  font-style: italic;
+}
+
+.simple-family-tree-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+
+.control-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.control-button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #374151;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.control-button:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+}
+
+.control-button:active {
+  transform: translateY(0);
+}
+
+.control-button.fit-button {
+  background: #10b981;
+  color: white;
+  border-color: #059669;
+}
+
+.control-button.fit-button:hover {
+  background: #059669;
+  border-color: #047857;
+}
+
+.zoom-level {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  min-width: 40px;
+  text-align: center;
+}
+
+.generation-badges {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.generation-badge {
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.generation-badge.grandparent {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+}
+
+.generation-badge.parent {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #60a5fa;
+}
+
+.generation-badge.child {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #34d399;
+}
+
+.simple-family-tree-instructions {
+  padding: 12px 20px;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+  font-size: 12px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.simple-family-tree-instructions p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.simple-family-tree-instructions strong {
+  color: #374151;
+}
+
+/* ========================================
+   CLASSIC FAMILY TREE STYLES
+   ======================================== */
+
+.classic-family-tree-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background: #f8fafc;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.classic-family-tree-svg-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100%;
+  padding: 20px;
+  width: 100%;
+}
+
+.classic-family-tree-svg {
+  max-width: 100%;
+  height: auto;
+  shape-rendering: geometricPrecision;
+  text-rendering: optimizeLegibility;
+  min-width: 100%;
+}
+
+.classic-family-tree-container.multi-row-active {
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.classic-family-tree-svg-wrapper.multi-row {
+  justify-content: flex-start;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.multi-row-node {
+  transition: all 0.3s ease;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.multi-row-node:hover {
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+  transform: translateY(-2px);
+}
+
+.multi-row-connection {
+  transition: stroke-width 0.3s ease;
+}
+
+.multi-row-connection:hover {
+  stroke-width: 3;
+  filter: drop-shadow(0 2px 4px rgba(139, 69, 19, 0.3));
+}
+
+.multi-row-name {
+  dominant-baseline: middle;
+  text-anchor: middle;
+}
+
+.multi-row-contact {
+  dominant-baseline: middle;
+  text-anchor: middle;
+}
+
+.multi-row-address {
+  dominant-baseline: middle;
+  text-anchor: middle;
+}
+
+.connections path {
+  transition: stroke-width 0.2s;
+}
+
+.connections path:hover {
+  stroke-width: 3;
+  filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.3));
+}
+
+.connections line {
+  transition: stroke-width 0.2s;
+}
+
+.connections line:hover {
+  stroke-width: 3;
+  filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.3));
+}
+
+/* ========================================
+   RELATIONSHIP MANAGER STYLES
+   ======================================== */
+
+.relationship-manager {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.relationship-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.relationship-manager-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.relationship-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.relationship-type-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.relationship-type-btn {
+  background: #f3f4f6;
+  border: 2px solid #e5e7eb;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.relationship-type-btn:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.relationship-type-btn.active {
+  background: #3b82f6;
+  border-color: #2563eb;
+  color: white;
+}
+
+.relationship-panel {
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.relationship-panel.active {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.relationship-panel h3 {
+  margin: 0 0 12px 0;
+  color: #1f2937;
+}
+
+.relationship-panel p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.relationship-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.relationship-action-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.relationship-action-btn:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.relationship-action-btn.secondary {
+  background: #6b7280;
+}
+
+.relationship-action-btn.secondary:hover {
+  background: #4b5563;
+}
+
+.relationship-action-btn.danger {
+  background: #dc2626;
+}
+
+.relationship-action-btn.danger:hover {
+  background: #b91c1b;
+}
+
+/* ========================================
+   FAMILY TREE TABS AND CONTROLS
+   ======================================== */
+
+.family-tree-tabs {
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 20px;
+}
+
+.tab-button {
+  padding: 12px 20px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab-button:hover {
+  color: #374151;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.tab-button.active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+  background: white;
+}
+
+.tab-button:first-child {
+  border-top-left-radius: 8px;
+}
+
+.tab-button:last-child {
+  border-top-right-radius: 8px;
+}
+
+.multi-row-toggle-btn {
+  padding: 6px 10px;
+  border: 2px solid #10b981;
+  background: #ffffff;
+  color: #10b981;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 110px;
+  height: 30px;
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.multi-row-toggle-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.multi-row-toggle-btn:hover::before {
+  left: 100%;
+}
+
+.multi-row-toggle-btn:hover {
+  background: #10b981;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.multi-row-toggle-btn.active {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+}
+
+.multi-row-toggle-btn.active:hover {
+  background: #059669;
+  border-color: #059669;
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4);
+}
+
+.layout-indicator {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.layout-indicator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.8s ease;
+}
+
+.layout-indicator:hover::before {
+  left: 100%;
+}
+
+.layout-indicator.multi-row-active {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  border-color: #10b981;
+  color: #065f46;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}

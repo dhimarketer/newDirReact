@@ -2,6 +2,7 @@
 # Based on existing Flask moderation and approval functionality
 
 from django.db import models
+from django.utils import timezone
 from dirReactFinal_core.models import User
 from dirReactFinal_directory.models import PhoneBookEntry
 
@@ -57,7 +58,7 @@ class PendingChange(models.Model):
         self.status = 'approved'
         self.reviewed_by = reviewer
         self.review_notes = notes
-        self.review_date = models.timezone.now()
+        self.review_date = timezone.now()
         self.save()
     
     def reject(self, reviewer, notes=None):
@@ -65,7 +66,7 @@ class PendingChange(models.Model):
         self.status = 'rejected'
         self.reviewed_by = reviewer
         self.review_notes = notes
-        self.review_date = models.timezone.now()
+        self.review_date = timezone.now()
         self.save()
 
 class PhotoModeration(models.Model):
@@ -108,7 +109,7 @@ class PhotoModeration(models.Model):
         self.status = 'approved'
         self.reviewed_by = reviewer
         self.review_notes = notes
-        self.review_date = models.timezone.now()
+        self.review_date = timezone.now()
         self.save()
     
     def reject(self, reviewer, notes=None):
@@ -116,7 +117,7 @@ class PhotoModeration(models.Model):
         self.status = 'rejected'
         self.reviewed_by = reviewer
         self.review_notes = notes
-        self.review_date = models.timezone.now()
+        self.review_date = timezone.now()
         self.save()
 
 class SpamReport(models.Model):

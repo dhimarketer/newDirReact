@@ -2,7 +2,7 @@
 // 2025-01-28: Implements traditional family tree layout with parents at top, children below
 // 2025-01-28: Clean hierarchical structure matching family1.png reference
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef, useCallback } from 'react';
 import { PhoneBookEntry } from '../../types/directory';
 
 interface FamilyMember {
@@ -20,15 +20,136 @@ interface FamilyRelationship {
   is_active: boolean;
 }
 
+interface DraggablePosition {
+  x: number;
+  y: number;
+}
+
 interface ClassicFamilyTreeProps {
   familyMembers: FamilyMember[];
   relationships?: FamilyRelationship[];
+  useMultiRowLayout?: boolean; // 2025-01-29: NEW - Toggle between classic and multi-row layouts
+  svgRef?: React.RefObject<SVGSVGElement>; // 2025-01-29: NEW - Reference to SVG element for download functionality
 }
 
 const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({ 
   familyMembers, 
-  relationships = [] 
+  relationships = [],
+  useMultiRowLayout = false,
+  svgRef
 }) => {
+
+  // 2025-01-29: NEW - Drag and drop functionality for interactive family tree
+  const [draggedMember, setDraggedMember] = useState<number | null>(null);
+  const [memberPositions, setMemberPositions] = useState<Map<number, DraggablePosition>>(new Map());
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // 2025-01-29: NEW - Random positioning for bottom layer members
+  const getRandomOffset = useCallback(() => {
+    return (Math.random() - 0.5) * 60; // Random offset between -30px and +30px
+  }, []);
+
+  // 2025-01-29: NEW - Text truncation utility for long names
+  const truncateText = useCallback((text: string, maxWidth: number, fontSize: number = 12) => {
+    if (!text) return '';
+    
+    // Estimate character width (approximate for monospace-like fonts)
+    const avgCharWidth = fontSize * 0.6;
+    const maxChars = Math.floor(maxWidth / avgCharWidth);
+    
+    if (text.length <= maxChars) return text;
+    
+    // Truncate and add ellipsis
+    return text.substring(0, maxChars - 3) + '...';
+  }, []);
+
+  // 2025-01-29: NEW - Create unique mask ID for each family member
+  const createMaskId = useCallback((memberId: number) => `mask-${memberId}`, []);
+
+  // 2025-01-29: NEW - Text wrapping utility for long names
+  const wrapText = useCallback((text: string, maxWidth: number, fontSize: number = 12) => {
+    if (!text) return '';
+    
+    // Estimate character width (approximate for monospace-like fonts)
+    const avgCharWidth = fontSize * 0.6;
+    const maxChars = Math.floor(maxWidth / avgCharWidth);
+    
+    if (text.length <= maxChars) return text;
+    
+    // Word-based wrapping - ONLY break at spaces, never within words
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+    
+    for (const word of words) {
+      // Check if adding this word would exceed the line limit
+      const testLine = currentLine ? currentLine + ' ' + word : word;
+      
+      if (testLine.length <= maxChars) {
+        // Word fits on current line
+        currentLine = testLine;
+      } else {
+        // Word doesn't fit - start new line
+        if (currentLine) {
+          lines.push(currentLine.trim());
+        }
+        currentLine = word;
+      }
+    }
+    
+    // Add the last line if it has content
+    if (currentLine.trim()) {
+      lines.push(currentLine.trim());
+    }
+    
+    return lines;
+  }, []);
+
+  // 2025-01-29: FIXED - Improved drag event handlers to prevent flickering
+  const handleMouseDown = useCallback((e: React.MouseEvent, memberId: number) => {
+    e.preventDefault();
+    setDraggedMember(memberId);
+    setIsDragging(true);
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    dragOffset.current = { x: 0, y: 0 };
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging || draggedMember === null) return;
+    
+    const deltaX = e.clientX - dragStartPos.current.x;
+    const deltaY = e.clientY - dragStartPos.current.y;
+    
+    // Update the drag offset reference to prevent flickering
+    dragOffset.current = { x: deltaX, y: deltaY };
+    
+    // Force re-render by updating state
+    setMemberPositions(prev => {
+      const newPositions = new Map(prev);
+      newPositions.set(draggedMember, { x: deltaX, y: deltaY });
+      return newPositions;
+    });
+  }, [isDragging, draggedMember]);
+
+  const handleMouseUp = useCallback(() => {
+    if (draggedMember !== null) {
+      // Finalize the position
+      setMemberPositions(prev => {
+        const newPositions = new Map(prev);
+        const currentPos = newPositions.get(draggedMember) || { x: 0, y: 0 };
+        newPositions.set(draggedMember, currentPos);
+        return newPositions;
+      });
+    }
+    setIsDragging(false);
+    setDraggedMember(null);
+    dragOffset.current = { x: 0, y: 0 };
+  }, [draggedMember]);
+
+  // 2025-01-29: NEW - Multi-row layout functionality implemented directly in this component
+
   // Organize family members into classic structure
   const organizedMembers = useMemo(() => {
     // Filter out members without valid pid
@@ -37,7 +158,13 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
     );
 
     if (validMembers.length === 0) {
-      return { parents: [], children: [] };
+      return { 
+        parents: [], 
+        children: [],
+        parentChildMap: new Map(),
+        childParentMap: new Map(),
+        spouseMap: new Map()
+      };
     }
     
     // 2025-01-29: DEBUG - Add parent detection debugging
@@ -309,10 +436,10 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
       const eldest = sortedByAge[0];
       const eldestAge = eldest.entry.age || 0;
       
-      // Step 1: Eldest person becomes parent if they have 10+ year gap to potential children
+      // Step 1: Eldest person becomes parent if they have 12+ year gap to potential children
       console.log(`🔍 STEP 1: Checking if eldest ${eldest.entry.name} (${eldestAge}) can be parent to children`);
       
-      // Find potential children (members with 10+ year age gap from eldest)
+      // Find potential children (members with 12+ year age gap from eldest)
       const potentialChildren: typeof validMembers = [];
       let eldestCanBeParent = false;
       
@@ -321,9 +448,9 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
         const memberAge = member.entry.age || 0;
         const ageDifference = eldestAge - memberAge;
         
-        console.log(`  📏 ${eldest.entry.name} (${eldestAge}) vs ${member.entry.name} (${memberAge}): gap = ${ageDifference} years ${ageDifference >= 10 ? '✅' : '❌'}`);
+        console.log(`  📏 ${eldest.entry.name} (${eldestAge}) vs ${member.entry.name} (${memberAge}): gap = ${ageDifference} years ${ageDifference >= 12 ? '✅' : '❌'}`);
         
-        if (ageDifference >= 10) {
+        if (ageDifference >= 12) {
           potentialChildren.push(member);
           eldestCanBeParent = true;
         }
@@ -332,7 +459,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
       if (eldestCanBeParent) {
         console.log(`    ✅ ${eldest.entry.name} can be parent to ${potentialChildren.length} children`);
       } else {
-        console.log(`    ❌ ${eldest.entry.name} cannot be parent - no children with 10+ year gap`);
+        console.log(`    ❌ ${eldest.entry.name} cannot be parent - no children with 12+ year gap`);
       }
       
       if (eldestCanBeParent) {
@@ -344,7 +471,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
       } else {
         // Eldest cannot be a parent, add to children
         children.push(eldest);
-        console.log(`⚠️ ${eldest.entry.name} (${eldestAge}) cannot be parent - no children with 10+ year gap`);
+        console.log(`⚠️ ${eldest.entry.name} (${eldestAge}) cannot be parent - no children with 12+ year gap`);
         
         // Add all other members to children
         for (let i = 1; i < sortedByAge.length; i++) {
@@ -353,12 +480,12 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
       }
     }
     
-    // Step 2: Find second parent - second most eldest person of different gender with 10+ year gap to non-parents
+    // Step 2: Find second parent - second most eldest person of different gender with 12+ year gap to non-parents
     if (potentialParents.length === 1) {
       const firstParent = potentialParents[0];
       const firstParentGender = firstParent.entry.gender;
       
-      console.log(`🔍 STEP 2: Looking for second parent (different gender than ${firstParent.entry.name} with 10+ year gap to non-parents)`);
+      console.log(`🔍 STEP 2: Looking for second parent (different gender than ${firstParent.entry.name} with 12+ year gap to non-parents)`);
       console.log(`  📋 Current children array (${children.length} members):`, children.map(c => `${c.entry.name} (${c.entry.age})`));
       
       // Find the second eldest person among remaining members (excluding first parent)
@@ -387,19 +514,27 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
             continue;
           }
           
-          // Must have 10+ year gap to all non-parents (children)
+          // Must have 10+ year gap to potential children (those with 10+ year gap from first parent)
           let canBeSecondParent = true;
-          console.log(`    🔍 Checking age gaps against ${children.length} children:`, children.map(c => `${c.entry.name} (${c.entry.age})`));
           
-          for (const child of children) {
+          // Calculate potential children based on first parent's age gap
+          const potentialChildren = sortedByAge.filter(m => {
+            if (m === firstParent || m === member) return false; // Exclude both parents
+            const ageDiff = (firstParent.entry.age || 0) - (m.entry.age || 0);
+            return ageDiff >= 12; // Only those with 12+ year gap from first parent
+          });
+          
+          console.log(`    🔍 Checking age gaps against ${potentialChildren.length} potential children:`, potentialChildren.map(c => `${c.entry.name} (${c.entry.age})`));
+          
+          for (const child of potentialChildren) {
             const childAge = child.entry.age || 0;
             const ageDifference = memberAge - childAge;
             
-            console.log(`    📏 ${member.entry.name} (${memberAge}) vs ${child.entry.name} (${childAge}): gap = ${ageDifference} years ${ageDifference >= 10 ? '✅' : '❌'}`);
+            console.log(`    📏 ${member.entry.name} (${memberAge}) vs ${child.entry.name} (${childAge}): gap = ${ageDifference} years ${ageDifference >= 12 ? '✅' : '❌'}`);
             
-            if (ageDifference < 10) {
+            if (ageDifference < 12) {
               canBeSecondParent = false;
-              console.log(`      ❌ Cannot be parent to ${child.entry.name} - age gap too small (${ageDifference} < 10)`);
+              console.log(`      ❌ Cannot be parent to ${child.entry.name} - age gap too small (${ageDifference} < 12)`);
               break;
             }
           }
@@ -436,7 +571,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
           const memberAge = member.entry.age || 0;
           const ageDifference = parentAge - memberAge;
           
-          if (ageDifference >= 10) {
+          if (ageDifference >= 12) {
             console.log(`  ✅ ${member.entry.name} (${memberAge}) can be child to ${parent.entry.name} (${parentAge}) - gap: ${ageDifference} years`);
             return true;
           }
@@ -483,18 +618,37 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
     const nodeWidth = 120;
     const nodeHeight = 80;
     
-    // 2025-01-28: FIXED - Use fixed spacing and center the tree properly
-    // Use fixed spacing between nodes for consistent layout
-    const fixedSpacing = 60; // Fixed spacing between nodes
+    // 2025-01-29: FIXED - Improved spacing and container sizing for better fit
+    const fixedSpacing = 40; // Reduced spacing for better fit
     
     // Calculate total width needed for each generation with fixed spacing
     const totalParentWidth = parentCount * nodeWidth + (parentCount > 1 ? (parentCount - 1) * fixedSpacing : 0);
     const totalChildWidth = childCount * nodeWidth + (childCount > 1 ? (childCount - 1) * fixedSpacing : 0);
     
-    // Use container width (1000px) with margins
-    const containerWidth = 1000;
-    const margin = 40;
-    const availableWidth = containerWidth - margin;
+    // 2025-01-29: FIXED - Dynamic container sizing based on actual content needs
+    const minContainerWidth = Math.max(totalParentWidth, totalChildWidth) + 100; // Add 100px margin
+    const containerWidth = useMultiRowLayout ? Math.max(1600, minContainerWidth) : Math.max(1000, minContainerWidth);
+    const margin = 50; // Increased margin for better spacing
+    const availableWidth = containerWidth - (2 * margin);
+    
+    // 2025-01-29: ENHANCED - Dynamic height calculation based on layout needs
+    const baseHeight = 200; // Reduced base height for parents and connections
+    const childRowHeight = nodeHeight + 20; // Reduced spacing between rows
+    
+    // Calculate optimal height based on number of children and layout mode
+    let optimalHeight = baseHeight;
+    if (useMultiRowLayout && childCount > 8) {
+      // Multi-row layout: calculate height based on number of rows needed
+      const maxChildrenPerRow = Math.ceil(Math.sqrt(childCount));
+      const numRows = Math.ceil(childCount / maxChildrenPerRow);
+      optimalHeight = baseHeight + (numRows * childRowHeight) + 20; // Add small margin
+    } else if (childCount > 0) {
+      // Single-row layout: add height for children with minimal spacing
+      optimalHeight = baseHeight + childRowHeight + 10; // Add small margin
+    }
+    
+    // Ensure minimum height for visual appeal
+    optimalHeight = Math.max(optimalHeight, 250);
     
     return {
       nodeWidth,
@@ -502,10 +656,11 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
       parentSpacing: fixedSpacing,
       childSpacing: fixedSpacing,
       totalWidth: availableWidth,
-      totalHeight: 300,
-      containerWidth: availableWidth
+      totalHeight: optimalHeight,
+      containerWidth: containerWidth,
+      margin: margin
     };
-  }, [organizedMembers]);
+  }, [organizedMembers, useMultiRowLayout]);
 
   // 2025-01-28: Helper function to calculate centered positions
   const calculateCenteredPosition = (index: number, totalCount: number, spacing: number) => {
@@ -626,19 +781,29 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
     );
   }
 
-  const { nodeWidth, nodeHeight, parentSpacing, childSpacing, totalWidth, totalHeight } = treeDimensions;
+  // 2025-01-29: ENHANCED - Using treeDimensions directly for better multi-row support
 
   return (
     <div className="classic-family-tree">
-      <div className="classic-family-tree-container">
+      {/* 2025-01-29: ENHANCED - Added layout indicator */}
+      {useMultiRowLayout && familyMembers.length > 6 && (
+        <div className="layout-indicator multi-row-active">
+          📐 Multi-row layout active - Family members arranged in multiple rows
+        </div>
+      )}
+      
+      <div className={`classic-family-tree-container ${useMultiRowLayout ? 'multi-row-active' : ''}`}>
         {/* 2025-01-28: FIXED - Use full container width to prevent clipping */}
-        <div className="classic-family-tree-svg-wrapper">
+        <div className={`classic-family-tree-svg-wrapper ${useMultiRowLayout ? 'multi-row' : ''}`}>
           <svg
-            width="100%"
-            height={totalHeight}
-            viewBox={`0 0 ${totalWidth} ${totalHeight}`}
+            ref={svgRef}
+            width={treeDimensions.containerWidth}
+            height={treeDimensions.totalHeight}
+            viewBox={`0 0 ${treeDimensions.containerWidth} ${treeDimensions.totalHeight}`}
             className="classic-family-tree-svg"
-            preserveAspectRatio="xMidYMid meet"
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
           >
             <defs>
               {/* Connection line styles */}
@@ -657,14 +822,20 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
             {/* Parent Generation */}
             <g className="parent-generation">
               {organizedMembers.parents.map((parent, index) => {
-                // 2025-01-28: FIXED - Center-based positioning to prevent clipping
-                // Calculate center position and expand outward
-                const x = calculateCenteredPosition(index, organizedMembers.parents.length, treeDimensions.parentSpacing);
-                const y = 50;
+                // 2025-01-29: ENHANCED - Calculate base position for parents
+                let x = calculateCenteredPosition(index, organizedMembers.parents.length, treeDimensions.parentSpacing);
+                let y = 50;
+                
+                // 2025-01-29: ENHANCED - Apply drag offset if parent has been moved
+                const dragOffset = memberPositions.get(parent.entry.pid);
+                if (dragOffset) {
+                  x += dragOffset.x;
+                  y += dragOffset.y;
+                }
                 
                 return (
                   <g key={parent.entry.pid} className="parent-node">
-                    {/* Parent node */}
+                    {/* Parent node with drag functionality */}
                     <rect
                       x={x}
                       y={y}
@@ -672,22 +843,42 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                       height={treeDimensions.nodeHeight}
                       rx="8"
                       ry="8"
-                      fill="#F5F5DC"
+                      fill="#FFE4B5"
                       stroke="#8B4513"
                       strokeWidth="2"
+                      style={{ cursor: 'grab' }}
+                      onMouseDown={(e) => handleMouseDown(e, parent.entry.pid!)}
                     />
                     
-                    {/* Parent name */}
-                    <text
-                      x={x + treeDimensions.nodeWidth / 2}
-                      y={y + 25}
-                      textAnchor="middle"
-                      fontSize="12"
-                      fontWeight="600"
-                      fill="#8B4513"
+                    {/* Parent name with text wrapping */}
+                    <foreignObject
+                      x={x + 5}
+                      y={y + 10}
+                      width={treeDimensions.nodeWidth - 10}
+                      height={30}
+                      style={{ overflow: 'hidden' }}
                     >
-                      {formatNameWithAge(parent.entry.name, parent)}
-                    </text>
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: '#8B4513',
+                          textAlign: 'center',
+                          lineHeight: '1.2',
+                          wordWrap: 'normal',
+                          overflowWrap: 'normal',
+                          wordBreak: 'normal',
+                          hyphens: 'none',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title={formatNameWithAge(parent.entry.name, parent)}
+                      >
+                        {formatNameWithAge(parent.entry.name, parent)}
+                      </div>
+                    </foreignObject>
                     
                     {/* Parent contact */}
                     <text
@@ -698,6 +889,17 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                       fill="#8B4513"
                     >
                       {parent.entry.contact}
+                    </text>
+                    
+                    {/* Parent address */}
+                    <text
+                      x={x + treeDimensions.nodeWidth / 2}
+                      y={y + 55}
+                      textAnchor="middle"
+                      fontSize="8"
+                      fill="#8B4513"
+                    >
+                      {parent.entry.address}
                     </text>
                   </g>
                 );
@@ -735,13 +937,13 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                   />
                 )}
 
-                {/* Vertical connection from parents to children */}
+                {/* 2025-01-29: ENHANCED - Optimized vertical connection from parents to children */}
                 {organizedMembers.children.length > 0 && (
                   <line
                     x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
                     y1={50 + treeDimensions.nodeHeight}
                     x2={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
-                    y2={200}
+                    y2={130}
                     stroke="#8B4513"
                     strokeWidth="2"
                     markerEnd="url(#arrowhead-classic)"
@@ -750,65 +952,309 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
               </>
             )}
 
-            {/* Child Generation */}
+            {/* Child Generation - 2025-01-29: ENHANCED with unified layout logic */}
             <g className="child-generation">
-              {organizedMembers.children.map((child, index) => {
-                // 2025-01-28: FIXED - Center-based positioning to prevent clipping
-                // Calculate center position and expand outward
-                const x = calculateCenteredPosition(index, organizedMembers.children.length, treeDimensions.childSpacing);
-                const y = 220;
+              {(() => {
+                // 2025-01-29: UNIFIED LAYOUT LOGIC - Single consistent approach for both layouts
+                const totalChildren = organizedMembers.children.length;
                 
-                return (
-                  <g key={child.entry.pid} className="child-node">
-                    {/* Child node */}
-                    <rect
-                      x={x}
-                      y={y}
-                      width={treeDimensions.nodeWidth}
-                      height={treeDimensions.nodeHeight}
-                      rx="8"
-                      ry="8"
-                      fill="#F0F8FF"
-                      stroke="#8B4513"
-                      strokeWidth="2"
-                    />
+                if (totalChildren === 0) return null;
+                
+                // 2025-01-29: ENHANCED - Unified space calculation for optimal fit
+                const containerWidth = treeDimensions.containerWidth;
+                const margin = treeDimensions.margin;
+                const availableWidth = containerWidth - (2 * margin);
+                const availableHeight = treeDimensions.totalHeight - 200; // Reserve 200px for parents and connections
+                
+                // 2025-01-29: ENHANCED - Automatic layout decision based on available space
+                const singleRowWidth = totalChildren * treeDimensions.nodeWidth + (totalChildren > 1 ? (totalChildren - 1) * 20 : 0);
+                const useMultiRow = useMultiRowLayout && (singleRowWidth > availableWidth || totalChildren > 8);
+                
+                if (useMultiRow) {
+                  console.log('🔄 CREATING UNIFIED MULTI-ROW LAYOUT');
+                  
+                  // 2025-01-29: ENHANCED - Optimal row distribution based on available space
+                  const maxChildrenPerRow = Math.ceil(Math.sqrt(totalChildren)); // Square root for balanced distribution
+                  const numRows = Math.ceil(totalChildren / maxChildrenPerRow);
+                  
+                  // Create rows with balanced distribution
+                  const rows: Array<Array<{ child: FamilyMember; index: number }>> = Array.from({ length: numRows }, () => []);
+                  
+                  organizedMembers.children.forEach((child, index) => {
+                    const rowIndex = Math.floor(index / maxChildrenPerRow);
+                    rows[rowIndex].push({ child, index });
+                  });
+                  
+                  console.log(`📐 Unified multi-row distribution: ${totalChildren} children, ${numRows} rows, ${maxChildrenPerRow} max per row`);
+                  
+                  // 2025-01-29: ENHANCED - Unified positioning calculation for all rows
+                  const rowPositions = rows.map((row, rowIndex) => {
+                    if (row.length === 0) return { startX: 0, spacing: 0 };
                     
-                    {/* Child name */}
-                    <text
-                      x={x + treeDimensions.nodeWidth / 2}
-                      y={y + 25}
-                      textAnchor="middle"
-                      fontSize="12"
-                      fontWeight="600"
-                      fill="#8B4513"
-                    >
-                      {formatNameWithAge(child.entry.name, child)}
-                    </text>
+                    const totalNodeWidth = row.length * treeDimensions.nodeWidth;
+                    const remainingSpace = availableWidth - totalNodeWidth;
+                    const optimalSpacing = row.length > 1 ? remainingSpace / (row.length - 1) : 0;
+                    const finalSpacing = Math.max(optimalSpacing, 15); // Minimum 15px spacing for tight fit
+                    const totalRowWidth = totalNodeWidth + ((row.length - 1) * finalSpacing);
+                    const startX = margin + (availableWidth - totalRowWidth) / 2;
                     
-                    {/* Child contact */}
-                    <text
-                      x={x + treeDimensions.nodeWidth / 2}
-                      y={y + 40}
-                      textAnchor="middle"
-                      fontSize="9"
-                      fill="#8B4513"
-                    >
-                      {child.entry.contact}
-                    </text>
+                    return { startX, spacing: finalSpacing };
+                  });
+                  
+                  // 2025-01-29: ENHANCED - Unified rendering with optimal vertical distribution
+                  const rowHeight = treeDimensions.nodeHeight + 30; // 30px gap between rows
+                  const totalRowsHeight = numRows * rowHeight;
+                  const startY = 180 + (availableHeight - totalRowsHeight) / 2; // Center rows vertically
+                  
+                  return rows.flatMap((row, rowIndex) => 
+                    row.map(({ child, index }, colIndex) => {
+                      const { startX, spacing } = rowPositions[rowIndex];
+                      
+                      let x: number;
+                      let y: number;
+                      
+                      if (rowIndex === 0) {
+                        // Top row: normal positioning
+                        x = startX + (colIndex * (treeDimensions.nodeWidth + spacing));
+                        y = startY;
+                      } else {
+                        // Bottom rows: staggered positioning between top row children with random offset
+                        const topRowSpacing = rowPositions[0].spacing;
+                        const topRowStartX = rowPositions[0].startX;
+                        
+                        // 2025-01-29: ENHANCED - Add random horizontal offset for natural variation
+                        const randomOffset = getRandomOffset();
+                        
+                        // Calculate position between top row children
+                        if (colIndex === 0) {
+                          // First child in row goes between first and second top row children
+                          x = topRowStartX + (treeDimensions.nodeWidth / 2) + (topRowSpacing / 2) + randomOffset;
+                        } else if (colIndex === row.length - 1) {
+                          // Last child in row goes between last and second-to-last top row children
+                          const lastTopRowIndex = rows[0].length - 1;
+                          x = topRowStartX + (lastTopRowIndex * (treeDimensions.nodeWidth + topRowSpacing)) + (treeDimensions.nodeWidth / 2) - (topRowSpacing / 2) + randomOffset;
+                        } else {
+                          // Middle children go between corresponding top row children
+                          const topRowIndex = colIndex + 1; // Offset by 1 to position between top row children
+                          x = topRowStartX + (topRowIndex * (treeDimensions.nodeWidth + topRowSpacing)) + (treeDimensions.nodeWidth / 2) + randomOffset;
+                        }
+                        
+                        y = startY + (rowIndex * rowHeight);
+                      }
+                      
+                      // 2025-01-29: ENHANCED - Apply drag offset if member has been moved
+                      const dragOffset = memberPositions.get(child.entry.pid);
+                      if (dragOffset) {
+                        x += dragOffset.x;
+                        y += dragOffset.y;
+                      }
+                      
+                      // 2025-01-29: ENHANCED - Unified connection logic for all layouts
+                      const parentCenterX = calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2;
+                      const parentBottomY = 130;
+                      const childTopY = y;
+                      
+                      // 2025-01-29: FIXED - Adjusted control points to prevent arrow overlap with nodes
+                      const controlPoint1X = parentCenterX;
+                      const controlPoint1Y = parentBottomY + (childTopY - parentBottomY) / 2;
+                      const controlPoint2X = x + treeDimensions.nodeWidth / 2;
+                      const controlPoint2Y = childTopY - 15;
+                      
+                      const pathData = `M ${parentCenterX} ${parentBottomY} C ${controlPoint1X} ${controlPoint1Y} ${controlPoint2X} ${controlPoint2Y} ${x + treeDimensions.nodeWidth / 2} ${childTopY}`;
+                      
+                      return (
+                        <g key={child.entry.pid} className="child-node multi-row">
+                          {/* Curved connection line from parent to child */}
+                          <path
+                            d={pathData}
+                            fill="none"
+                            stroke="#8B4513"
+                            strokeWidth="2"
+                            markerEnd="url(#arrowhead-classic)"
+                            className="multi-row-connection"
+                          />
+                          
+                          {/* Child node with drag functionality */}
+                          <rect
+                            x={x}
+                            y={y}
+                            width={treeDimensions.nodeWidth}
+                            height={treeDimensions.nodeHeight}
+                            rx="8"
+                            ry="8"
+                            fill="#F0F8FF"
+                            stroke="#8B4513"
+                            strokeWidth="2"
+                            className="multi-row-node"
+                            style={{ cursor: 'grab' }}
+                            onMouseDown={(e) => handleMouseDown(e, child.entry.pid!)}
+                          />
+                          
+                          {/* Child name with text wrapping */}
+                          <foreignObject
+                            x={x + 5}
+                            y={y + 10}
+                            width={treeDimensions.nodeWidth - 10}
+                            height={30}
+                            style={{ overflow: 'hidden' }}
+                          >
+                            <div
+                              style={{
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                color: '#8B4513',
+                                textAlign: 'center',
+                                lineHeight: '1.2',
+                                wordWrap: 'normal',
+                                overflowWrap: 'normal',
+                                wordBreak: 'normal',
+                                hyphens: 'none',
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              title={formatNameWithAge(child.entry.name, child)}
+                            >
+                              {formatNameWithAge(child.entry.name, child)}
+                            </div>
+                          </foreignObject>
+                          
+                          {/* Child contact with truncation */}
+                          <text
+                            x={x + treeDimensions.nodeWidth / 2}
+                            y={y + 40}
+                            textAnchor="middle"
+                            fontSize="9"
+                            fill="#8B4513"
+                            className="multi-row-contact"
+                          >
+                            {child.entry.contact}
+                          </text>
+                          
+                          {/* Child address with truncation */}
+                          <text
+                            x={x + treeDimensions.nodeWidth / 2}
+                            y={y + 55}
+                            textAnchor="middle"
+                            fontSize="8"
+                            fill="#8B4513"
+                            className="multi-row-address"
+                          >
+                            {child.entry.address}
+                          </text>
+                        </g>
+                      );
+                    })
+                  );
+                } else {
+                  // 2025-01-29: ENHANCED - Unified single-row layout with optimal space utilization
+                  console.log('🔄 CREATING UNIFIED SINGLE-ROW LAYOUT');
+                  
+                  // Calculate optimal spacing for maximum space utilization
+                  const totalWidth = totalChildren * treeDimensions.nodeWidth;
+                  const optimalSpacing = totalChildren > 1 ? (availableWidth - totalWidth) / (totalChildren - 1) : 0;
+                  const finalSpacing = Math.max(optimalSpacing, 15); // Minimum 15px spacing for tight fit
+                  
+                  // Center the row vertically in available space
+                  const y = 180 + (availableHeight - treeDimensions.nodeHeight) / 2;
+                  
+                  return organizedMembers.children.map((child, index) => {
+                    // Calculate position with optimal spacing
+                    let x = calculateCenteredPosition(index, totalChildren, finalSpacing);
+                    let y = 180 + (availableHeight - treeDimensions.nodeHeight) / 2;
                     
-                    {/* Connection line from main vertical to child */}
-                    <line
-                      x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
-                      y1={200}
-                      x2={x + treeDimensions.nodeWidth / 2}
-                      y2={y + treeDimensions.nodeHeight / 2}
-                      stroke="#8B4513"
-                      strokeWidth="1"
-                      markerEnd="url(#arrowhead-classic)"
-                    />
-                  </g>
-                );
-              })}
+                    // 2025-01-29: ENHANCED - Apply drag offset if member has been moved
+                    const dragOffset = memberPositions.get(child.entry.pid);
+                    if (dragOffset) {
+                      x += dragOffset.x;
+                      y += dragOffset.y;
+                    }
+                    
+                    return (
+                      <g key={child.entry.pid} className="child-node">
+                        {/* Child node with drag functionality */}
+                        <rect
+                          x={x}
+                          y={y}
+                          width={treeDimensions.nodeWidth}
+                          height={treeDimensions.nodeHeight}
+                          rx="8"
+                          ry="8"
+                          fill="#F0F8FF"
+                          stroke="#8B4513"
+                          strokeWidth="2"
+                          style={{ cursor: 'grab' }}
+                          onMouseDown={(e) => handleMouseDown(e, child.entry.pid!)}
+                        />
+                        
+                        {/* Child name with text wrapping */}
+                        <foreignObject
+                          x={x + 5}
+                          y={y + 10}
+                          width={treeDimensions.nodeWidth - 10}
+                          height={30}
+                          style={{ overflow: 'hidden' }}
+                        >
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              color: '#8B4513',
+                              textAlign: 'center',
+                              lineHeight: '1.2',
+                              wordWrap: 'normal',
+                              overflowWrap: 'normal',
+                              wordBreak: 'normal',
+                              hyphens: 'none',
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            title={formatNameWithAge(child.entry.name, child)}
+                          >
+                            {formatNameWithAge(child.entry.name, child)}
+                          </div>
+                        </foreignObject>
+                        
+                        {/* Child contact */}
+                        <text
+                          x={x + treeDimensions.nodeWidth / 2}
+                          y={y + 40}
+                          textAnchor="middle"
+                          fontSize="9"
+                          fill="#8B4513"
+                        >
+                          {child.entry.contact}
+                        </text>
+                        
+                        {/* Child address */}
+                        <text
+                          x={x + treeDimensions.nodeWidth / 2}
+                          y={y + 55}
+                          textAnchor="middle"
+                          fontSize="8"
+                          fill="#8B4513"
+                        >
+                          {child.entry.address}
+                        </text>
+                        
+                        {/* 2025-01-29: ENHANCED - Optimized connection line from main vertical to child */}
+                        <line
+                          x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
+                          y1={130}
+                          x2={x + treeDimensions.nodeWidth / 2}
+                          y2={y - 5}
+                          stroke="#8B4513"
+                          strokeWidth="1"
+                          markerEnd="url(#arrowhead-classic)"
+                        />
+                      </g>
+                    );
+                  });
+                }
+              })()}
             </g>
           </svg>
         </div>

@@ -2,6 +2,7 @@
 # Comprehensive testing of all API endpoints
 
 import json
+import pytest
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -9,7 +10,7 @@ from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from dirReactFinal_core.models import User, UserPermission, EventLog
+from dirReactFinal_core.models import User, UserPermission, EventLog, Atoll, Island, Party
 from dirReactFinal_directory.models import PhoneBookEntry, Image
 from dirReactFinal_family.models import FamilyGroup, FamilyMember
 from dirReactFinal_moderation.models import PendingChange, PhotoModeration
@@ -17,6 +18,7 @@ from dirReactFinal_scoring.models import ScoreTransaction, RewardRule
 
 User = get_user_model()
 
+@pytest.mark.django_db
 class BaseTestCase(APITestCase):
     """Base test case with common setup"""
     
@@ -87,7 +89,6 @@ class BaseTestCase(APITestCase):
         UserPermission.objects.create(
             user_type='premium',
             module='family',
-            can_read=True,
             can_write=True,
             can_delete=True,
             can_admin=False
@@ -102,13 +103,23 @@ class BaseTestCase(APITestCase):
             can_admin=True
         )
         
+        # Create Atoll, Island, and Party objects first
+        self.male_atoll = Atoll.objects.create(name='Male')
+        self.addu_atoll = Atoll.objects.create(name='Addu')
+        
+        self.male_island = Island.objects.create(name='Male City', atoll='Male')
+        self.hithadhoo_island = Island.objects.create(name='Hithadhoo', atoll='Addu')
+        
+        self.test_party = Party.objects.create(name='Test Party', short_name='TP')
+        
         # Create test phonebook entries
         self.contact1 = PhoneBookEntry.objects.create(
             name='John Doe',
             contact='7771234',
             address='123 Main Street',
-            atoll='Male',
-            island='Male City',
+            atoll=self.male_atoll,
+            island=self.male_island,
+            party=self.test_party,
             status='active'
         )
         
@@ -116,8 +127,9 @@ class BaseTestCase(APITestCase):
             name='Jane Smith',
             contact='7775678',
             address='456 Oak Avenue',
-            atoll='Addu',
-            island='Hithadhoo',
+            atoll=self.addu_atoll,
+            island=self.hithadhoo_island,
+            party=self.test_party,
             status='active'
         )
         
@@ -140,6 +152,7 @@ class BaseTestCase(APITestCase):
         # Set up API client
         self.client = APIClient()
 
+@pytest.mark.django_db
 class AuthenticationTestCase(BaseTestCase):
     """Test authentication endpoints"""
     
@@ -213,6 +226,7 @@ class AuthenticationTestCase(BaseTestCase):
         has_password_error = 'password_confirm' in response.data or 'non_field_errors' in response.data
         self.assertTrue(has_password_error, f"Expected password mismatch error, got: {response.data}")
 
+@pytest.mark.django_db
 class PhoneBookEntryTestCase(BaseTestCase):
     """Test phonebook entry endpoints"""
     
@@ -321,6 +335,7 @@ class PhoneBookEntryTestCase(BaseTestCase):
         self.assertEqual(self.contact1.status, 'inactive')
         self.assertEqual(self.contact2.status, 'inactive')
 
+@pytest.mark.django_db
 class UserManagementTestCase(BaseTestCase):
     """Test user management endpoints"""
     
@@ -369,6 +384,7 @@ class UserManagementTestCase(BaseTestCase):
         ).first()
         self.assertIsNotNone(event_log)
 
+@pytest.mark.django_db
 class FamilyManagementTestCase(BaseTestCase):
     """Test family management endpoints"""
     
@@ -413,6 +429,7 @@ class FamilyManagementTestCase(BaseTestCase):
         self.assertEqual(response.data['name'], 'Doe Family')
         self.assertEqual(response.data['member_count'], 0)
 
+@pytest.mark.django_db
 class ModerationTestCase(BaseTestCase):
     """Test moderation endpoints"""
     
@@ -451,6 +468,7 @@ class ModerationTestCase(BaseTestCase):
         self.assertEqual(self.pending_change.status, 'rejected')
         self.assertEqual(self.pending_change.reviewed_by, self.admin_user)
 
+@pytest.mark.django_db
 class AnalyticsTestCase(BaseTestCase):
     """Test analytics endpoints"""
     
@@ -478,6 +496,7 @@ class AnalyticsTestCase(BaseTestCase):
         self.assertEqual(response.data['overview']['total_families'], 1)
         self.assertEqual(response.data['overview']['pending_changes'], 1)
 
+@pytest.mark.django_db
 class HealthCheckTestCase(BaseTestCase):
     """Test health check endpoint"""
     
@@ -492,6 +511,7 @@ class HealthCheckTestCase(BaseTestCase):
         self.assertEqual(response.data['database'], 'connected')
         self.assertEqual(response.data['version'], '1.0.0')
 
+@pytest.mark.django_db
 class PermissionTestCase(BaseTestCase):
     """Test permission system"""
     
@@ -537,6 +557,7 @@ class PermissionTestCase(BaseTestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+@pytest.mark.django_db
 class FilterTestCase(BaseTestCase):
     """Test filtering and search functionality"""
     
