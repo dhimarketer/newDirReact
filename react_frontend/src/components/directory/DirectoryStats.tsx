@@ -25,12 +25,12 @@ const DirectoryStats: React.FC<DirectoryStatsProps> = ({ stats, isLoading = fals
   }
 
   // Get top atolls
-  const topAtolls = Object.entries(stats.entries_by_atoll)
+  const topAtolls = Object.entries(stats.entries_by_atoll || {})
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5);
 
   // Get top professions
-  const topProfessions = Object.entries(stats.entries_by_profession)
+  const topProfessions = Object.entries(stats.entries_by_profession || {})
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5);
 
@@ -50,7 +50,7 @@ const DirectoryStats: React.FC<DirectoryStatsProps> = ({ stats, isLoading = fals
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Total Entries</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.total_entries.toLocaleString()}</p>
+              <p className="text-2xl font-semibold text-gray-900">{(stats.total_entries || 0).toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -67,7 +67,7 @@ const DirectoryStats: React.FC<DirectoryStatsProps> = ({ stats, isLoading = fals
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Recent Additions</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.recent_additions.toLocaleString()}</p>
+              <p className="text-2xl font-semibold text-gray-900">{(stats.recent_additions || 0).toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -84,7 +84,7 @@ const DirectoryStats: React.FC<DirectoryStatsProps> = ({ stats, isLoading = fals
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Pending Changes</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.pending_changes.toLocaleString()}</p>
+              <p className="text-2xl font-semibold text-gray-900">{(stats.pending_changes || 0).toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -102,7 +102,7 @@ const DirectoryStats: React.FC<DirectoryStatsProps> = ({ stats, isLoading = fals
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Gender Distribution</p>
               <p className="text-2xl font-semibold text-gray-900">
-                {stats.entries_by_gender.male || 0}M / {stats.entries_by_gender.female || 0}F
+                {(stats.entries_by_gender?.male || 0)}M / {(stats.entries_by_gender?.female || 0)}F
               </p>
             </div>
           </div>
@@ -120,10 +120,10 @@ const DirectoryStats: React.FC<DirectoryStatsProps> = ({ stats, isLoading = fals
                 <span className="text-sm font-medium text-gray-700">{atoll}</span>
                 <div className="flex items-center">
                   <div className="w-24 bg-gray-200 rounded-full h-2 mr-3">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${(count / stats.total_entries) * 100}%` }}
-                    ></div>
+                                      <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(count / (stats.total_entries || 1)) * 100}%` }}
+                  ></div>
                   </div>
                   <span className="text-sm text-gray-500 w-12 text-right">{count.toLocaleString()}</span>
                 </div>
@@ -141,10 +141,10 @@ const DirectoryStats: React.FC<DirectoryStatsProps> = ({ stats, isLoading = fals
                 <span className="text-sm font-medium text-gray-700">{profession}</span>
                 <div className="flex items-center">
                   <div className="w-24 bg-gray-200 rounded-full h-2 mr-3">
-                    <div 
-                      className="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                      style={{ width: `${(count / stats.total_entries) * 100}%` }}
-                    ></div>
+                                      <div 
+                    className="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${(count / (stats.total_entries || 1)) * 100}%` }}
+                  ></div>
                   </div>
                   <span className="text-sm text-gray-500 w-12 text-right">{count.toLocaleString()}</span>
                 </div>

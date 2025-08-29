@@ -62,7 +62,6 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile = false }) => {
       console.log('Adding admin navigation items');
       baseNavigation.push({ name: 'Settings', href: '/settings', icon: Settings });
       baseNavigation.push({ name: 'Admin', href: '/admin', icon: Shield });
-      baseNavigation.push({ name: 'Admin Image Search', href: '/admin-image-search', icon: Image });
     } else {
       console.log('User is not admin, not adding admin navigation');
     }

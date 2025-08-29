@@ -1321,18 +1321,7 @@ const FamilyTreeVisualization: React.FC<FamilyTreeVisualizationProps> = ({
         
         {/* Remove separate age display since it's now part of the name */}
         
-        {/* 2025-01-28: Contact number */}
-        {member.entry.contact && (
-          <text
-            x={node.x + node.width / 2}
-            y={node.y + 35}
-            textAnchor="middle"
-            fontSize="10"
-            fill="#6b7280"
-          >
-            {member.entry.contact}
-          </text>
-        )}
+        {/* 2025-01-29: Removed contact number display - keeping only member names for cleaner family tree */}
         
         {/* 2025-01-28: Selection indicators */}
         {isSelected && (

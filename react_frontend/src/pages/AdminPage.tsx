@@ -3,7 +3,7 @@
 import React from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../store/authStore';
-import { Image, Users, Settings, Shield, Database, BarChart3, FileText, UserCheck } from 'lucide-react';
+import { Users, Settings, Shield, Database, BarChart3, FileText, UserCheck } from 'lucide-react';
 
 const AdminPage: React.FC = () => {
   const { user, isLoading } = useAuth();
@@ -23,13 +23,6 @@ const AdminPage: React.FC = () => {
   }
 
   const adminFeatures = [
-    {
-      title: 'Image Search',
-      description: 'View all users with images as visual tiles for easy identification',
-      icon: Image,
-      href: '/admin-image-search',
-      color: 'bg-blue-500 hover:bg-blue-600'
-    },
     {
       title: 'User Management',
       description: 'Manage user accounts, permissions, and access levels',
@@ -125,7 +118,7 @@ const AdminPage: React.FC = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -142,21 +135,7 @@ const AdminPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Image className="w-6 h-6 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Users with Images</p>
-              <p className="text-2xl font-bold text-gray-900">
-                <Link to="/admin-image-search" className="text-green-600 hover:text-green-800">
-                  View Images
-                </Link>
-              </p>
-            </div>
-          </div>
-        </div>
+
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">

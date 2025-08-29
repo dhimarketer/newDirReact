@@ -16,7 +16,7 @@ import SearchPage from './pages/SearchPage';
 import DirectoryPage from './pages/DirectoryPage';
 import FamilyPage from './pages/FamilyPage';
 import AdminPage from './pages/AdminPage';
-import AdminImageSearchPage from './pages/AdminImageSearchPage';
+
 import AdminUserManagementPage from './pages/AdminUserManagementPage';
 import SettingsPage from './pages/SettingsPage';
 import PremiumImageSearchPage from './pages/PremiumImageSearchPage';
@@ -45,7 +45,7 @@ function AppRoutes() {
         <Route path="family" element={<FamilyPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="admin" element={<AdminPage />} />
-        <Route path="admin-image-search" element={<AdminImageSearchPage />} />
+
         <Route path="admin/users" element={<AdminUserManagementPage />} />
         <Route path="premium-image-search" element={<PremiumImageSearchPage />} />
       </Route>

@@ -1120,29 +1120,20 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                             </div>
                           </foreignObject>
                           
-                          {/* Child contact with truncation */}
-                          <text
-                            x={x + treeDimensions.nodeWidth / 2}
-                            y={y + 40}
-                            textAnchor="middle"
-                            fontSize="9"
-                            fill="#8B4513"
-                            className="multi-row-contact"
-                          >
-                            {child.entry.contact}
-                          </text>
+                          {/* 2025-01-29: Removed contact display - keeping only member names for cleaner family tree */}
                           
-                          {/* Child address with truncation */}
-                          <text
-                            x={x + treeDimensions.nodeWidth / 2}
-                            y={y + 55}
-                            textAnchor="middle"
-                            fontSize="8"
-                            fill="#8B4513"
-                            className="multi-row-address"
-                          >
-                            {child.entry.address}
-                          </text>
+                          {/* 2025-01-29: Removed address display - keeping only member names for cleaner family tree */}
+                          
+                          {/* 2025-01-29: ENHANCED - Optimized connection line from main vertical to child */}
+                          <line
+                            x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
+                            y1={130}
+                            x2={x + treeDimensions.nodeWidth / 2}
+                            y2={y - 5}
+                            stroke="#8B4513"
+                            strokeWidth="1"
+                            markerEnd="url(#arrowhead-classic)"
+                          />
                         </g>
                       );
                     })
@@ -1218,27 +1209,9 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                           </div>
                         </foreignObject>
                         
-                        {/* Child contact */}
-                        <text
-                          x={x + treeDimensions.nodeWidth / 2}
-                          y={y + 40}
-                          textAnchor="middle"
-                          fontSize="9"
-                          fill="#8B4513"
-                        >
-                          {child.entry.contact}
-                        </text>
+                        {/* 2025-01-29: Removed contact display - keeping only member names for cleaner family tree */}
                         
-                        {/* Child address */}
-                        <text
-                          x={x + treeDimensions.nodeWidth / 2}
-                          y={y + 55}
-                          textAnchor="middle"
-                          fontSize="8"
-                          fill="#8B4513"
-                        >
-                          {child.entry.address}
-                        </text>
+                        {/* 2025-01-29: Removed address display - keeping only member names for cleaner family tree */}
                         
                         {/* 2025-01-29: ENHANCED - Optimized connection line from main vertical to child */}
                         <line
