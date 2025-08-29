@@ -72,6 +72,10 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   // 2025-01-29: NEW - State for multi-row layout toggle
   const [useMultiRowLayout, setUseMultiRowLayout] = useState(false);
   
+  // 2025-01-29: NEW - State for tracking unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  
   const windowRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const resizeHandleRef = useRef<HTMLDivElement>(null);
@@ -321,6 +325,8 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     if (familyGroupData && familyGroupData.id) {
       markFamilyAsManuallyUpdated(familyGroupData.id);
     }
+    // 2025-01-29: NEW - Track unsaved changes
+    setHasUnsavedChanges(true);
     console.log('Relationships updated:', updatedRelationships);
   };
 
@@ -331,6 +337,8 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     if (familyGroupData && familyGroupData.id) {
       markFamilyAsManuallyUpdated(familyGroupData.id);
     }
+    // 2025-01-29: NEW - Track unsaved changes
+    setHasUnsavedChanges(true);
     console.log('Family members updated:', updatedMembers);
   };
   
@@ -386,6 +394,35 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     }
   };
 
+  // 2025-01-29: NEW - Function to save family changes
+  const handleSaveFamily = async () => {
+    if (!familyGroupData?.id) {
+      console.error('No family group ID available for saving');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Use the new saveFamilyChanges method to save family changes
+      const response = await familyService.saveFamilyChanges(address, island, familyMembers, familyRelationships);
+      
+      if (response.success && response.data) {
+        console.log('Family saved successfully');
+        setHasUnsavedChanges(false);
+        // Refresh family data to get updated information
+        await fetchFamilyMembers();
+        alert('Family changes saved successfully!');
+      } else {
+        throw new Error(response.error || 'Failed to save family changes');
+      }
+    } catch (error) {
+      console.error('Failed to save family changes:', error);
+      alert(`Failed to save family changes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // 2025-01-28: ENHANCED: Toggle editing mode
   const toggleEditingMode = () => {
     setIsEditingMode(!isEditingMode);
@@ -436,6 +473,18 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
           </div>
           
           <div className="family-tree-controls">
+            {/* 2025-01-29: NEW - Save Family button when in editing mode with unsaved changes */}
+            {isEditingMode && hasUnsavedChanges && (
+              <button
+                onClick={handleSaveFamily}
+                disabled={isSaving}
+                className="save-family-btn"
+                title="Save family changes"
+              >
+                {isSaving ? '💾 Saving...' : '💾 Save Family'}
+              </button>
+            )}
+            
             {/* 2025-01-29: NEW - Added Delete Family button to clear saved relationships */}
             {familyGroupExists && (
               <button
@@ -514,6 +563,8 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                   onRelationshipChange={handleRelationshipChange}
                   onFamilyMembersChange={handleFamilyMembersChange}
                   isEditable={true}
+                  onSaveFamily={handleSaveFamily}
+                  hasUnsavedChanges={hasUnsavedChanges}
                 />
               ) : (
                 /* Show ClassicFamilyTree when not editing */

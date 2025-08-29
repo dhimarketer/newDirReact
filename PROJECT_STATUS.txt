@@ -35,3 +35,91 @@
 [2025-01-29 01:45] | react_frontend/src/components/family/ClassicFamilyTree.tsx:1131 | Removed contact and address displays from family tree member boxes - keeping only member names for cleaner display | ok
 
 [2025-01-29 01:50] | react_frontend/src/components/family/ClassicFamilyTree.tsx:1131 | RESTORED relationship arrows after accidentally removing them during contact/address cleanup | ok
+
+[2025-01-29 02:30] | react_frontend/src/components/directory/AddDirectoryEntryModal.tsx:1 | Created AddDirectoryEntryModal component for users to add new directory entries with admin approval workflow | ok
+
+[2025-01-29 02:30] | react_frontend/src/components/directory/EditDirectoryEntryModal.tsx:1 | Created EditDirectoryEntryModal component for users to edit existing directory entries with admin approval workflow | ok
+
+[2025-01-29 02:30] | react_frontend/src/pages/AdminPendingChangesPage.tsx:1 | Created AdminPendingChangesPage component for administrators to review and approve/reject pending directory changes | ok
+
+[2025-01-29 02:30] | react_frontend/src/services/directoryService.ts:200 | Added createEntry, updateEntry, and getParties methods to support add/edit functionality | ok
+
+[2025-01-29 02:30] | react_frontend/src/pages/DirectoryPage.tsx:25 | Added Add New Entry button and integrated AddDirectoryEntryModal for authenticated users | ok
+
+[2025-01-29 02:30] | react_frontend/src/components/directory/SearchResults.tsx:320 | Added Actions column with Edit buttons for each directory entry in search results | ok
+
+[2025-01-29 02:30] | react_frontend/src/router.tsx:25 | Added route for AdminPendingChangesPage at /admin/pending-changes | ok
+
+[2025-01-29 02:30] | react_frontend/src/pages/AdminPage.tsx:60 | Added Pending Changes navigation item to admin dashboard | ok
+
+[2025-01-29 03:00] | react_frontend/src/components/directory/AddDirectoryEntryModal.tsx:180 | Enhanced modal styling with modern design: gradient backgrounds, rounded corners, improved spacing, enhanced form fields, and better visual hierarchy | ok
+
+[2025-01-29 03:00] | react_frontend/src/components/directory/AddDirectoryEntryModal.tsx:78 | Fixed service method call from getAtolls() to getAtollNames() to match actual service implementation | ok
+
+[2025-01-29 03:15] | react_frontend/src/components/directory/EditDirectoryEntryModal.tsx:200 | Enhanced EditDirectoryEntryModal styling with modern design: orange gradient theme, rounded corners, improved spacing, enhanced form fields, and better visual hierarchy to match Add form styling | ok
+
+[2025-01-29 03:45] | django_backend/dirReactFinal_api/views.py:456 | FIXED BROKEN ADMIN APPROVAL WORKFLOW - Modified perform_create to create pending changes instead of directly saving entries. Users now submit entries for admin approval. | ok
+
+[2025-01-29 03:45] | django_backend/dirReactFinal_api/views.py:500 | FIXED BROKEN ADMIN APPROVAL WORKFLOW - Added perform_update method to create pending changes for edit operations instead of directly modifying entries. | ok
+
+[2025-01-29 03:45] | django_backend/dirReactFinal_api/views.py:540 | FIXED BROKEN ADMIN APPROVAL WORKFLOW - Added perform_partial_update method to create pending changes for partial edit operations. | ok
+
+[2025-01-29 03:45] | django_backend/dirReactFinal_api/views.py:580 | FIXED BROKEN ADMIN APPROVAL WORKFLOW - Added perform_destroy method to create pending changes for delete operations instead of directly deleting entries. | ok
+
+[2025-01-29 03:45] | django_backend/dirReactFinal_api/views.py:1080 | ENHANCED ADMIN APPROVAL WORKFLOW - Enhanced approve method to actually process approved changes: create entries for adds, update entries for edits, delete entries for deletions. | ok
+
+[2025-01-29 04:00] | react_frontend/src/components/directory/SearchResults.tsx:220 | IMPLEMENTED CLICKABLE NAME FEATURE - Made name field in search results clickable to open edit modal, connecting search workflow to edit functionality using pid field for unique identification | ok
+
+[2025-01-29 03:45] | django_backend/dirReactFinal_api/views.py:1080 | ENHANCED ADMIN APPROVAL WORKFLOW - Added proper error handling and logging for all approval operations. Complete CRUD workflow now functional with admin oversight. | ok
+
+[2025-01-29 03:30] | react_frontend/src/components/layout/Sidebar.tsx:14 | Added PlusCircle icon import and "Add Entry" navigation item to sidebar for easy access to add new directory entries | ok
+
+[2025-01-29 03:30] | react_frontend/src/pages/AddEntryPage.tsx:1 | Created dedicated AddEntryPage component with comprehensive information cards, instructions, and integrated AddDirectoryEntryModal for better user experience | ok
+
+[2025-01-29 03:30] | react_frontend/src/router.tsx:25 | Added route for AddEntryPage at /add-entry for dedicated entry creation page | ok
+
+[2025-01-29 03:30] | react_frontend/src/pages/DirectoryPage.tsx:25 | Added floating action button (FAB) and enhanced "Add New Entry" button in no-search state for better visibility and accessibility | ok
+
+[2025-01-29 03:30] | react_frontend/src/components/directory/AddDirectoryEntryModal.tsx:180 | Fixed form button styling: reduced oversized buttons to standard web form size (px-4 py-2) and simplified action button layout | ok
+
+[2025-01-29 03:30] | react_frontend/src/components/directory/EditDirectoryEntryModal.tsx:200 | Fixed form button styling: reduced oversized buttons to standard web form size (px-4 py-2) and simplified action button layout | ok
+
+[2025-01-29 03:30] | react_frontend/src/components/directory/AddDirectoryEntryModal.tsx:78 | Fixed dropdown population: corrected atoll mapping, improved island filtering logic, and enhanced user experience with better dropdown states | ok
+
+[2025-01-29 03:30] | react_frontend/src/components/directory/EditDirectoryEntryModal.tsx:200 | Fixed dropdown population: corrected atoll mapping, improved island filtering logic, and enhanced user experience with better dropdown states | ok
+
+[2025-01-29 03:45] | django_backend/dirReactFinal_core/views.py:40 | Added get_parties view to provide political parties data for dropdown selection with proper API endpoint | ok
+
+[2025-01-29 03:45] | django_backend/dirReactFinal_core/views.py:55 | Added get_atolls view to provide atoll data for dropdown selection with proper API endpoint | ok
+
+[2025-01-29 03:45] | django_backend/dirReactFinal_core/serializers.py:20 | Added PartySerializer and AtollSerializer to properly serialize party and atoll data for API responses | ok
+
+[2025-01-29 03:45] | django_backend/dirfinal/urls.py:20 | Added API endpoints for /api/atolls/ and /api/parties/ to provide data for form dropdowns | ok
+
+[2025-01-29 03:45] | react_frontend/src/services/directoryService.ts:243 | Fixed getParties method to use correct /api/parties/ endpoint and handle proper response structure | ok
+
+[2025-01-29 04:15] | django_backend/dirReactFinal_api/serializers.py:66 | FIXED ISLAND/ATOLL DISPLAY - Updated PhoneBookEntrySerializer to include atoll_name, island_name, and party_name fields using SerializerMethodField to extract names from ForeignKey relationships instead of showing numerical IDs | ok
+
+[2025-01-29 04:15] | react_frontend/src/types/directory.ts:25 | Updated PhoneBookEntry interface to include atoll_name, island_name, and party_name fields for proper display of relationship names | ok
+
+[2025-01-29 04:15] | react_frontend/src/components/directory/SearchResults.tsx:175 | Updated getFieldValue function to use atoll_name, island_name, and party_name fields instead of numerical IDs, with fallback to original fields for backward compatibility | ok
+
+[2025-01-29 03:45] | react_frontend/src/components/directory/AddDirectoryEntryModal.tsx:78 | Updated to use proper /api/atolls/ endpoint instead of islandService.getAtollNames() for correct atoll data | ok
+
+[2025-01-29 03:45] | react_frontend/src/components/directory/EditDirectoryEntryModal.tsx:200 | Updated to use proper /api/atolls/ endpoint instead of islandService.getAtollNames() for correct atoll data | ok
+
+[2025-01-29 04:30] | react_frontend/src/components/family/RelationshipManager.tsx:1 | ENHANCED FAMILY EDITING - Added remove member buttons (❌) to family member cards for intuitive member removal | ok
+
+[2025-01-29 04:30] | react_frontend/src/components/family/RelationshipManager.tsx:100 | ENHANCED FAMILY EDITING - Added save family button and change tracking to preserve family modifications | ok
+
+[2025-01-29 04:30] | react_frontend/src/components/family/FamilyTreeWindow.tsx:70 | ENHANCED FAMILY EDITING - Added unsaved changes tracking and save functionality to FamilyTreeWindow | ok
+
+[2025-01-29 04:30] | react_frontend/src/components/family/FamilyTreeWindow.tsx:400 | ENHANCED FAMILY EDITING - Added save family button to header when editing with unsaved changes | ok
+
+[2025-01-29 04:30] | react_frontend/src/services/familyService.ts:300 | ENHANCED FAMILY EDITING - Added saveFamilyChanges method to save modified family state to backend | ok
+
+[2025-01-29 04:30] | react_frontend/src/components/directory/SearchResults.tsx:140 | ENHANCED FAMILY DISPLAY - Updated address click handler to check for saved families first, showing saved families instead of creating new ones | ok
+
+[2025-01-29 04:30] | react_frontend/src/styles/family-tree.css:100 | ENHANCED FAMILY EDITING - Added CSS styles for save family button, remove member buttons, and enhanced member cards | ok
+
+[2025-01-29 04:30] | react_frontend/src/components/directory/EditDirectoryEntryModal.tsx:78 | FIXED ISLAND/PARTY SELECTION - Fixed API response parsing for atolls endpoint and corrected island filtering logic to handle atoll name vs code mismatch (e.g., "Atoll AA" vs "AA") | ok

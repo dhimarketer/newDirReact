@@ -8,8 +8,13 @@ import { toast } from 'react-hot-toast';
 import SearchBar from '../components/directory/SearchBar';
 import SearchResults from '../components/directory/SearchResults';
 import DirectoryStats from '../components/directory/DirectoryStats';
+import AddDirectoryEntryModal from '../components/directory/AddDirectoryEntryModal';
+import { useAuth } from '../store/authStore';
+import { Plus } from 'lucide-react';
 
 const DirectoryPage: React.FC = () => {
+  const { user } = useAuth();
+  
   // State management
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [searchParams, setSearchParams] = useState<SearchParams>({
@@ -21,6 +26,9 @@ const DirectoryPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
+  
+  // Add Directory Entry modal state
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Load directory stats on component mount
   useEffect(() => {
@@ -154,10 +162,25 @@ const DirectoryPage: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Directory Search</h1>
-        <p className="text-gray-600">
-          Search through our comprehensive directory of contacts and manage your phonebook entries.
-        </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Directory Search</h1>
+            <p className="text-gray-600">
+              Search through our comprehensive directory of contacts and manage your phonebook entries.
+            </p>
+          </div>
+          {user && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <span>Add New Entry</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Directory Statistics */}
@@ -221,6 +244,15 @@ const DirectoryPage: React.FC = () => {
             >
               Search Female Contacts
             </button>
+            {user && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="px-6 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 border border-blue-600 rounded-md hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+              >
+                <Plus className="w-4 h-4 inline mr-2" />
+                Add New Entry
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -249,6 +281,29 @@ const DirectoryPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Add Directory Entry Modal */}
+      <AddDirectoryEntryModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={() => {
+          // Refresh directory stats after adding entry
+          loadDirectoryStats();
+        }}
+      />
+
+      {/* Floating Action Button */}
+      {user && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1 flex items-center justify-center"
+            title="Add New Entry"
+          >
+            <Plus className="w-8 h-8" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -455,13 +455,125 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
         return PhoneBookEntrySerializer
     
     def perform_create(self, serializer):
-        entry = serializer.save()
+        # 2025-01-29: FIX - Create pending change instead of directly saving entry
+        # This ensures all user submissions go through admin approval workflow
         
-        # Log creation event
+        # Get the validated data
+        validated_data = serializer.validated_data
+        
+        # Create a pending change for admin approval
+        from dirReactFinal_moderation.models import PendingChange
+        
+        pending_change = PendingChange.objects.create(
+            change_type='add',
+            status='pending',
+            new_data=validated_data,
+            requested_by=self.request.user,
+            entry=None  # No existing entry for new additions
+        )
+        
+        # Log creation of pending change
         EventLog.objects.create(
             user=self.request.user,
-            event_type='add_contact',
-            description=f'Added contact: {entry.name}'
+            event_type='pending_change_created',
+            description=f'Created pending change for new entry: {validated_data.get("name", "Unknown")}'
+        )
+        
+        # Don't save the entry yet - it will be created after admin approval
+        # The serializer.save() call will be intercepted, so we need to handle this differently
+        raise serializers.ValidationError(
+            "Entry submitted successfully and is pending admin approval. "
+            "You will be notified once it's reviewed."
+        )
+    
+    def perform_update(self, serializer):
+        # 2025-01-29: FIX - Create pending change for updates instead of directly modifying entry
+        # This ensures all user edits go through admin approval workflow
+        
+        instance = self.get_object()
+        validated_data = serializer.validated_data
+        
+        # Create a pending change for admin approval
+        from dirReactFinal_moderation.models import PendingChange
+        
+        pending_change = PendingChange.objects.create(
+            change_type='edit',
+            status='pending',
+            new_data=validated_data,
+            requested_by=self.request.user,
+            entry=instance  # Link to existing entry being edited
+        )
+        
+        # Log creation of pending change for edit
+        EventLog.objects.create(
+            user=self.request.user,
+            event_type='pending_change_created',
+            description=f'Created pending change for editing entry: {instance.name}'
+        )
+        
+        # Don't update the entry yet - it will be updated after admin approval
+        raise serializers.ValidationError(
+            "Edit submitted successfully and is pending admin approval. "
+            "You will be notified once it's reviewed."
+        )
+    
+    def perform_partial_update(self, serializer):
+        # 2025-01-29: FIX - Create pending change for partial updates as well
+        # This ensures all user edits go through admin approval workflow
+        
+        instance = self.get_object()
+        validated_data = serializer.validated_data
+        
+        # Create a pending change for admin approval
+        from dirReactFinal_moderation.models import PendingChange
+        
+        pending_change = PendingChange.objects.create(
+            change_type='edit',
+            status='pending',
+            new_data=validated_data,
+            requested_by=self.request.user,
+            entry=instance  # Link to existing entry being edited
+        )
+        
+        # Log creation of pending change for partial edit
+        EventLog.objects.create(
+            user=self.request.user,
+            event_type='pending_change_created',
+            description=f'Created pending change for partial edit of entry: {instance.name}'
+        )
+        
+        # Don't update the entry yet - it will be updated after admin approval
+        raise serializers.ValidationError(
+            "Edit submitted successfully and is pending admin approval. "
+            "You will be notified once it's reviewed."
+        )
+    
+    def perform_destroy(self, instance):
+        # 2025-01-29: FIX - Create pending change for deletions instead of directly deleting entry
+        # This ensures all user deletions go through admin approval workflow
+        
+        # Create a pending change for admin approval
+        from dirReactFinal_moderation.models import PendingChange
+        
+        pending_change = PendingChange.objects.create(
+            change_type='delete',
+            status='pending',
+            new_data={'action': 'delete', 'entry_name': instance.name},
+            requested_by=self.request.user,
+            entry=instance  # Link to existing entry being deleted
+        )
+        
+        # Log creation of pending change for deletion
+        EventLog.objects.create(
+            user=self.request.user,
+            event_type='pending_change_created',
+            description=f'Created pending change for deleting entry: {instance.name}'
+        )
+        
+        # Don't delete the entry yet - it will be deleted after admin approval
+        raise serializers.ValidationError(
+            "Delete request submitted successfully and is pending admin approval. "
+            "You will be notified once it's reviewed."
         )
     
     @action(detail=False, methods=['post'])
@@ -1034,12 +1146,117 @@ class PendingChangeViewSet(viewsets.ModelViewSet):
         if not request.user.is_staff:
             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
         
-        change.status = 'approved'
-        change.reviewed_by = request.user
-        change.reviewed_at = timezone.now()
-        change.save()
-        
-        return Response({'message': 'Change approved'})
+        try:
+            # 2025-01-29: ENHANCED - Actually process the approved change
+            if change.change_type == 'add':
+                # Create the actual entry from pending change data
+                from dirReactFinal_directory.models import PhoneBookEntry
+                from dirReactFinal_api.serializers import PhoneBookEntryCreateSerializer
+                
+                # Create serializer with the pending change data
+                serializer = PhoneBookEntryCreateSerializer(data=change.new_data)
+                if serializer.is_valid():
+                    # Save the entry
+                    entry = serializer.save()
+                    
+                    # Log the actual entry creation
+                    EventLog.objects.create(
+                        user=request.user,
+                        event_type='add_contact',
+                        description=f'Admin approved and created entry: {entry.name}'
+                    )
+                    
+                    # Update the pending change
+                    change.status = 'approved'
+                    change.reviewed_by = request.user
+                    change.reviewed_at = timezone.now()
+                    change.entry = entry  # Link to the created entry
+                    change.save()
+                    
+                    return Response({
+                        'message': 'Change approved and entry created successfully',
+                        'entry_id': entry.pid
+                    })
+                else:
+                    return Response({
+                        'error': 'Invalid entry data',
+                        'details': serializer.errors
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                    
+            elif change.change_type == 'edit':
+                # Handle editing existing entries
+                if change.entry:
+                    # Update the existing entry with new data
+                    for field, value in change.new_data.items():
+                        if hasattr(change.entry, field):
+                            setattr(change.entry, field, value)
+                    change.entry.save()
+                    
+                    # Log the update
+                    EventLog.objects.create(
+                        user=request.user,
+                        event_type='edit_contact',
+                        description=f'Admin approved edit for entry: {change.entry.name}'
+                    )
+                    
+                    # Update the pending change
+                    change.status = 'approved'
+                    change.reviewed_by = request.user
+                    change.reviewed_at = timezone.now()
+                    change.save()
+                    
+                    return Response({
+                        'message': 'Edit approved and applied successfully',
+                        'entry_id': change.entry.pid
+                    })
+                else:
+                    return Response({
+                        'error': 'No entry found for edit operation'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            elif change.change_type == 'delete':
+                # Handle deleting entries
+                if change.entry:
+                    entry_name = change.entry.name
+                    entry_id = change.entry.pid
+                    
+                    # Delete the entry
+                    change.entry.delete()
+                    
+                    # Log the deletion
+                    EventLog.objects.create(
+                        user=request.user,
+                        event_type='delete_contact',
+                        description=f'Admin approved deletion of entry: {entry_name}'
+                    )
+                    
+                    # Update the pending change
+                    change.status = 'approved'
+                    change.reviewed_by = request.user
+                    change.reviewed_at = timezone.now()
+                    change.save()
+                    
+                    return Response({
+                        'message': 'Delete approved and entry removed successfully',
+                        'deleted_entry_id': entry_id
+                    })
+                else:
+                    return Response({
+                        'error': 'No entry found for delete operation'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                # For other change types, just mark as approved
+                change.status = 'approved'
+                change.reviewed_by = request.user
+                change.reviewed_at = timezone.now()
+                change.save()
+                
+                return Response({'message': 'Change approved'})
+                
+        except Exception as e:
+            return Response({
+                'error': 'Failed to process approved change',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):

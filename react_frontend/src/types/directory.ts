@@ -25,6 +25,10 @@ export interface PhoneBookEntry {
   image_status?: string;
   family_group_id?: number;
   age?: number;  // 2025-01-28: Added age field for reliable backend-calculated ages
+  // 2025-01-29: Added fields for ForeignKey relationship names
+  atoll_name?: string;
+  island_name?: string;
+  party_name?: string;
 }
 
 export interface SearchFilters {

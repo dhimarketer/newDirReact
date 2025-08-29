@@ -215,6 +215,46 @@ class DirectoryService {
       throw new Error(error.response?.data?.message || 'Failed to get person details');
     }
   }
+
+  /**
+   * Create a new directory entry (creates pending change for admin approval)
+   */
+  async createEntry(entryData: Partial<PhoneBookEntry>): Promise<void> {
+    try {
+      await apiService.post(`${this.baseUrl}/`, entryData);
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to create entry');
+    }
+  }
+
+  /**
+   * Update an existing directory entry (creates pending change for admin approval)
+   */
+  async updateEntry(pid: number, entryData: Partial<PhoneBookEntry>): Promise<void> {
+    try {
+      await apiService.patch(`${this.baseUrl}/${pid}/`, entryData);
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to update entry');
+    }
+  }
+
+  /**
+   * Get political parties for dropdown selection
+   */
+  async getParties(): Promise<Array<{ id: number; name: string }>> {
+    try {
+      const response = await apiService.get<{ success: boolean; parties: Array<{ id: number; name: string; short_name: string }> }>('/api/parties/');
+      
+      if (response.data.success) {
+        return response.data.parties;
+      } else {
+        throw new Error('Failed to fetch parties');
+      }
+    } catch (error: any) {
+      console.warn('Failed to get parties:', error);
+      return [];
+    }
+  }
 }
 
 // Create singleton instance

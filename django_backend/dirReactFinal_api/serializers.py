@@ -68,6 +68,10 @@ class PhoneBookEntrySerializer(serializers.ModelSerializer):
     """Serializer for phonebook entries"""
     age = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+    # 2025-01-29: Added methods to handle ForeignKey relationships
+    atoll_name = serializers.SerializerMethodField()
+    island_name = serializers.SerializerMethodField()
+    party_name = serializers.SerializerMethodField()
     
     class Meta:
         model = PhoneBookEntry
@@ -75,7 +79,7 @@ class PhoneBookEntrySerializer(serializers.ModelSerializer):
                  'street', 'ward', 'party', 'DOB', 'status', 'remark', 
                  'email', 'gender', 'extra', 'profession', 'pep_status',
                  'change_status', 'requested_by', 'batch', 'image_status', 'family_group_id',
-                 'age', 'image_url']  # 2025-08-22: Added missing age and image_url fields
+                 'age', 'image_url', 'atoll_name', 'island_name', 'party_name']  # 2025-01-29: Added atoll_name, island_name, party_name fields
         read_only_fields = ['pid']  # pid is the primary key
     
     def get_age(self, obj):
@@ -83,6 +87,25 @@ class PhoneBookEntrySerializer(serializers.ModelSerializer):
     
     def get_image_url(self, obj):
         # Since we don't have actual image files, return a placeholder or None
+        return None
+    
+    # 2025-01-29: Added methods to extract names from ForeignKey relationships
+    def get_atoll_name(self, obj):
+        """Extract atoll name from ForeignKey relationship"""
+        if obj.atoll:
+            return obj.atoll.name
+        return None
+    
+    def get_island_name(self, obj):
+        """Extract island name from ForeignKey relationship"""
+        if obj.island:
+            return obj.island.name
+        return None
+    
+    def get_party_name(self, obj):
+        """Extract party name from ForeignKey relationship"""
+        if obj.party:
+            return obj.party.name
         return None
 
 class PhoneBookEntryCreateSerializer(serializers.ModelSerializer):

@@ -66,6 +66,13 @@ const AdminPage: React.FC = () => {
       color: 'bg-yellow-500 hover:bg-yellow-600'
     },
     {
+      title: 'Pending Changes',
+      description: 'Review and approve user-submitted directory changes',
+      icon: FileText,
+      href: '/admin/pending-changes',
+      color: 'bg-orange-500 hover:bg-orange-600'
+    },
+    {
       title: 'Security',
       description: 'Manage security settings, API keys, and access controls',
       icon: Shield,

@@ -231,6 +231,55 @@ class FamilyService {
     return response.data;
   }
 
+  // 2025-01-29: NEW - Method to save family changes with current state
+  async saveFamilyChanges(address: string, island: string, members: any[], relationships: any[]): Promise<{
+    success: boolean;
+    data?: any;
+    error?: string;
+  }> {
+    try {
+      console.log('DEBUG: Saving family changes for:', { address, island });
+      console.log('DEBUG: Members to save:', members);
+      console.log('DEBUG: Relationships to save:', relationships);
+      
+      // Use the create_or_update_by_address endpoint with explicit data
+      const response = await apiService.post('/family/groups/create_or_update_by_address/', {
+        address,
+        island,
+        members: members.map(member => ({
+          entry_id: member.entry.pid,
+          role: member.role
+        })),
+        relationships: relationships.map(rel => ({
+          person1_id: rel.person1,
+          person2_id: rel.person2,
+          relationship_type: rel.relationship_type,
+          notes: rel.notes || ''
+        }))
+      });
+      
+      console.log('DEBUG: Save response:', response);
+      
+      if (response.data) {
+        return {
+          success: true,
+          data: response.data
+        };
+      } else {
+        return {
+          success: false,
+          error: 'Failed to save family changes'
+        };
+      }
+    } catch (error: any) {
+      console.error('Error saving family changes:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to save family changes'
+      };
+    }
+  }
+
   // 2025-01-28: Added method to create or update family group by address
   async createOrUpdateFamilyByAddress(address: string, island: string): Promise<{
     success: boolean;

@@ -10,7 +10,9 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useAuth } from '../../store/authStore';
 import { getUserType, getVisibleFields } from '../../utils/searchFieldUtils';
 import FamilyTreeWindow from '../family/FamilyTreeWindow';
+import EditDirectoryEntryModal from './EditDirectoryEntryModal';
 import islandService from '../../services/islandService';
+import familyService from '../../services/familyService';
 
 interface SearchResultsProps {
   results: PhoneBookEntry[];
@@ -42,6 +44,10 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   const [familyTreeWindowOpen, setFamilyTreeWindowOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState('');
   const [selectedIsland, setSelectedIsland] = useState('');
+  
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<PhoneBookEntry | null>(null);
   
   const totalPages = Math.ceil(totalCount / pageSize);
   const userType = getUserType(user!);
@@ -96,51 +102,52 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     return contact;
   };
 
-  // Handle address click to show family tree window
+  // 2025-01-28: NEW - Handle address click to open family tree window
   const handleAddressClick = async (address: string, island: string) => {
-    console.log('Address clicked:', { address, island }); // 2025-01-28: Debug logging for address click
+    console.log('Address clicked:', { address, island });
     
-    // 2025-01-28: FIXED - Prioritize island from search result entry since it contains correct ForeignKey data
-    // The search filters may contain wildcard patterns, but the search result has the actual island relationship
-    let islandToUse = island;
-    
-    if (searchFilters?.island && searchFilters.island.trim()) {
-      // Log what we're getting from search filters for debugging
-      console.log('Search filters island (may contain wildcards):', searchFilters.island);
-      console.log('Using island from search result entry (correct ForeignKey data):', island);
-    } else {
-      // Fallback to island from search result entry
-      console.log('Using island from search result entry:', island);
-    }
-    
-    // 2025-01-28: ENHANCED - Resolve island name from search result entry (which has correct ForeignKey data)
-    let islandName = islandToUse;
-    
-    // Convert island ID to island name if it's a numeric ID (from ForeignKey relationship)
-    if (islandToUse && !isNaN(Number(islandToUse))) {
-      try {
-        const resolvedIslandName = await islandService.getIslandNameById(islandToUse);
-        if (resolvedIslandName) {
-          islandName = resolvedIslandName;
-          console.log('Converted island ID to name:', { id: islandToUse, name: islandName });
+    // 2025-01-29: ENHANCED - First check if there's a saved family for this address
+    try {
+      const familyResponse = await familyService.getFamilyByAddress(address, island);
+      
+      if (familyResponse.success && familyResponse.data && familyResponse.data.id) {
+        // There's a saved family - open it directly
+        console.log('Found saved family for address:', address);
+        setSelectedAddress(address);
+        setSelectedIsland(island);
+        setFamilyTreeWindowOpen(true);
+      } else {
+        // No saved family - check if we can create one
+        console.log('No saved family found, checking if we can create one');
+        
+        // Check if any entries at this address have DOB data
+        const entriesAtAddress = results.filter(entry => 
+          entry.address === address && entry.island === island
+        );
+        
+        const hasDOBData = entriesAtAddress.some(entry => 
+          entry.DOB && entry.DOB !== 'None' && entry.DOB.trim() !== ''
+        );
+        
+        if (hasDOBData) {
+          // Can create family - open family tree window
+          console.log('Can create family for address:', address);
+          setSelectedAddress(address);
+          setSelectedIsland(island);
+          setFamilyTreeWindowOpen(true);
         } else {
-          console.warn('Could not resolve island ID to name:', islandToUse);
+          // No DOB data - show message
+          alert('No date of birth (DOB) data available for this address. Family tree cannot be generated.');
+          return;
         }
-      } catch (error) {
-        console.error('Error converting island ID to name:', error);
-        // Fall back to using the original island value
       }
-    } else if (islandToUse && islandToUse.trim()) {
-      // If it's already a string (island name), use it directly
-      console.log('Using island name directly:', islandToUse);
-      islandName = islandToUse;
+    } catch (error) {
+      console.error('Error checking for saved family:', error);
+      // Fallback to original behavior
+      setSelectedAddress(address);
+      setSelectedIsland(island);
+      setFamilyTreeWindowOpen(true);
     }
-    
-    console.log('Final resolved island name:', islandName);
-    
-    setSelectedAddress(address);
-    setSelectedIsland(islandName);
-    setFamilyTreeWindowOpen(true);
   };
 
   // 2025-01-28: NEW - Check if address has DOB data for family tree availability
@@ -171,9 +178,11 @@ const SearchResults: React.FC<SearchResultsProps> = ({
       case 'address':
         return entry.address || null;
       case 'atoll':
-        return entry.atoll || null;
+        // 2025-01-29: Use atoll_name instead of atoll ID for display
+        return entry.atoll_name || entry.atoll || null;
       case 'island':
-        return entry.island || null;
+        // 2025-01-29: Use island_name instead of island ID for display
+        return entry.island_name || entry.island || null;
       case 'street':
         return entry.street || null;
       case 'profession':
@@ -183,7 +192,8 @@ const SearchResults: React.FC<SearchResultsProps> = ({
       case 'DOB':
         return entry.DOB ? `Age: ${formatAge(entry.DOB)}` : null;
       case 'party':
-        return entry.party || null;
+        // 2025-01-29: Use party_name instead of party ID for display
+        return entry.party_name || entry.party || null;
       case 'change_status':
         return entry.change_status || 'Active';
       default:
@@ -205,6 +215,22 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         <span className={`status-badge ${value.toLowerCase()}`}>
           {value}
         </span>
+      );
+    }
+
+    // Special handling for name field - make it clickable to open edit modal
+    if (field.field_name === 'name') {
+      return (
+        <button
+          onClick={() => {
+            setSelectedEntry(entry);
+            setShowEditModal(true);
+          }}
+          className="text-sm text-blue-600 hover:text-blue-800 underline cursor-pointer truncate-text font-medium"
+          title={`Click to edit ${value}'s record`}
+        >
+          {value}
+        </button>
       );
     }
 
@@ -312,6 +338,11 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                     {field.field_label}
                   </th>
                 ))}
+                {user && (
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-blue-700 uppercase tracking-wider min-w-[120px]">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white">
@@ -322,6 +353,19 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                       {renderFieldCell(entry, field)}
                     </td>
                   ))}
+                  {user && (
+                    <td className="table-cell">
+                      <button
+                        onClick={() => {
+                          setSelectedEntry(entry);
+                          setShowEditModal(true);
+                        }}
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -391,13 +435,27 @@ const SearchResults: React.FC<SearchResultsProps> = ({
 
               {/* Family Tree Window */}
               <FamilyTreeWindow
-          isOpen={familyTreeWindowOpen}
-          onClose={() => setFamilyTreeWindowOpen(false)}
-          address={selectedAddress}
-          island={selectedIsland}
-        />
-    </div>
-  );
-};
+                isOpen={familyTreeWindowOpen}
+                onClose={() => setFamilyTreeWindowOpen(false)}
+                address={selectedAddress}
+                island={selectedIsland}
+              />
+
+              {/* Edit Directory Entry Modal */}
+              <EditDirectoryEntryModal
+                isOpen={showEditModal}
+                onClose={() => {
+                  setShowEditModal(false);
+                  setSelectedEntry(null);
+                }}
+                entry={selectedEntry}
+                onSuccess={() => {
+                  // Could trigger a refresh of search results here
+                  toast.success('Entry update submitted successfully!');
+                }}
+              />
+            </div>
+          );
+        };
 
 export default SearchResults;

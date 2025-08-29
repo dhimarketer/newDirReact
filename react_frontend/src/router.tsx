@@ -14,10 +14,12 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import ProfilePage from './pages/ProfilePage';
 import SearchPage from './pages/SearchPage';
 import DirectoryPage from './pages/DirectoryPage';
+import AddEntryPage from './pages/AddEntryPage';
 import FamilyPage from './pages/FamilyPage';
 import AdminPage from './pages/AdminPage';
 
 import AdminUserManagementPage from './pages/AdminUserManagementPage';
+import AdminPendingChangesPage from './pages/AdminPendingChangesPage';
 import SettingsPage from './pages/SettingsPage';
 import PremiumImageSearchPage from './pages/PremiumImageSearchPage';
 
@@ -42,11 +44,13 @@ function AppRoutes() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="directory" element={<DirectoryPage />} />
+        <Route path="add-entry" element={<AddEntryPage />} />
         <Route path="family" element={<FamilyPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="admin" element={<AdminPage />} />
 
         <Route path="admin/users" element={<AdminUserManagementPage />} />
+        <Route path="admin/pending-changes" element={<AdminPendingChangesPage />} />
         <Route path="premium-image-search" element={<PremiumImageSearchPage />} />
       </Route>
 

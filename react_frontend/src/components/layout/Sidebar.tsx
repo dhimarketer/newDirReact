@@ -11,6 +11,7 @@ import {
   Home, 
   Search, 
   BookOpen, 
+  PlusCircle, 
   Users, 
   Image, 
   Settings, 
@@ -45,6 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile = false }) => {
       { name: 'Home', href: '/', icon: Home },
       { name: 'Search', href: '/search', icon: Search },
       { name: 'Directory', href: '/directory', icon: BookOpen },
+      { name: 'Add Entry', href: '/add-entry', icon: PlusCircle },
       { name: 'Family', href: '/family', icon: Users },
     ];
 

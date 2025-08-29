@@ -2,6 +2,7 @@
 // 2025-01-28: Implements drag-and-drop relationship creation with visual indicators
 // 2025-01-28: Real-time updates and enhanced editing capabilities
 // 2025-01-28: Clean interface for managing family relationships
+// 2025-01-29: ENHANCED - Added remove member buttons and save family functionality
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { PhoneBookEntry } from '../../types/directory';
@@ -27,6 +28,8 @@ interface RelationshipManagerProps {
   onRelationshipChange: (relationships: FamilyRelationship[]) => void;
   onFamilyMembersChange?: (members: FamilyMember[]) => void; // 2025-01-28: Added callback for family member changes
   isEditable: boolean;
+  onSaveFamily?: () => void; // 2025-01-29: NEW - Callback to save family changes
+  hasUnsavedChanges?: boolean; // 2025-01-29: NEW - Track if there are unsaved changes
 }
 
 interface DragState {
@@ -60,7 +63,9 @@ const RelationshipManager: React.FC<RelationshipManagerProps> = ({
   relationships,
   onRelationshipChange,
   onFamilyMembersChange,
-  isEditable
+  isEditable,
+  onSaveFamily,
+  hasUnsavedChanges = false
 }) => {
   const [dragState, setDragState] = useState<DragState>({
     sourceMember: null,
@@ -435,6 +440,27 @@ const RelationshipManager: React.FC<RelationshipManagerProps> = ({
     }
   };
 
+  // 2025-01-29: NEW - Function to remove a member from the family
+  const removeMemberFromFamily = useCallback((member: FamilyMember) => {
+    if (confirm(`Are you sure you want to remove ${member.entry.name} from this family?`)) {
+      // Remove relationships involving this member
+      const updatedRelationships = relationships.filter(rel => 
+        rel.person1 !== member.entry.pid && rel.person2 !== member.entry.pid
+      );
+      
+      // Update relationships
+      onRelationshipChange(updatedRelationships);
+      
+      // Notify parent component about family member change
+      if (onFamilyMembersChange) {
+        const updatedMembers = familyMembers.filter(m => m.entry.pid !== member.entry.pid);
+        onFamilyMembersChange(updatedMembers);
+      }
+      
+      alert(`${member.entry.name} has been removed from the family tree.`);
+    }
+  }, [familyMembers, relationships, onRelationshipChange, onFamilyMembersChange]);
+
   if (!isEditable) {
     return (
       <div className="relationship-manager-readonly">
@@ -521,8 +547,18 @@ const RelationshipManager: React.FC<RelationshipManagerProps> = ({
                 {dragState.targetMember?.entry.pid === member.entry.pid && '🎯 Target'}
               </div>
               
-              {/* 2025-01-28: Added family exclusion controls */}
+              {/* 2025-01-29: ENHANCED - Added remove member button alongside exclusion controls */}
               <div className="member-actions">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeMemberFromFamily(member);
+                  }}
+                  className="remove-member-btn"
+                  title="Remove from family"
+                >
+                  ❌
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -537,6 +573,25 @@ const RelationshipManager: React.FC<RelationshipManagerProps> = ({
             </div>
           ))}
         </div>
+
+        {/* 2025-01-29: NEW - Save Family Button */}
+        {onSaveFamily && (
+          <div className="save-family-section">
+            <button
+              onClick={onSaveFamily}
+              className={`save-family-btn ${hasUnsavedChanges ? 'has-changes' : ''}`}
+              disabled={!hasUnsavedChanges}
+              title={hasUnsavedChanges ? 'Save your family changes' : 'No changes to save'}
+            >
+              {hasUnsavedChanges ? '💾 Save Family Changes' : '💾 No Changes to Save'}
+            </button>
+            {hasUnsavedChanges && (
+              <p className="save-family-hint">
+                💡 Click "Save Family Changes" to preserve your family tree modifications
+              </p>
+            )}
+          </div>
+        )}
         
         {/* 2025-01-28: Show excluded members section */}
         {excludedMembers.length > 0 && (
