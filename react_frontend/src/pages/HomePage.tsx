@@ -3,21 +3,17 @@
 // 2025-01-27: Fixed data structure handling and added better error handling
 // 2025-01-27: Updated to use correct Django analytics endpoint data structure
 // 2025-01-27: Refactored to use Pico.css for lightweight, responsive, and professional styling
+// 2025-01-29: REMOVED - Redundant Quick Actions section that duplicated sidebar navigation
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../store/authStore';
-import { Link } from 'react-router-dom';
 import { 
-  SearchIcon, 
   UsersIcon, 
-  BookOpenIcon, 
   ChartBarIcon,
   UserCircleIcon,
   ShieldCheckIcon,
   StarIcon,
-  TrendingUpIcon,
-  Image,
-  Crown
+  TrendingUpIcon
 } from 'lucide-react';
 import { homePageService, HomePageStats } from '../services/homePageService';
 import { STORAGE_KEYS } from '../utils/constants';
@@ -104,14 +100,14 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="home-page space-y-5">
       {/* Hero Section */}
       <section className="page-header" aria-labelledby="welcome-heading">
         <div className="content-wrapper">
           {/* Welcome Section */}
           <div className="mb-4">
             <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full mb-3" aria-hidden="true">
-              <BookOpenIcon className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
+              <UserCircleIcon className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
             </div>
             <h1 id="welcome-heading" className="page-title">
               Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">dirFinal</span>
@@ -139,67 +135,6 @@ const HomePage: React.FC = () => {
               </div>
             </div>
           )}
-        </div>
-      </section>
-
-      {/* Quick Actions Section */}
-      <section className="section">
-        <div className="content-wrapper">
-          <h2 className="section-title">Quick Actions</h2>
-          <p className="section-subtitle">Get started with the most common tasks</p>
-          
-          <div className="quick-actions">
-            {/* Search Directory */}
-            <article className="action-card">
-              <div className="flex items-center mb-3">
-                <div className="action-icon blue">
-                  <SearchIcon className="w-6 h-6" />
-                </div>
-                <h3 className="action-title">Search Directory</h3>
-              </div>
-              <p className="action-description">
-                Find people, businesses, and organizations in your directory with advanced search capabilities.
-              </p>
-              <Link to="/search" className="btn-primary">
-                Start Searching
-                <SearchIcon className="w-4 h-4" />
-              </Link>
-            </article>
-
-            {/* Family Management */}
-            <article className="action-card">
-              <div className="flex items-center mb-3">
-                <div className="action-icon green">
-                  <UsersIcon className="w-6 h-6" />
-                </div>
-                <h3 className="action-title">Family Management</h3>
-              </div>
-              <p className="action-description">
-                Discover and manage family connections, build family trees, and explore relationships.
-              </p>
-              <Link to="/family" className="btn-primary">
-                Explore Family
-                <UsersIcon className="w-4 h-4" />
-              </Link>
-            </article>
-
-            {/* Directory Browse */}
-            <article className="action-card">
-              <div className="flex items-center mb-3">
-                <div className="action-icon purple">
-                  <BookOpenIcon className="w-6 h-6" />
-                </div>
-                <h3 className="action-title">Browse Directory</h3>
-              </div>
-              <p className="action-description">
-                Browse through the complete directory with advanced filtering and sorting options.
-              </p>
-              <Link to="/directory" className="btn-primary">
-                Browse Now
-                <BookOpenIcon className="w-4 h-4" />
-              </Link>
-            </article>
-          </div>
         </div>
       </section>
 
@@ -319,10 +254,10 @@ const HomePage: React.FC = () => {
                 <p className="action-description">
                   Access administrative tools, user management, and system settings.
                 </p>
-                <Link to="/admin" className="btn-primary">
+                <a href="/admin" className="btn-primary">
                   Go to Admin
                   <ShieldCheckIcon className="w-4 h-4" />
-                </Link>
+                </a>
               </article>
               
               <article className="action-card">
@@ -335,10 +270,10 @@ const HomePage: React.FC = () => {
                 <p className="action-description">
                   View system statistics, user activity, and performance metrics.
                 </p>
-                <Link to="/admin" className="btn-primary">
+                <a href="/admin" className="btn-primary">
                   View Analytics
                   <ChartBarIcon className="w-4 h-4" />
-                </Link>
+                </a>
               </article>
             </div>
           </div>

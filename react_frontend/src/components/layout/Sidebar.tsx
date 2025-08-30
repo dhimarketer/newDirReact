@@ -1,7 +1,8 @@
 // 2025-01-27: Creating simplified Sidebar component to reduce errors
 // 2025-01-27: Updated to use new styling approach and improved layout structure
 // 2025-01-27: Refactored to use Pico.css for lightweight, responsive, and professional styling
-// 2025-01-27: Fixed sidebar positioning and layout overlap issues
+// 2025-01-29: Cleaned up navigation - consolidated all navigation items here, removed duplicates
+// 2025-01-29: REMOVED - Duplicate logo section that duplicates Header branding
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -43,26 +44,28 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile = false }) => {
     }
 
     const baseNavigation: NavigationItem[] = [
-      { name: 'Home', href: '/', icon: Home },
-      { name: 'Search', href: '/search', icon: Search },
-      { name: 'Directory', href: '/directory', icon: BookOpen },
+      { name: 'Search', href: '/', icon: Search },
+      { name: 'Home', href: '/home', icon: Home },
       { name: 'Add Entry', href: '/add-entry', icon: PlusCircle },
       { name: 'Family', href: '/family', icon: Users },
     ];
 
     // Add image search if user has sufficient points
-    if (user && user.score >= 10) {
+    if (user && (user.score || 0) >= 10) {
       baseNavigation.push({ 
         name: 'Image Search', 
         href: '/premium-image-search', 
-        icon: Image
+        icon: Image,
+        isPremium: true
       });
     }
+
+    // Add settings for all authenticated users
+    baseNavigation.push({ name: 'Settings', href: '/settings', icon: Settings });
 
     // Add admin features if user is admin
     if (user?.is_staff || user?.is_superuser) {
       console.log('Adding admin navigation items');
-      baseNavigation.push({ name: 'Settings', href: '/settings', icon: Settings });
       baseNavigation.push({ name: 'Admin', href: '/admin', icon: Shield });
     } else {
       console.log('User is not admin, not adding admin navigation');
@@ -155,16 +158,6 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile = false }) => {
   // Desktop sidebar
   return (
     <div className="desktop-sidebar">
-      {/* Logo */}
-      <div className="sidebar-logo">
-        <Link to="/" className="sidebar-logo-link">
-          <div className="sidebar-logo-icon">
-            <span className="sidebar-logo-text">DF</span>
-          </div>
-          <span className="sidebar-logo-title">dirFinal</span>
-        </Link>
-      </div>
-
       {/* Navigation */}
       <nav className="sidebar-nav">
         {navigation.map((item) => {

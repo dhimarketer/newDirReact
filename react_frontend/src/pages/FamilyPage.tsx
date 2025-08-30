@@ -160,50 +160,68 @@ const FamilyPage: React.FC = () => {
         
         console.log(`🔍 Looking for second parent (different gender from ${firstParent.name})`);
         
-        // Look for second parent among remaining members AND children
-        const allRemainingMembers = sortedMembersWithAge.filter(member => 
-          !potentialParents.includes(member)
+        // 2025-01-29: FIXED - Only look for second parent among members who could logically be parents
+        // Exclude people who are too close in age to be parents (likely siblings)
+        const potentialSecondParents = sortedMembersWithAge.filter(member => {
+          if (potentialParents.includes(member)) return false; // Already a parent
+          
+          const memberAge = calculateAge(member)!;
+          const firstParentAge = calculateAge(firstParent)!;
+          
+                  // 2025-01-29: CORRECTED LOGIC - Second parent must be:
+        // 1. Different gender from first parent
+        // 2. Have age gap greater than 12 years compared to all other family members (other than first parent)
+        
+        // Check gender difference
+        if (firstParentGender && member.gender && firstParentGender === member.gender) {
+          console.log(`❌ ${member.name} (${memberAge}) - same gender as first parent ${firstParent.name} (${firstParentAge})`);
+          return false;
+        }
+        
+        // Check if they have sufficient age gap (>12 years) to all other family members
+        // AND ensure they're not too close in age to be siblings with other members
+        const otherFamilyMembers = sortedMembersWithAge.filter(m => 
+          m !== member && m !== firstParent
         );
         
-        let bestSecondParent = null;
+        let hasSufficientAgeGap = true;
+        let notTooCloseForSiblings = true;
         
-        for (const member of allRemainingMembers) {
-          const memberAge = calculateAge(member)!;
-          const memberGender = member.gender;
+        for (const otherMember of otherFamilyMembers) {
+          const otherAge = calculateAge(otherMember)!;
+          const ageDifference = memberAge - otherAge;
           
-          // Must be different gender from first parent
-          if (firstParentGender && memberGender && firstParentGender === memberGender) {
-            console.log(`❌ ${member.name} (${memberAge}) - same gender as first parent`);
-            continue;
+          // Check parent-child relationship (need >12 years gap)
+          if (ageDifference <= 12) {
+            console.log(`❌ ${member.name} (${memberAge}) cannot be parent to ${otherMember.name} (${otherAge}) - gap: ${ageDifference} years (need >12)`);
+            hasSufficientAgeGap = false;
+            break;
           }
           
-          // Must have 10+ year gap to all other remaining members (excluding first parent and self)
-          let canBeParent = true;
-          for (const otherMember of allRemainingMembers) {
-            if (otherMember === member) continue; // Skip self
-            
-            const otherAge = calculateAge(otherMember)!;
-            const ageDifference = memberAge - otherAge;
-            
-            if (ageDifference < 10) {
-              canBeParent = false;
-              console.log(`❌ ${member.name} (${memberAge}) cannot be parent to ${otherMember.name} (${otherAge}) - gap: ${ageDifference} years`);
-              break;
-            }
-          }
-          
-          if (canBeParent) {
-            bestSecondParent = member;
-            console.log(`✅ ${member.name} (${memberAge}) identified as second parent (different gender)`);
+          // Check sibling relationship (if gap is too small, they're likely siblings, not parent-child)
+          // If age difference is <= 8 years, they're likely siblings and shouldn't both be parents
+          if (ageDifference <= 8) {
+            console.log(`❌ ${member.name} (${memberAge}) and ${otherMember.name} (${otherAge}) are likely siblings (gap: ${ageDifference} years) - both cannot be parents`);
+            notTooCloseForSiblings = false;
             break;
           }
         }
         
-        if (bestSecondParent) {
-          potentialParents.push(bestSecondParent);
-          console.log(`💑 ${bestSecondParent.name} added as second parent`);
+        if (!hasSufficientAgeGap || !notTooCloseForSiblings) {
+          return false;
+        }
+          
+          console.log(`✅ ${member.name} (${memberAge}) qualifies as potential second parent`);
+          return true;
+        });
+        
+        if (potentialSecondParents.length > 0) {
+          // Take the first qualified candidate
+          const secondParent = potentialSecondParents[0];
+          potentialParents.push(secondParent);
+          console.log(`💑 ${secondParent.name} (${calculateAge(secondParent)}) added as second parent`);
         } else {
-          console.log(`❌ No suitable second parent found`);
+          console.log(`❌ No suitable second parent found - family will be single parent`);
         }
       }
       

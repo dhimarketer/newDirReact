@@ -97,6 +97,35 @@ describe('Enhanced Search Query Parser', () => {
       expect(maleResult.filters.gender).toBe('*m*');
       expect(femaleResult.filters.gender).toBe('*f*');
     });
+
+    // 2025-01-29: Test for multi-word name detection (mohamed umar manik)
+    it('should detect multi-word names correctly', async () => {
+      const result = await parseEnhancedQuery('mohamed umar manik');
+      
+      // Should be detected as a name, not an address
+      expect(result.filters.name).toBe('*mohamed umar manik*');
+      expect(result.fieldAssignments[0].field).toBe('name');
+      expect(result.fieldAssignments[0].confidence).toBeGreaterThan(80);
+      
+      // Should NOT be detected as an address
+      expect(result.filters.address).toBeUndefined();
+      
+      console.log('✅ Multi-word name detection result:', result);
+    });
+
+    it('should prioritize names over addresses for multi-word terms', async () => {
+      const result = await parseEnhancedQuery('mohamed umar manik, thaibaa');
+      
+      // First term should be name
+      expect(result.filters.name).toBe('*mohamed umar manik*');
+      expect(result.fieldAssignments[0].field).toBe('name');
+      
+      // Second term should be address
+      expect(result.filters.address).toBe('*thaibaa*');
+      expect(result.fieldAssignments[1].field).toBe('address');
+      
+      console.log('✅ Name vs Address priority result:', result);
+    });
   });
 
   describe('Edge Cases', () => {

@@ -204,6 +204,10 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     setIsLoading(true);
     setError(null);
     
+    console.log('=== FAMILY TREE WINDOW: Starting fetchFamilyMembers ===');
+    console.log('Address:', address);
+    console.log('Island:', island);
+    
     try {
       const response = await familyService.getFamilyByAddress(address, island);
       
@@ -224,7 +228,9 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
         
         try {
           // Always attempt to create the family group automatically
+          console.log('Calling createOrUpdateFamilyByAddress...');
           const createResponse = await familyService.createOrUpdateFamilyByAddress(address, island);
+          console.log('Create response:', createResponse);
           
           if (createResponse.success && createResponse.data) {
             console.log('Successfully created family group automatically');
@@ -234,14 +240,14 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
           } else {
             console.error('Failed to automatically create family group:', createResponse.error);
             // 2025-01-28: UPDATED - Show more accurate message since backend now allows family creation for all addresses
-            setError('Unable to create family group automatically. This could be due to no phonebook entries found at this address, or a temporary system issue. Please try again or contact support if the problem persists.');
+            setError(`Unable to create family group automatically: ${createResponse.error || 'Unknown error'}`);
             setFamilyGroupExists(false);
             setFamilyGroupData(null);
           }
         } catch (createError) {
           console.error('Error automatically creating family group:', createError);
           // 2025-01-28: UPDATED - Show more accurate message since backend now allows family creation for all addresses
-          setError('Unable to create family group due to a system error. Please try again or contact support if the problem persists.');
+          setError(`Unable to create family group due to a system error: ${createError instanceof Error ? createError.message : 'Unknown error'}`);
           setFamilyGroupExists(false);
           setFamilyGroupData(null);
         }
@@ -552,6 +558,30 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
               <p className="text-sm text-gray-500 mt-2">
                 Family tree is being generated automatically...
               </p>
+              {/* 2025-01-29: ADDED - Debug information and retry button */}
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800 mb-2">
+                  <strong>Debug Info:</strong>
+                </p>
+                <p className="text-xs text-blue-700 mb-1">
+                  Address: {address} | Island: {island}
+                </p>
+                <p className="text-xs text-blue-700 mb-1">
+                  Family Group Exists: {familyGroupExists ? 'Yes' : 'No'}
+                </p>
+                <p className="text-xs text-blue-700 mb-1">
+                  Loading: {isLoading ? 'Yes' : 'No'}
+                </p>
+                <p className="text-xs text-blue-700 mb-1">
+                  Error: {error || 'None'}
+                </p>
+                <button
+                  onClick={() => fetchFamilyMembers()}
+                  className="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                >
+                  Retry Family Creation
+                </button>
+              </div>
             </div>
           ) : (
             <>

@@ -33,6 +33,158 @@
   color: #3b82f6;
 }
 
+/* 2025-01-29: Add specific styling for add-entry page to override conflicts */
+.add-entry-page,
+.add-entry-page * {
+  box-sizing: border-box;
+}
+
+.add-entry-page .max-w-4xl {
+  max-width: 56rem !important;
+}
+
+.add-entry-page .max-w-6xl {
+  max-width: 72rem !important;
+}
+
+.add-entry-page .w-5.h-5 {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+}
+
+.add-entry-page .w-4.h-4 {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+.add-entry-page .w-6.h-6 {
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+}
+
+.add-entry-page .w-8.h-8 {
+  width: 2rem !important;
+  height: 2rem !important;
+}
+
+.add-entry-page .w-10.h-10 {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+}
+
+.add-entry-page .flex-shrink-0 {
+  flex-shrink: 0 !important;
+}
+
+.add-entry-page .min-w-0 {
+  min-width: 0 !important;
+}
+
+.add-entry-page .flex-1 {
+  flex: 1 1 0% !important;
+}
+
+/* 2025-01-29: Override Pico.css form styling to prevent full-width fields */
+.add-entry-page input,
+.add-entry-page select,
+.add-entry-page textarea {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 2025-01-29: More specific Pico.css overrides for form elements */
+.add-entry-page form input[type="text"],
+.add-entry-page form input[type="email"],
+.add-entry-page form input[type="tel"],
+.add-entry-page form select,
+.add-entry-page form textarea {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.add-entry-page form .grid > div {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.add-entry-page form .grid > div > input,
+.add-entry-page form .grid > div > select,
+.add-entry-page form .grid > div > textarea {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* Override any Pico.css form styling */
+.add-entry-page form {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.add-entry-page form > div {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.add-entry-page .grid {
+  display: grid !important;
+}
+
+.add-entry-page .grid-cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+}
+
+.add-entry-page .md\:grid-cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.add-entry-page .gap-4 {
+  gap: 1rem !important;
+}
+
+.add-entry-page .gap-6 {
+  gap: 1.5rem !important;
+}
+
+.add-entry-page .max-w-4xl {
+  max-width: 56rem !important;
+}
+
+.add-entry-page .max-w-6xl {
+  max-width: 72rem !important;
+}
+
+.add-entry-page .mx-auto {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.add-entry-page .px-4 {
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+}
+
+.add-entry-page .sm\:px-6 {
+  padding-left: 1.5rem !important;
+  padding-right: 1.5rem !important;
+}
+
+.add-entry-page .lg\:px-8 {
+  padding-left: 2rem !important;
+  padding-right: 2rem !important;
+}
+
+.add-entry-page .py-6 {
+  padding-top: 1.5rem !important;
+  padding-bottom: 1.5rem !important;
+}
+
+.add-entry-page .py-8 {
+  padding-top: 2rem !important;
+  padding-bottom: 2rem !important;
+}
+
 /* Form components */
 .form-group {
   margin-bottom: var(--spacing-md);
@@ -303,4 +455,186 @@
 .profile-details-scroll {
   scrollbar-width: thin;
   scrollbar-color: #CBD5E0 #F7FAFC;
+}
+
+/* 2025-01-29: ADDED - HomePage-specific styles for consistent styling */
+.home-page {
+  background-color: #f9fafb;
+  min-height: 100vh;
+}
+
+/* Welcome card styling */
+.welcome-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease-in-out;
+}
+
+.welcome-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Section styling */
+.section {
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+/* Stats grid styling */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.stat-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease-in-out;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0.5rem 0;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Action card styling */
+.action-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease-in-out;
+}
+
+.action-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.action-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+}
+
+.action-description {
+  color: #6b7280;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.action-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 1rem;
+  flex-shrink: 0;
+}
+
+.action-icon.red {
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+.action-icon.indigo {
+  background-color: #eef2ff;
+  color: #4f46e5;
+}
+
+/* Enhanced button styling for HomePage */
+.home-page .btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  border: none;
+  color: white;
+  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+.home-page .btn-primary:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .stat-card {
+    padding: 1rem;
+  }
+  
+  .stat-number {
+    font-size: 1.5rem;
+  }
+  
+  .welcome-card {
+    padding: 1rem;
+  }
+  
+  .action-card {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .page-title {
+    font-size: 2rem;
+  }
+  
+  .page-subtitle {
+    font-size: 1rem;
+  }
 }

@@ -6,8 +6,8 @@ from .models import PhoneBookEntry, Image, SearchHistory
 @admin.register(PhoneBookEntry)
 class PhoneBookEntryAdmin(admin.ModelAdmin):
     """Admin for PhoneBookEntry model"""
-    list_display = ['name', 'contact', 'nid', 'atoll', 'island', 'change_status', 'pep_status']
-    list_filter = ['change_status', 'atoll', 'island', 'gender', 'pep_status']
+    list_display = ['name', 'contact', 'nid', 'atoll', 'island', 'status', 'is_unlisted', 'change_status', 'pep_status']
+    list_filter = ['change_status', 'atoll', 'island', 'gender', 'pep_status', 'status', 'is_unlisted']
     search_fields = ['name', 'contact', 'nid', 'address', 'email']
     readonly_fields = ['pid']  # pid is the primary key
     
@@ -19,7 +19,7 @@ class PhoneBookEntryAdmin(admin.ModelAdmin):
             'fields': ('address', 'atoll', 'island', 'street', 'ward')
         }),
         ('Additional Information', {
-            'fields': ('party', 'status', 'remark', 'profession', 'pep_status', 'extra')
+            'fields': ('party', 'status', 'is_unlisted', 'remark', 'profession', 'pep_status', 'extra')
         }),
         ('Change Management', {
             'fields': ('change_status', 'requested_by', 'batch', 'image_status')

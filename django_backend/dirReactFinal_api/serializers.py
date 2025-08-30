@@ -317,6 +317,9 @@ class SearchSerializer(serializers.Serializer):
     page = serializers.IntegerField(required=False, default=1, min_value=1)
     page_size = serializers.IntegerField(required=False, default=20, min_value=1, max_value=100)
     limit_results = serializers.BooleanField(required=False, default=False)  # 2025-01-27: For family searches
+    # 2025-01-29: Added smart field detection flag for comma-separated queries
+    enableSmartFieldDetection = serializers.BooleanField(required=False, default=False)
+    useAndLogic = serializers.BooleanField(required=False, default=False)
 
 class BulkOperationSerializer(serializers.Serializer):
     """Serializer for bulk operations"""

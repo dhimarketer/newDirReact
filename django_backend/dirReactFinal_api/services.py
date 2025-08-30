@@ -4,7 +4,7 @@
 from django.db.models import Q, QuerySet
 from django.utils import timezone
 from datetime import datetime, timedelta
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, List
 from .utils import create_wildcard_query
 from dirReactFinal_directory.models import PhoneBookEntry
 import logging
@@ -184,12 +184,28 @@ class SearchService:
         }
         
         logger.info(f"Search analysis: {analysis}")
+        logger.info(f"DEBUG: Raw data received: {data}")
+        logger.info(f"DEBUG: Query field: '{data.get('query', 'NOT_FOUND')}'")
+        logger.info(f"DEBUG: has_query: {analysis['has_query']}")
         return analysis
     
     def handle_comma_separated_query(self, data: Dict[str, Any], analysis: Dict[str, Any]) -> Tuple[QuerySet, Dict[str, Any]]:
         """Handle comma-separated queries with AND logic"""
         # 2025-01-28: Extract comma-separated query logic from advanced_search method
         logger.info("Processing comma-separated query with AND logic")
+        
+        # 2025-01-29: ENABLED - Smart field detection for comma-separated queries
+        # Check if smart field detection is enabled
+        logger.info(f"DEBUG: Checking enableSmartFieldDetection. Data keys: {list(data.keys())}")
+        logger.info(f"DEBUG: enableSmartFieldDetection value: {data.get('enableSmartFieldDetection')}")
+        logger.info(f"DEBUG: enableSmartFieldDetection type: {type(data.get('enableSmartFieldDetection'))}")
+        
+        if data.get('enableSmartFieldDetection'):
+            logger.info("Smart field detection enabled - using intelligent field detection")
+            return self._handle_smart_field_detection(data, analysis)
+        
+        # Fall back to regular comma-separated logic
+        logger.info("Using regular comma-separated query logic")
         
         queryset = PhoneBookEntry.objects.all()
         and_conditions = Q()
@@ -285,7 +301,22 @@ class SearchService:
     
     def handle_field_combination_search(self, data: Dict[str, Any], analysis: Dict[str, Any]) -> QuerySet:
         """Handle searches with multiple field combinations (address+island, address+party, etc.)"""
-        # 2025-01-28: Extract field combination logic from advanced_search method
+        # 2025-01-29: FIXED - Don't start with all entries, only process when combinations exist
+        # This prevents returning all entries when no field combinations are found
+        
+        # Check if any field combinations exist
+        has_combinations = (
+            (analysis['has_address_filter'] and analysis['has_island_filter']) or
+            (analysis['has_address_filter'] and analysis['has_party_filter']) or
+            (analysis['has_name_filter'] and analysis['has_party_filter']) or
+            (analysis['has_island_filter'] and analysis['has_party_filter'])
+        )
+        
+        if not has_combinations:
+            # No field combinations found, return None to indicate no processing needed
+            return None
+        
+        # Process field combinations only when they exist
         queryset = PhoneBookEntry.objects.all()
         
         if analysis['has_address_filter'] and analysis['has_island_filter']:
@@ -432,16 +463,22 @@ class SearchService:
         # 2025-01-28: Extract general query logic from advanced_search method
         query = data['query'].strip()
         logger.info(f"General query search: '{query}'")
+        logger.info(f"DEBUG: Query type analysis - isdigit: {query.isdigit()}, political party: {query.upper() in self.political_parties}, gender: {query.upper() in self.gender_values}, atoll: {query.upper() in self.atoll_codes}")
         
         if query.isdigit():
+            logger.info(f"DEBUG: Handling as numeric query")
             return self._handle_numeric_query(query, queryset)
         elif query.upper() in self.political_parties:
+            logger.info(f"DEBUG: Handling as political party query")
             return self._handle_political_party_query(query, queryset)
         elif query.upper() in self.gender_values:
+            logger.info(f"DEBUG: Handling as gender query")
             return self._handle_gender_query(query, queryset)
         elif len(query) <= 3 and query.upper() in self.atoll_codes:
+            logger.info(f"DEBUG: Handling as atoll query")
             return self._handle_atoll_query(query, queryset)
         else:
+            logger.info(f"DEBUG: Handling as text query")
             return self._handle_text_query(query, queryset)
     
     def _handle_numeric_query(self, query: str, queryset: QuerySet) -> QuerySet:
@@ -494,6 +531,9 @@ class SearchService:
         
         # Check if query looks like an island name
         is_likely_island = any(island in query.lower() for island in self.island_indicators)
+        logger.info(f"DEBUG: Query '{query}' - is_likely_island: {is_likely_island}")
+        logger.info(f"DEBUG: Island indicators: {self.island_indicators}")
+        logger.info(f"DEBUG: Query lower: '{query.lower()}'")
         
         # Check if query looks like a profession
         is_likely_profession = any(prof in query.lower() for prof in self.profession_indicators)
@@ -510,7 +550,10 @@ class SearchService:
                 island_query = Q(island__name__iregex=query.replace('*', '.*').replace('%', '.*'))
             else:
                 island_query = Q(island__name__icontains=query)
-            return queryset.filter(island_query)
+            logger.info(f"DEBUG: Island query: {island_query}")
+            result = queryset.filter(island_query)
+            logger.info(f"DEBUG: Island search result count: {result.count()}")
+            return result
         elif is_likely_profession:
             logger.info(f"Query '{query}' detected as profession - searching in profession field")
             profession_query = create_wildcard_query('profession', query)
@@ -527,9 +570,11 @@ class SearchService:
                 island_query = Q(island__name__icontains=query)
             profession_query = create_wildcard_query('profession', query)
             remark_query = create_wildcard_query('remark', query)
-            return queryset.filter(
+            result = queryset.filter(
                 name_query | address_query | island_query | profession_query | remark_query
             )
+            logger.info(f"DEBUG: Comprehensive search result count: {result.count()}")
+            return result
     
     def apply_individual_filters(self, data: Dict[str, Any], analysis: Dict[str, Any], queryset: QuerySet) -> QuerySet:
         """Apply individual field filters to the queryset"""
@@ -637,3 +682,440 @@ class SearchService:
                 logger.info(f"Sample entry: {entry.name} - Party: {entry.party} - Contact: {entry.contact}")
         
         return results, total_count, page, page_size
+
+    def _handle_smart_field_detection(self, data: Dict[str, Any], analysis: Dict[str, Any]) -> Tuple[QuerySet, Dict[str, Any]]:
+        """Handle smart field detection for comma-separated queries"""
+        # 2025-01-29: NEW - Real database-driven field detection
+        logger.info("Running smart field detection with real database queries")
+        
+        queryset = PhoneBookEntry.objects.all()
+        smart_filters = {}
+        field_assignments = []
+        
+        # Get the raw query terms from frontend
+        raw_query = data.get('query', '')
+        if not raw_query:
+            logger.warning("No query terms provided for smart field detection")
+            return queryset, {'search_type': 'smart_field_detection', 'error': 'No query terms'}
+        
+        # 2025-01-29: FIXED - Preserve multi-word address phrases instead of splitting them
+        # Split by commas first, then preserve multi-word terms as complete phrases
+        comma_terms = [term.strip() for term in raw_query.split(',') if term.strip()]
+        terms = []
+        
+        for comma_term in comma_terms:
+            # If the term contains spaces, it's likely a multi-word address/phrase
+            # Keep it as a complete term instead of splitting into individual words
+            if ' ' in comma_term:
+                terms.append(comma_term)
+                logger.info(f"🔍 Preserved multi-word term: '{comma_term}' (likely address/phrase)")
+            else:
+                # Single word term, add as is
+                terms.append(comma_term)
+                logger.info(f"🔍 Single word term: '{comma_term}'")
+        
+        logger.info(f"Smart field detection analyzing terms: {terms}")
+        
+        # 2025-01-29: DEBUG - Check what's in the database for these terms
+        self.debug_search_terms(terms)
+        
+        # For each term, run database queries to find best field match
+        for term in terms:
+            logger.info(f"Analyzing term: '{term}'")
+            
+            # 2025-01-29: ENHANCED - Prioritize address detection for multi-word terms
+            # Multi-word terms are more likely to be addresses than names or other fields
+            if ' ' in term:
+                logger.info(f"🔍 Multi-word term '{term}' - prioritizing address detection")
+                # For multi-word terms, check address field first
+                address_count = PhoneBookEntry.objects.filter(address__icontains=term).count()
+                if address_count > 0:
+                    # High confidence for multi-word terms in address field
+                    smart_filters['address'] = f"*{term}*"
+                    field_assignments.append({
+                        'term': term,
+                        'field': 'address',
+                        'count': address_count,
+                        'confidence': 95,  # High confidence for multi-word addresses
+                        'reason': 'Multi-word term detected as address'
+                    })
+                    logger.info(f"✅ Multi-word term '{term}' assigned to address field ({address_count} matches)")
+                else:
+                    # Even if no matches, still assign to address field for proper search
+                    # This ensures the search logic works correctly
+                    smart_filters['address'] = f"*{term}*"
+                    field_assignments.append({
+                        'term': term,
+                        'field': 'address',
+                        'count': 0,
+                        'confidence': 0,  # No confidence since no matches found
+                        'reason': 'Multi-word term assigned to address field (no matches found)'
+                    })
+                    logger.info(f"⚠️ Multi-word term '{term}' assigned to address field (0 matches) - will filter out all results")
+                continue  # Skip further analysis for this term
+            
+            # Run actual database queries against all relevant fields
+            field_matches = self._query_all_fields_for_term(term)
+            
+            if field_matches:
+                # Find the field with the highest match count
+                best_field = max(field_matches, key=lambda x: x['count'])
+                
+                if best_field['count'] > 0:
+                    # Apply the filter to this field
+                    smart_filters[best_field['field']] = f"*{term}*"
+                    field_assignments.append({
+                        'term': term,
+                        'field': best_field['field'],
+                        'count': best_field['count'],
+                        'confidence': self._calculate_confidence(best_field['count'], best_field['total']),
+                        'reason': 'Database query detected best field'
+                    })
+                    
+                    logger.info(f"✅ Term '{term}' assigned to {best_field['field']} field ({best_field['count']} matches)")
+                else:
+                    logger.info(f"❌ Term '{term}' has no matches in any field")
+            else:
+                logger.info(f"❌ Term '{term}' could not be analyzed")
+        
+        # Apply all the smart filters
+        if smart_filters:
+            logger.info(f"Applying smart filters: {smart_filters}")
+            logger.info(f"🔍 Smart field detection will apply AND logic between: {list(smart_filters.keys())}")
+            queryset, filter_results = self._apply_smart_filters(queryset, smart_filters)
+        else:
+            logger.info("No smart filters to apply, using general search")
+            # Fall back to general search across all fields
+            general_query = Q()
+            for term in terms:
+                general_query |= (
+                    Q(name__icontains=term) |
+                    Q(address__icontains=term) |
+                    Q(island__name__icontains=term) |
+                    Q(atoll__name__icontains=term) |
+                    Q(party__name__icontains=term) |
+                    Q(contact__icontains=term) |
+                    Q(nid__icontains=term) |
+                    Q(profession__icontains=term) |
+                    Q(gender__icontains=term) |
+                    Q(remark__icontains=term) |
+                    Q(pep_status__icontains=term)
+                )
+            queryset = queryset.filter(general_query)
+            logger.info(f"🔍 Applied general search with OR logic for {len(terms)} terms")
+        
+        response_data = {
+            'search_type': 'smart_field_detection',
+            'field_assignments': field_assignments,
+            'smart_filters_applied': smart_filters,
+            'terms_analyzed': terms
+        }
+        
+        logger.info(f"Smart field detection completed. Results: {queryset.count()} entries")
+        return queryset, response_data
+
+    def _query_all_fields_for_term(self, term: str) -> List[Dict[str, Any]]:
+        """Query all relevant fields to find matches for a term"""
+        # 2025-01-29: NEW - Real database queries for field detection
+        logger.info(f"Running database queries for term: '{term}'")
+        
+        # 2025-01-29: FIXED - Import models at the top to prevent import errors
+        from dirReactFinal_core.models import Island
+        
+        field_results = []
+        
+        try:
+            # Query each field and count matches
+            name_count = PhoneBookEntry.objects.filter(name__icontains=term).count()
+            address_count = PhoneBookEntry.objects.filter(address__icontains=term).count()
+            
+            # 2025-01-29: ENHANCED - Better island detection with detailed logging and fallback
+            try:
+                # 2025-01-29: FIXED - Handle numerical foreign key relationship correctly
+                # First, find the island ID from the Island table
+                
+                # Try to find the island by name
+                island_matches = Island.objects.filter(name__icontains=term)
+                if island_matches.exists():
+                    # Get the island IDs that match
+                    island_ids = list(island_matches.values_list('id', flat=True))
+                    logger.info(f"✅ Found island IDs for '{term}': {island_ids}")
+                    
+                    # Now search the t1 table using these island IDs
+                    island_count = PhoneBookEntry.objects.filter(island_id__in=island_ids).count()
+                    logger.info(f"✅ Island query for '{term}' using IDs {island_ids}: {island_count} matches")
+                else:
+                    # No island found by name
+                    island_count = 0
+                    logger.info(f"❌ No island found with name containing '{term}'")
+                
+                # If no matches found, try alternative island detection methods
+                if island_count == 0:
+                    # Check if term is in our island indicators list
+                    if term.lower() in [ind.lower() for ind in self.island_indicators]:
+                        logger.info(f"🔍 Term '{term}' found in island indicators - checking for similar names")
+                        # Try partial matching with island names
+                        try:
+                            similar_islands = Island.objects.filter(name__icontains=term)
+                            if similar_islands.exists():
+                                logger.info(f"✅ Found {similar_islands.count()} similar island names for '{term}'")
+                                # Update count to reflect potential matches
+                                island_count = 1  # At least one potential match
+                        except Exception as similar_error:
+                            logger.warning(f"❌ Similar island search failed: {similar_error}")
+                    
+                    # 2025-01-29: ADDITIONAL FALLBACK - Try exact match for common island names
+                    if island_count == 0:
+                        try:
+                            # Check for exact island name matches
+                            exact_island = Island.objects.filter(name__iexact=term)
+                            if exact_island.exists():
+                                logger.info(f"✅ Found exact island match for '{term}'")
+                                island_count = 1
+                        except Exception as exact_error:
+                            logger.warning(f"❌ Exact island search failed: {exact_error}")
+                
+            except Exception as island_error:
+                logger.warning(f"❌ Island query failed for '{term}': {island_error}")
+                island_count = 0
+            
+            try:
+                # 2025-01-29: FIXED - Use numerical ID approach for atoll detection
+                from dirReactFinal_core.models import Atoll
+                atoll_matches = Atoll.objects.filter(name__icontains=term)
+                if atoll_matches.exists():
+                    atoll_ids = list(atoll_matches.values_list('id', flat=True))
+                    logger.info(f"✅ Found atoll IDs for '{term}': {atoll_ids}")
+                    atoll_count = PhoneBookEntry.objects.filter(atoll_id__in=atoll_ids).count()
+                    logger.info(f"✅ Atoll query for '{term}' using IDs {atoll_ids}: {atoll_count} matches")
+                else:
+                    atoll_count = 0
+                    logger.info(f"❌ No atoll found with name containing '{term}'")
+            except Exception as atoll_error:
+                logger.warning(f"❌ Atoll query failed for '{term}': {atoll_error}")
+                atoll_count = 0
+            
+            try:
+                # 2025-01-29: FIXED - Use numerical ID approach for party detection
+                from dirReactFinal_core.models import Party
+                party_matches = Party.objects.filter(name__icontains=term)
+                if party_matches.exists():
+                    party_ids = list(party_matches.values_list('id', flat=True))
+                    logger.info(f"✅ Found party IDs for '{term}': {party_ids}")
+                    party_count = PhoneBookEntry.objects.filter(party_id__in=party_ids).count()
+                    logger.info(f"✅ Party query for '{term}' using IDs {party_ids}: {party_count} matches")
+                else:
+                    party_count = 0
+                    logger.info(f"❌ No party found with name containing '{term}'")
+            except Exception as party_error:
+                logger.warning(f"❌ Party query failed for '{term}': {party_error}")
+                party_count = 0
+            contact_count = PhoneBookEntry.objects.filter(contact__icontains=term).count()
+            nid_count = PhoneBookEntry.objects.filter(nid__icontains=term).count()
+            profession_count = PhoneBookEntry.objects.filter(profession__icontains=term).count()
+            gender_count = PhoneBookEntry.objects.filter(gender__icontains=term).count()
+            remark_count = PhoneBookEntry.objects.filter(remark__icontains=term).count()
+            pep_status_count = PhoneBookEntry.objects.filter(pep_status__icontains=term).count()
+            
+            # Get total record count for confidence calculation
+            total_records = PhoneBookEntry.objects.count()
+            
+            # Build results list
+            field_results = [
+                {'field': 'name', 'count': name_count, 'total': total_records},
+                {'field': 'address', 'count': address_count, 'total': total_records},
+                {'field': 'island', 'count': island_count, 'total': total_records},
+                {'field': 'atoll', 'count': atoll_count, 'total': total_records},
+                {'field': 'party', 'count': party_count, 'total': total_records},
+                {'field': 'contact', 'count': contact_count, 'total': total_records},
+                {'field': 'nid', 'count': nid_count, 'total': total_records},
+                {'field': 'profession', 'count': profession_count, 'total': total_records},
+                {'field': 'gender', 'count': gender_count, 'total': total_records},
+                {'field': 'remark', 'count': remark_count, 'total': total_records},
+                {'field': 'pep_status', 'count': pep_status_count, 'total': total_records}
+            ]
+            
+            logger.info(f"Field query results for '{term}': {field_results}")
+            
+        except Exception as e:
+            logger.error(f"Error querying fields for term '{term}': {e}")
+            field_results = []
+        
+        return field_results
+
+    def _calculate_confidence(self, match_count: int, total_records: int) -> int:
+        """Calculate confidence percentage for field assignment"""
+        if match_count == 0:
+            return 0
+        
+        ratio = match_count / total_records
+        
+        if ratio > 0.1:
+            return 95  # Very high confidence
+        elif ratio > 0.05:
+            return 85  # High confidence
+        elif ratio > 0.02:
+            return 75  # Medium-high confidence
+        elif ratio > 0.01:
+            return 65  # Medium confidence
+        elif ratio > 0.005:
+            return 55  # Low-medium confidence
+        else:
+            return max(30, int(ratio * 1000))  # Minimum 30% confidence
+
+    def _apply_smart_filters(self, queryset: QuerySet, smart_filters: Dict[str, str]) -> Tuple[QuerySet, Dict[str, Any]]:
+        """Apply smart filters to the queryset and return detailed results"""
+        # 2025-01-29: ENHANCED - Apply detected field filters with detailed logging and proper AND logic
+        logger.info(f"Applying smart filters: {smart_filters}")
+        
+        # 2025-01-29: FIXED - Import models at the top to prevent import errors
+        from dirReactFinal_core.models import Island, Atoll, Party
+        
+        initial_count = queryset.count()
+        logger.info(f"📊 Initial queryset count: {initial_count}")
+        
+        filter_results = {
+            'initial_count': initial_count,
+            'filters_applied': [],
+            'final_count': 0,
+            'filter_breakdown': {}
+        }
+        
+        # 2025-01-29: FIXED - Apply all filters with AND logic to ensure proper combination
+        # Build a combined Q object for all filters to ensure AND logic
+        combined_filters = Q()
+        
+        for field, value in smart_filters.items():
+            before_count = queryset.count()
+            
+            if field in ['island', 'atoll', 'party']:
+                # Handle ForeignKey fields - need to find IDs first
+                if '*' in value:
+                    # Remove wildcards for ForeignKey searches
+                    clean_value = value.replace('*', '')
+                    
+                    if field == 'island':
+                        # For island field, find the island ID first
+                        island_matches = Island.objects.filter(name__icontains=clean_value)
+                        if island_matches.exists():
+                            island_ids = list(island_matches.values_list('id', flat=True))
+                            field_filter = Q(island_id__in=island_ids)
+                            logger.info(f"🔍 Island filter: '{clean_value}' → IDs {island_ids}")
+                        else:
+                            # No island found, create empty filter
+                            field_filter = Q(pk__isnull=True)  # This will return no results
+                            logger.warning(f"❌ No island found for '{clean_value}'")
+                    elif field == 'atoll':
+                        # For atoll field, find the atoll ID first
+                        atoll_matches = Atoll.objects.filter(name__icontains=clean_value)
+                        if atoll_matches.exists():
+                            atoll_ids = list(atoll_matches.values_list('id', flat=True))
+                            field_filter = Q(atoll_id__in=atoll_ids)
+                            logger.info(f"🔍 Atoll filter: '{clean_value}' → IDs {atoll_ids}")
+                        else:
+                            field_filter = Q(pk__isnull=True)
+                            logger.warning(f"❌ No atoll found for '{clean_value}'")
+                    elif field == 'party':
+                        # For party field, find the party ID first
+                        party_matches = Party.objects.filter(name__icontains=clean_value)
+                        if party_matches.exists():
+                            party_ids = list(party_matches.values_list('id', flat=True))
+                            field_filter = Q(party_id__in=party_ids)
+                            logger.info(f"🔍 Party filter: '{clean_value}' → IDs {party_ids}")
+                        else:
+                            field_filter = Q(pk__isnull=True)
+                            logger.warning(f"❌ No party found for '{clean_value}'")
+                else:
+                    # No wildcards, same logic
+                    if field == 'island':
+                        island_matches = Island.objects.filter(name__icontains=value)
+                        if island_matches.exists():
+                            island_ids = list(island_matches.values_list('id', flat=True))
+                            field_filter = Q(island_id__in=island_ids)
+                        else:
+                            field_filter = Q(pk__isnull=True)
+                    elif field == 'atoll':
+                        atoll_matches = Atoll.objects.filter(name__icontains=value)
+                        if atoll_matches.exists():
+                            atoll_ids = list(atoll_matches.values_list('id', flat=True))
+                            field_filter = Q(atoll_id__in=atoll_ids)
+                        else:
+                            field_filter = Q(pk__isnull=True)
+                    elif field == 'party':
+                        party_matches = Party.objects.filter(name__icontains=value)
+                        if party_matches.exists():
+                            party_ids = list(party_matches.values_list('id', flat=True))
+                            field_filter = Q(party_id__in=party_ids)
+                        else:
+                            field_filter = Q(pk__isnull=True)
+            else:
+                # Handle regular text fields
+                if '*' in value:
+                    # Remove wildcards for icontains searches
+                    clean_value = value.replace('*', '')
+                    field_filter = Q(**{f"{field}__icontains": clean_value})
+                else:
+                    field_filter = Q(**{f"{field}__icontains": value})
+            
+            # Add to combined filters with AND logic
+            combined_filters &= field_filter
+            
+            logger.info(f"✅ Added filter: {field} = '{value}' to combined AND logic")
+            
+            filter_results['filters_applied'].append({
+                'field': field,
+                'value': value,
+                'before_count': before_count,
+                'filter_added': True
+            })
+            
+            filter_results['filter_breakdown'][field] = {
+                'value': value,
+                'filter_type': 'combined_and'
+            }
+        
+        # Apply all filters at once with AND logic
+        if combined_filters:
+            queryset = queryset.filter(combined_filters)
+            logger.info(f"🎯 Applied combined AND filters: {combined_filters}")
+        
+        final_count = queryset.count()
+        filter_results['final_count'] = final_count
+        
+        logger.info(f"🎯 Final combined result count: {final_count}")
+        logger.info(f"📊 Total reduction: {initial_count} → {final_count} (reduced by {initial_count - final_count})")
+        
+        return queryset, filter_results
+
+    def debug_search_terms(self, terms: List[str]):
+        """Debug method to check what's in the database for given search terms"""
+        logger.info("🔍 DEBUG: Checking database content for search terms")
+        
+        for term in terms:
+            logger.info(f"\n🔍 DEBUG: Analyzing term '{term}'")
+            
+            # Check address field
+            address_count = PhoneBookEntry.objects.filter(address__icontains=term).count()
+            logger.info(f"   📍 Address '{term}': {address_count} matches")
+            
+            # Check island field
+            from dirReactFinal_core.models import Island
+            island_matches = Island.objects.filter(name__icontains=term)
+            if island_matches.exists():
+                island_ids = list(island_matches.values_list('id', flat=True))
+                island_count = PhoneBookEntry.objects.filter(island_id__in=island_ids).count()
+                logger.info(f"   🏝️ Island '{term}' (IDs {island_ids}): {island_count} matches")
+            else:
+                logger.info(f"   🏝️ Island '{term}': No matches found")
+            
+            # Check name field
+            name_count = PhoneBookEntry.objects.filter(name__icontains=term).count()
+            logger.info(f"   👤 Name '{term}': {name_count} matches")
+            
+            # Check other fields
+            contact_count = PhoneBookEntry.objects.filter(contact__icontains=term).count()
+            profession_count = PhoneBookEntry.objects.filter(profession__icontains=term).count()
+            logger.info(f"   📞 Contact '{term}': {contact_count} matches")
+            logger.info(f"   💼 Profession '{term}': {profession_count} matches")
+        
+        logger.info("🔍 DEBUG: Database content check completed")

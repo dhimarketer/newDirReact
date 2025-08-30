@@ -40,6 +40,17 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   const { user } = useAuth();
   const { adminSearchFieldSettings, fetchAdminSearchFieldSettings } = useSettingsStore();
   
+  // 2025-01-29: DEBUG - Log component props
+  console.log('🔍 SearchResults: Component rendered with props:', {
+    resultsLength: results?.length,
+    totalCount,
+    currentPage,
+    pageSize,
+    isLoading,
+    searchFilters
+  });
+  console.log('🔍 SearchResults: Results array:', results);
+  
   // Family tree window state
   const [familyTreeWindowOpen, setFamilyTreeWindowOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState('');
@@ -117,33 +128,18 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         setSelectedIsland(island);
         setFamilyTreeWindowOpen(true);
       } else {
-        // No saved family - check if we can create one
-        console.log('No saved family found, checking if we can create one');
+        // No saved family - create one automatically using backend inference
+        console.log('No saved family found, creating one automatically for address:', address);
         
-        // Check if any entries at this address have DOB data
-        const entriesAtAddress = results.filter(entry => 
-          entry.address === address && entry.island === island
-        );
-        
-        const hasDOBData = entriesAtAddress.some(entry => 
-          entry.DOB && entry.DOB !== 'None' && entry.DOB.trim() !== ''
-        );
-        
-        if (hasDOBData) {
-          // Can create family - open family tree window
-          console.log('Can create family for address:', address);
-          setSelectedAddress(address);
-          setSelectedIsland(island);
-          setFamilyTreeWindowOpen(true);
-        } else {
-          // No DOB data - show message
-          alert('No date of birth (DOB) data available for this address. Family tree cannot be generated.');
-          return;
-        }
+        // 2025-01-29: FIXED - Allow family tree generation even without DOB data
+        // The backend will handle family inference and create the family group
+        setSelectedAddress(address);
+        setSelectedIsland(island);
+        setFamilyTreeWindowOpen(true);
       }
     } catch (error) {
       console.error('Error checking for saved family:', error);
-      // Fallback to original behavior
+      // Fallback to opening family tree window - let backend handle inference
       setSelectedAddress(address);
       setSelectedIsland(island);
       setFamilyTreeWindowOpen(true);
@@ -157,11 +153,8 @@ const SearchResults: React.FC<SearchResultsProps> = ({
 
   // 2025-01-28: NEW - Get tooltip text for address click
   const getAddressTooltip = (entry: PhoneBookEntry): string => {
-    if (hasDOBData(entry)) {
-      return 'Click to view family tree';
-    } else {
-      return 'Family tree not available - no date of birth (DOB) data for this person';
-    }
+    // 2025-01-29: FIXED - Family trees are always available, regardless of DOB data
+    return 'Click to view family tree';
   };
 
   // Get field value for display
@@ -243,7 +236,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         // Address has DOB data - make it clickable for family tree
         return (
           <button
-            onClick={() => handleAddressClick(value, entry.island || '')}
+            onClick={() => handleAddressClick(value, entry.island_name || entry.island || '')}
             className="text-sm text-blue-400 hover:text-blue-300 underline cursor-pointer truncate-text"
             title={tooltipText}
           >
@@ -272,6 +265,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   };
 
   if (isLoading) {
+    console.log('🔍 SearchResults: Showing loading state');
     return (
       <div className="flex justify-center items-center py-12">
         <div className="text-center">
@@ -283,6 +277,9 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   }
 
   if (results.length === 0) {
+    console.log('🔍 SearchResults: Showing no results state - results.length === 0');
+    console.log('🔍 SearchResults: Results array:', results);
+    console.log('🔍 SearchResults: Total count:', totalCount);
     return (
       <div className="text-center py-12">
         <div className="text-blue-500 mb-4">
@@ -299,6 +296,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     );
   }
 
+  console.log('🔍 SearchResults: Rendering results table with', results.length, 'results');
   return (
     <div className="search-results-container space-y-6">
       {/* Results Header */}

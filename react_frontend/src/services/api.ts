@@ -202,6 +202,22 @@ class ApiService {
     return this.post(`/users/${userId}/change_password/`, passwordData);
   }
 
+  activateUser(userId: number) {
+    return this.post(`/users/${userId}/activate_user/`, {});
+  }
+
+  banUser(userId: number) {
+    return this.post(`/users/${userId}/ban_user/`, {});
+  }
+
+  unbanUser(userId: number) {
+    return this.post(`/users/${userId}/unban_user/`, {});
+  }
+
+  changeUserType(userId: number, userType: string) {
+    return this.post(`/users/${userId}/change_user_type/`, { user_type: userType });
+  }
+
   // Error handling
   private handleError(error: AxiosError) {
     if (error.response) {

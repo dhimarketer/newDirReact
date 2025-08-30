@@ -36,12 +36,17 @@ class PhoneBookEntryFilter(django_filters.FilterSet):
     ])
     profession = django_filters.CharFilter(lookup_expr='icontains')
     
-    # Status filters
+    # Status filters - 2025-01-29: ENHANCED - Added deceased and unlisted status options
     status = django_filters.ChoiceFilter(choices=[
         ('active', 'Active'),
+        ('deceased', 'Deceased'),
+        ('unlisted', 'Unlisted'),
         ('inactive', 'Inactive'),
-        ('pending', 'Pending')
+        ('outdated', 'Outdated')
     ])
+    
+    # 2025-01-29: NEW - Filter for unlisted entries
+    is_unlisted = django_filters.BooleanFilter(label='Unlisted')
     change_status = django_filters.ChoiceFilter(choices=[
         ('pending', 'Pending'),
         ('approved', 'Approved'),

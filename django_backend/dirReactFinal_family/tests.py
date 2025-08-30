@@ -128,7 +128,7 @@ class DeleteUpdatedFamiliesTestCase(APITestCase):
         # Check response
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('message', response.data)
-        self.assertIn('details', response.data)
+        self.assertIn('success', response.data)
         
         # Verify family is deleted
         self.assertFalse(FamilyGroup.objects.filter(id=self.family_group.id).exists())

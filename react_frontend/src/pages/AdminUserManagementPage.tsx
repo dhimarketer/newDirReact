@@ -155,6 +155,10 @@ const AdminUserManagementPage: React.FC = () => {
     new_password: '',
     confirm_password: ''
   });
+  const [showPromoteModal, setShowPromoteModal] = useState(false);
+  const [promoteData, setPromoteData] = useState({
+    user_type: 'basic'
+  });
 
   // Fetch users from API
   const fetchUsers = async () => {
@@ -433,6 +437,109 @@ const AdminUserManagementPage: React.FC = () => {
     setShowPasswordModal(true);
   };
 
+  // Open promote/demote modal
+  const openPromoteModal = (user: User) => {
+    setSelectedUser(user);
+    setPromoteData({ user_type: user.user_type });
+    setShowPromoteModal(true);
+  };
+
+  // Handle user activation
+  const handleActivateUser = async (user: User) => {
+    try {
+      if (!token) {
+        setError('No authentication token available');
+        return;
+      }
+
+      const response = await apiService.activateUser(user.id);
+
+      if (response.status !== 200 && response.status !== 201) {
+        const errorData = response.data;
+        throw new Error(errorData.detail || errorData.error || 'Failed to activate user');
+      }
+
+      setError(null);
+      fetchUsers();
+    } catch (err) {
+      console.error('Error activating user:', err);
+      setError(err instanceof Error ? err.message : 'Failed to activate user');
+    }
+  };
+
+  // Handle user ban
+  const handleBanUser = async (user: User) => {
+    try {
+      if (!token) {
+        setError('No authentication token available');
+        return;
+      }
+
+      const response = await apiService.banUser(user.id);
+
+      if (response.status !== 200 && response.status !== 201) {
+        const errorData = response.data;
+        throw new Error(errorData.detail || errorData.error || 'Failed to ban user');
+      }
+
+      setError(null);
+      fetchUsers();
+    } catch (err) {
+      console.error('Error banning user:', err);
+      setError(err instanceof Error ? err.message : 'Failed to ban user');
+    }
+  };
+
+  // Handle user unban
+  const handleUnbanUser = async (user: User) => {
+    try {
+      if (!token) {
+        setError('No authentication token available');
+        return;
+      }
+
+      const response = await apiService.unbanUser(user.id);
+
+      if (response.status !== 200 && response.status !== 201) {
+        const errorData = response.data;
+        throw new Error(errorData.detail || errorData.error || 'Failed to unban user');
+      }
+
+      setError(null);
+      fetchUsers();
+    } catch (err) {
+      console.error('Error unbanning user:', err);
+      setError(err instanceof Error ? err.message : 'Failed to unban user');
+    }
+  };
+
+  // Handle user type change
+  const handleChangeUserType = async () => {
+    if (!selectedUser) return;
+
+    try {
+      if (!token) {
+        setError('No authentication token available');
+        return;
+      }
+
+      const response = await apiService.changeUserType(selectedUser.id, promoteData.user_type);
+
+      if (response.status !== 200 && response.status !== 201) {
+        const errorData = response.data;
+        throw new Error(errorData.detail || errorData.error || 'Failed to change user type');
+      }
+
+      setShowPromoteModal(false);
+      setSelectedUser(null);
+      setError(null);
+      fetchUsers();
+    } catch (err) {
+      console.error('Error changing user type:', err);
+      setError(err instanceof Error ? err.message : 'Failed to change user type');
+    }
+  };
+
   // Filter users based on search and filters
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -516,17 +623,7 @@ const AdminUserManagementPage: React.FC = () => {
           Manage user accounts, permissions, and access levels
         </p>
         
-        {/* Debug Info */}
-        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
-          <h4 className="font-semibold text-blue-800 mb-2">Debug Info:</h4>
-          <div className="text-sm text-blue-700 space-y-1">
-            <p>showEditModal: {showEditModal.toString()}</p>
-            <p>showDeleteModal: {showDeleteModal.toString()}</p>
-            <p>selectedUser: {selectedUser ? selectedUser.username : 'null'}</p>
-            <p>Users loaded: {users.length}</p>
-            <p>Modal component should render: {(showEditModal && !!selectedUser).toString()}</p>
-          </div>
-        </div>
+
       </div>
 
       {/* Error Display */}
@@ -550,6 +647,63 @@ const AdminUserManagementPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* User Statistics */}
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Users className="h-6 w-6 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Users</p>
+              <p className="text-2xl font-semibold text-gray-900">{users.length}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Active Users</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                {users.filter(u => u.status === 'active' && !u.is_banned).length}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-red-100 rounded-lg">
+              <UserX className="h-6 w-6 text-red-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Banned Users</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                {users.filter(u => u.is_banned).length}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <Star className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Premium Users</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                {users.filter(u => u.user_type === 'premium').length}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Controls */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
@@ -599,17 +753,7 @@ const AdminUserManagementPage: React.FC = () => {
           Add User
         </button>
         
-        {/* Test Modal Button */}
-        <button
-          onClick={() => {
-            console.log('Test modal button clicked');
-            setSelectedUser(users[0]);
-            setShowEditModal(true);
-          }}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 ml-2"
-        >
-          Test Modal
-        </button>
+
 
       </div>
 
@@ -629,7 +773,7 @@ const AdminUserManagementPage: React.FC = () => {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Score
+                  Credit Points
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Joined
@@ -667,26 +811,54 @@ const AdminUserManagementPage: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
+                    <div className="flex items-center space-x-2">
                       {getUserTypeIcon(user.user_type)}
-                      <span className="ml-2 text-sm text-gray-900 capitalize">
+                      <span className={`text-sm font-medium capitalize px-2 py-1 rounded-full ${
+                        user.user_type === 'admin'
+                          ? 'bg-purple-100 text-purple-800'
+                          : user.user_type === 'moderator'
+                          ? 'bg-blue-100 text-blue-800'
+                          : user.user_type === 'premium'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
                         {user.user_type}
                       </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
+                    <div className="flex items-center space-x-2">
                       {getStatusIcon(user.status, user.is_banned)}
-                      <span className="ml-2 text-sm text-gray-900 capitalize">
-                        {user.is_banned ? 'Banned' : user.status}
-                      </span>
+                      <div>
+                        <span className={`text-sm font-medium capitalize px-2 py-1 rounded-full ${
+                          user.is_banned 
+                            ? 'bg-red-100 text-red-800' 
+                            : user.status === 'active'
+                            ? 'bg-green-100 text-green-800'
+                            : user.status === 'suspended'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {user.is_banned ? 'Banned' : user.status}
+                        </span>
+                        {user.is_banned && (
+                          <div className="text-xs text-red-600 mt-1">Account suspended</div>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{user.score}</div>
-                    {user.spam_score > 0 && (
-                      <div className="text-xs text-red-500">
-                        Spam: {user.spam_score}
+                    <div className="flex items-center space-x-2">
+                      <div className="text-lg font-semibold text-gray-900">{user.score}</div>
+                      {user.spam_score > 0 && (
+                        <div className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">
+                          Spam: {user.spam_score}
+                        </div>
+                      )}
+                    </div>
+                    {user.warning_count > 0 && (
+                      <div className="text-xs text-orange-600 mt-1">
+                        ⚠️ {user.warning_count} warning{user.warning_count !== 1 ? 's' : ''}
                       </div>
                     )}
                   </td>
@@ -694,37 +866,82 @@ const AdminUserManagementPage: React.FC = () => {
                     {new Date(user.join_date).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-2">
+                      {/* Edit User */}
                       <button
                         onClick={() => openEditModal(user)}
-                        className="text-blue-600 hover:text-blue-900"
+                        className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
                         title="Edit User"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
+                      
+                      {/* Update Score */}
                       <button
                         onClick={() => openScoreModal(user)}
-                        className="text-green-600 hover:text-green-900"
+                        className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
                         title="Update Score"
                       >
                         <Star className="w-4 h-4" />
                       </button>
+                      
+                      {/* Change Password */}
                       <button
                         onClick={() => openPasswordModal(user)}
-                        className="text-purple-600 hover:text-purple-900"
+                        className="text-purple-600 hover:text-purple-900 p-1 rounded hover:bg-purple-50"
                         title="Change Password"
                       >
                         <Shield className="w-4 h-4" />
                       </button>
+                      
+                      {/* Activate/Deactivate */}
+                      {user.status === 'inactive' ? (
+                        <button
+                          onClick={() => handleActivateUser(user)}
+                          className="text-emerald-600 hover:text-emerald-900 p-1 rounded hover:bg-emerald-50"
+                          title="Activate User"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setShowDeleteModal(true);
+                          }}
+                          className="text-orange-600 hover:text-orange-900 p-1 rounded hover:bg-orange-50"
+                          title="Deactivate User"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                      
+                      {/* Ban/Unban */}
+                      {user.is_banned ? (
+                        <button
+                          onClick={() => handleUnbanUser(user)}
+                          className="text-emerald-600 hover:text-emerald-900 p-1 rounded hover:bg-emerald-50"
+                          title="Unban User"
+                        >
+                          <UserCheck className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleBanUser(user)}
+                          className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                          title="Ban User"
+                        >
+                          <UserX className="w-4 h-4" />
+                        </button>
+                      )}
+                      
+                      {/* Promote/Demote */}
                       <button
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowDeleteModal(true);
-                        }}
-                        className="text-red-600 hover:text-red-900"
-                        title="Deactivate User"
+                        onClick={() => openPromoteModal(user)}
+                        className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50"
+                        title="Change User Type"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Crown className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -1017,6 +1234,53 @@ const AdminUserManagementPage: React.FC = () => {
               className="px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md hover:bg-purple-700"
             >
               Change Password
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Promote/Demote User Modal */}
+      {showPromoteModal && selectedUser && (
+        <Modal
+          isOpen={showPromoteModal}
+          onClose={() => setShowPromoteModal(false)}
+          title={`Change User Type for ${selectedUser.username}`}
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Current User Type: <span className="font-semibold capitalize">{selectedUser.user_type}</span>
+              </label>
+              <select
+                value={promoteData.user_type}
+                onChange={(e) => setPromoteData({...promoteData, user_type: e.target.value as any})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="basic">Basic</option>
+                <option value="premium">Premium</option>
+                <option value="moderator">Moderator</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+              <p className="text-sm text-yellow-800">
+                <strong>Note:</strong> Changing user types affects permissions and access levels. 
+                Admin users have full system access.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              onClick={() => setShowPromoteModal(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleChangeUserType}
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700"
+            >
+              Update User Type
             </button>
           </div>
         </Modal>

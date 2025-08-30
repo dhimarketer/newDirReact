@@ -79,8 +79,10 @@ class PendingChangeModelTest(TestCase):
         data_without_entry = self.test_change_data.copy()
         del data_without_entry['entry']
         
-        with self.assertRaises(IntegrityError):
-            PendingChange.objects.create(**data_without_entry)
+        # Entry field is optional (null=True, blank=True), so this should work
+        change = PendingChange.objects.create(**data_without_entry)
+        self.assertIsNotNone(change.id)
+        self.assertIsNone(change.entry)
 
     def test_pending_change_optional_fields(self):
         """Test that optional fields can be null/blank"""

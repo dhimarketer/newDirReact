@@ -1,5 +1,6 @@
-// 2025-01-28: Simplified smart search query parser - clean and effective field detection
-// Each comma-separated term is treated as a potential field with wildcard padding
+// 2025-01-29: SIMPLIFIED - Frontend sends raw queries, backend handles smart field detection
+// Users enter terms in any order (e.g., "ali, futha, male") and backend determines
+// which field each term belongs to by running actual database queries
 
 import { SearchFilters } from '../types/directory';
 
@@ -20,10 +21,10 @@ export interface FieldAssignment {
 }
 
 /**
- * Simplified smart search query parser
- * Each comma-separated term is analyzed independently for field detection
- * Uses wildcard padding (*term*) for flexible searching
- * Prevents duplicate field assignments in same query
+ * NEW STRATEGY: Database-driven field detection
+ * Users enter terms in any order: "ali, futha, male"
+ * System runs database queries to determine which field each term belongs to
+ * Benefits: No need to remember field names, intelligent field assignment
  */
 export const parseEnhancedQuery = async (rawQuery: string): Promise<ParsedQuery> => {
   const query = rawQuery.trim();
@@ -45,57 +46,66 @@ export const parseEnhancedQuery = async (rawQuery: string): Promise<ParsedQuery>
   let hasWildcards = false;
   let usedFields = new Set<string>();
 
-  console.log('🔍 Simplified Parser: Processing terms:', terms);
+  console.log('🔍 SIMPLIFIED STRATEGY: Frontend sends raw terms, backend handles smart field detection:', terms);
+  console.log('🔍 NOTE: Multi-word terms like "happy night" are preserved as complete phrases');
 
   // Process each term independently
   for (const term of terms) {
     if (!term) continue;
 
-    console.log(`   Analyzing term: "${term}"`);
+    console.log(`   Processing term: "${term}"`);
 
-    // Detect which field this term belongs to
-    const fieldMatch = detectField(term);
+    // Check if term follows field:value format (backward compatibility)
+    const explicitFieldMatch = parseExplicitFieldTerm(term);
     
-    if (fieldMatch && !usedFields.has(fieldMatch.field)) {
-      // Apply wildcard padding for flexible searching
-      const paddedTerm = `*${term}*`;
+    if (explicitFieldMatch && !usedFields.has(explicitFieldMatch.field)) {
+      // User explicitly specified field - use it directly
+      const paddedTerm = `*${explicitFieldMatch.term}*`;
       
-      // Assign to specific field
-      (filters as any)[fieldMatch.field] = paddedTerm;
-      usedFields.add(fieldMatch.field);
+      (filters as any)[explicitFieldMatch.field] = paddedTerm;
+      usedFields.add(explicitFieldMatch.field);
       
       fieldAssignments.push({
-        term: term,
-        field: fieldMatch.field,
-        confidence: fieldMatch.confidence,
-        reason: fieldMatch.reason,
+        term: explicitFieldMatch.term,
+        field: explicitFieldMatch.field,
+        confidence: 100,
+        reason: `User explicitly specified: ${explicitFieldMatch.field}`,
         paddedTerm: paddedTerm
       });
       
-      console.log(`   ✅ "${term}" → ${fieldMatch.field} (${paddedTerm})`);
+      console.log(`   ✅ "${term}" → ${explicitFieldMatch.field}:${explicitFieldMatch.term} (explicit)`);
       
-      // Check if term contains wildcards
-      if (term.includes('*') || term.includes('%')) {
+      if (explicitFieldMatch.term.includes('*') || explicitFieldMatch.term.includes('%')) {
         hasWildcards = true;
       }
+    } else if (explicitFieldMatch && usedFields.has(explicitFieldMatch.field)) {
+      // Field already used - add to general search
+      console.log(`   ❌ Field ${explicitFieldMatch.field} already used for "${term}" - adding to general search`);
+      searchTerms.push(term);
     } else {
-      if (!fieldMatch) {
-        console.log(`   ❌ No field detected for "${term}"`);
-      } else {
-        console.log(`   ❌ Field ${fieldMatch.field} already used for "${term}"`);
-      }
-      // Add to general search terms
+      // No explicit field - send to backend for smart field detection
+      console.log(`   🔍 No explicit field for "${term}" - sending to backend for smart detection`);
       searchTerms.push(term);
     }
   }
 
-  // Handle remaining search terms
+  // Handle remaining search terms - these will trigger smart field detection in backend
   if (searchTerms.length > 0) {
-    filters.query = searchTerms.join(' ');
+    // 2025-01-29: FIXED - Preserve comma separation for backend smart field detection
+    // Join with commas to maintain term boundaries for the backend parser
+    filters.query = searchTerms.join(', ');
+    console.log(`   🔍 Smart search terms: "${filters.query}" - backend will detect fields and apply filters`);
   }
 
-  // Mark as comma-separated query for backend AND logic
-  (filters as any)._commaSeparated = true;
+  // Mark for backend logic - use AND logic only if we have commas (multi-field search)
+  // No comma = single field search, Comma = multi-field search with AND logic
+  if (rawQuery.includes(',')) {
+    (filters as any).useAndLogic = true;
+    // 2025-01-29: ENABLED - Smart field detection for comma-separated queries
+    (filters as any).enableSmartFieldDetection = true;
+    console.log(`   🔍 Multi-field search detected - enabling smart field detection`);
+  }
+  // (filters as any).enableSmartFieldDetection = true;
 
   console.log('   Final result:', { filters, fieldAssignments, searchTerms });
   
@@ -103,183 +113,95 @@ export const parseEnhancedQuery = async (rawQuery: string): Promise<ParsedQuery>
 };
 
 /**
- * Simple field detection with priority-based matching
- * Returns the best field match for a given term
+ * Parse explicit field:term format (backward compatibility)
+ * Format: "name:ali", "address:futha", "island:male"
  */
-const detectField = (term: string): { field: keyof SearchFilters; confidence: number; reason: string } | null => {
-  const cleanTerm = term.toLowerCase();
-  
-  // 1. Gender (specific codes) - highest priority
-  if (['m', 'f'].includes(cleanTerm)) {
-    return { field: 'gender', confidence: 100, reason: 'Gender code (M/F)' };
+const parseExplicitFieldTerm = (term: string): { field: keyof SearchFilters; term: string } | null => {
+  if (!term.includes(':')) {
+    return null;
   }
-  
-  // 2. Age search
-  if (cleanTerm.startsWith('>') && /^\d+$/.test(cleanTerm.substring(1))) {
-    return { field: 'min_age', confidence: 100, reason: 'Age search with > operator' };
+
+  const parts = term.split(':');
+  if (parts.length !== 2) {
+    return null;
   }
-  
-  // 3. Phone number
-  if (/^\d{7}$/.test(term)) {
-    return { field: 'contact', confidence: 95, reason: '7-digit phone number' };
+
+  const field = parts[0].trim().toLowerCase();
+  const value = parts[1].trim();
+
+  if (!value) {
+    return null;
   }
-  
-  // 4. Address (check before party to avoid conflicts)
-  if (isAddress(cleanTerm)) {
-    return { field: 'address', confidence: 85, reason: 'Address pattern detected' };
+
+  const fieldMapping: Record<string, keyof SearchFilters> = {
+    'name': 'name', 'n': 'name',
+    'address': 'address', 'addr': 'address', 'a': 'address',
+    'island': 'island', 'i': 'island',
+    'atoll': 'atoll', 'at': 'atoll',
+    'party': 'party', 'p': 'party',
+    'contact': 'contact', 'phone': 'contact', 'tel': 'contact', 'c': 'contact',
+    'nid': 'nid', 'id': 'nid',
+    'profession': 'profession', 'prof': 'profession', 'job': 'profession',
+    'gender': 'gender', 'sex': 'gender', 'g': 'gender',
+    'min_age': 'min_age', 'max_age': 'max_age',
+    'remark': 'remark', 'pep_status': 'pep_status'
+  };
+
+  const mappedField = fieldMapping[field];
+  if (!mappedField) {
+    return null;
   }
-  
-  // 5. Political Party (after address to avoid conflicts)
-  if (isPoliticalParty(cleanTerm)) {
-    return { field: 'party', confidence: 95, reason: 'Political party detected' };
-  }
-  
-  // 6. Island (after address to avoid conflicts)
-  if (isIsland(cleanTerm)) {
-    return { field: 'island', confidence: 90, reason: 'Island name detected' };
-  }
-  
-  // 7. Name (fallback - most common)
-  if (isName(cleanTerm)) {
-    return { field: 'name', confidence: 70, reason: 'Likely a person name' };
-  }
-  
-  return null;
+
+  return { field: mappedField, term: value };
 };
 
 /**
- * Political party detection
+ * REMOVED: Fake database-driven field detection
+ * This logic has been moved to the Django backend where it belongs
+ * The backend will now run real database queries to detect fields
  */
-const isPoliticalParty = (term: string): boolean => {
-  const parties = [
-    'mdp', 'ppm', 'jp', 'mda', 'mnp', 'ap', 'democrats', 'pnc', 'mtd',
-    'maldivian democratic party', 'progressive party of maldives', 'jumhooree party',
-    'maldives development alliance', 'maldives national party', 'adhaalath party',
-    'the democrats', 'peoples national congress', 'maldives thirdway democrats'
-  ];
-  
-  return parties.some(party => 
-    term === party || term.includes(party) || party.includes(term)
-  );
-};
 
 /**
- * Island detection
+ * OLD FIELD DETECTION LOGIC - REMOVED
+ * The new strategy uses explicit field:term format instead of guessing fields
+ * This eliminates the complexity and unpredictability of field detection
  */
-const isIsland = (term: string): boolean => {
-  const cleanTerm = term.toLowerCase().trim();
-  
-  // Check exact matches first
-  const islands = [
-    'male', 'hithadhoo', 'thinadhoo', 'goidhoo', 'hulhumale', 'addu', 'fuvahmulah',
-    'kulhudhuffushi', 'naifaru', 'mahibadhoo', 'villingili', 'gan', 'maradhoo',
-    'feydhoo', 'habaruge', 'maafushi'
-  ];
-  
-  if (islands.includes(cleanTerm)) return true;
-  
-  // Check atoll prefixes with dots and optional spaces
-  const atollPrefixes = [
-    'k.', 's.', 'hdh.', 'gdh.', 'lh.', 'ha.', 'adh.', 'aa.', 'b.', 'r.', 
-    'sh.', 'th.', 'v.', 'm.', 'n.', 'l.', 'gn.', 'ga.', 'dh.', 'f.'
-  ];
-  
-  // Check if term starts with any atoll prefix
-  for (const prefix of atollPrefixes) {
-    if (cleanTerm.startsWith(prefix)) {
-      // Check if there's an island name after the prefix
-      const islandPart = cleanTerm.substring(prefix.length).trim();
-      if (islandPart.length > 0) {
-        return true;
-      }
-    }
-  }
-  
-  // Check for atoll prefixes with spaces (e.g., "s. hithadhoo")
-  for (const prefix of atollPrefixes) {
-    const prefixWithoutDot = prefix.replace('.', '');
-    if (cleanTerm.startsWith(prefixWithoutDot + ' ') || cleanTerm.startsWith(prefixWithoutDot + '+')) {
-      const islandPart = cleanTerm.substring(prefixWithoutDot.length + 1).trim();
-      if (islandPart.length > 0) {
-        return true;
-      }
-    }
-  }
-  
-  return false;
-};
 
 /**
- * Address detection
+ * OLD FIELD DETECTION HELPER FUNCTIONS - REMOVED
+ * These complex field detection functions are no longer needed with the new strategy
+ * The new approach uses explicit field:term format for predictable, reliable results
  */
-const isAddress = (term: string): boolean => {
-  const cleanTerm = term.toLowerCase().trim();
-  
-  // Multi-word phrases are usually addresses
-  if (cleanTerm.includes(' ') && cleanTerm.split(' ').length >= 2) {
-    return true;
-  }
-  
-  // Common Maldivian address suffixes
-  const addressSuffixes = [
-    'ge', 'aage', 'illa', 'eege', 'maa', 'villa', 'hotel', 'resort', 'guesthouse',
-    'building', 'complex', 'center', 'centre', 'office', 'shop', 'store'
-  ];
-  
-  // Check if term ends with any address suffix
-  for (const suffix of addressSuffixes) {
-    if (cleanTerm.endsWith(suffix)) {
-      return true;
-    }
-  }
-  
-  // Check for common Maldivian address patterns
-  const addressPatterns = [
-    /^[a-z]+(?:ge|aage|illa|eege|maa|villa)$/i,  // Single word with address suffix
-    /^[a-z]+\s+[a-z]+/i,  // Two or more words
-    /^[a-z]+\d+[a-z]*/i,  // Word with numbers (e.g., "building123")
-  ];
-  
-  for (const pattern of addressPatterns) {
-    if (pattern.test(cleanTerm)) {
-      return true;
-    }
-  }
-  
-  return false;
-};
+
+
+
+
+
+
 
 /**
- * Name detection (fallback)
- */
-const isName = (term: string): boolean => {
-  // Names are usually 3-50 characters, alphabetic
-  if (!/^[a-z]+$/i.test(term) || term.length < 3 || term.length > 50) {
-    return false;
-  }
-  
-  // Avoid obvious non-name words
-  const nonNames = [
-    'council', 'society', 'corporation', 'limited', 'association', 'health',
-    'post', 'centre', 'travel', 'tours', 'school', 'college', 'university'
-  ];
-  
-  return !nonNames.some(nonName => term.includes(nonName));
-};
-
-/**
- * Test function for debugging field detection
+ * Test function for debugging field:term parsing
  */
 export const testFieldDetection = (terms: string[]) => {
-  console.log('🧪 Testing field detection:');
+  console.log('🧪 Testing field:term parsing:');
   terms.forEach(term => {
-    const result = detectField(term);
-    console.log(`   "${term}" → ${result ? `${result.field} (${result.confidence}%)` : 'no match'}`);
+    const result = parseExplicitFieldTerm(term);
+    console.log(`   "${term}" → ${result ? `${result.field}:${result.term}` : 'no field:term format'}`);
   });
 };
 
-// Export for testing
-export { detectField, isPoliticalParty, isIsland, isAddress, isName };
+/**
+ * Test the complete parser with a specific term
+ */
+export const testParserWithTerm = async (term: string) => {
+  console.log(`🧪 Testing simplified parser with term: "${term}"`);
+  const result = await parseEnhancedQuery(term);
+  console.log('Parser result:', result);
+  console.log('Explicit field assignments:', result.fieldAssignments);
+  console.log('Smart search terms (for backend):', result.searchTerms);
+  console.log('Final filters:', result.filters);
+  return result;
+};
 
 /**
  * Format the parsed query for display

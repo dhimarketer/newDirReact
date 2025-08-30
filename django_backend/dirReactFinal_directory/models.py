@@ -27,7 +27,20 @@ class PhoneBookEntry(models.Model):
     # Additional information
     party = models.ForeignKey('dirReactFinal_core.Party', on_delete=models.SET_NULL, null=True, blank=True, db_column='party_fk_id', db_index=True)  # 2025-01-28: Updated to ForeignKey with db_index
     DOB = models.TextField(null=True, blank=True)
-    status = models.TextField(null=True, blank=True)
+    
+    # 2025-01-29: ENHANCED - Standardized status field with choices for deceased/unlisted functionality
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('deceased', 'Deceased'),
+        ('unlisted', 'Unlisted'),
+        ('inactive', 'Inactive'),
+        ('outdated', 'Outdated'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, null=True, blank=True, db_index=True)
+    
+    # 2025-01-29: NEW - Boolean field to mark entries as unlisted (hidden from public search)
+    is_unlisted = models.BooleanField(default=False, db_index=True)
+    
     remark = models.TextField(null=True, blank=True, db_index=True)  # 2025-01-28: Added db_index for search performance
     email = models.CharField(max_length=120, null=True, blank=True)
     gender = models.CharField(max_length=10, choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')], null=True, blank=True, db_column='gender_choice', db_index=True)  # 2025-01-28: Updated to CharField with choices and db_index

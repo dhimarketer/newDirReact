@@ -3,6 +3,7 @@
 // 2025-01-27: Integrated smart query parser for intelligent search
 // 2025-01-27: Simplified styling to use consistent Tailwind utilities and prevent CSS conflicts
 // 2025-01-27: COMPLETELY SIMPLIFIED - Google-like minimal interface for better UX
+// 2025-01-29: FIXED - CSS issue where cancel button was hiding search button by removing undefined CSS classes
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SearchFilters } from '../../types/directory';
@@ -206,18 +207,18 @@ const SearchBar: React.FC<SearchBarProps> = ({
     <div className="w-full">
       {/* Main Search Form - Ultra-clean Google-style */}
       <form onSubmit={handleSearch}>
-        <div className="search-bar-container">
+        <div className="w-full">
           <div className="flex flex-col items-center space-y-6">
             <div className="w-full max-w-2xl relative">
               <input
                 type="text"
                 value={query}
                 onChange={handleQueryChange}
-                placeholder="Search directory..."
-                className="search-input w-full text-lg px-6 py-4 border border-blue-300 rounded-full focus:border-blue-500 focus:outline-none bg-white shadow-sm hover:shadow-md transition-all duration-200 text-blue-800"
+                placeholder="ali, futha, male..."
+                className="w-full text-lg px-6 pr-12 py-4 border border-blue-300 rounded-full focus:border-blue-500 focus:outline-none bg-white shadow-sm hover:shadow-md transition-all duration-200 text-blue-800"
                 disabled={isLoading}
-                title="Smart Search: Use commas for structured queries, wildcards, or field-specific searches"
-                aria-label="Search directory entries"
+                title="SMART SEARCH: Enter terms in any order, system automatically detects which field each term belongs to"
+                aria-label="Smart search directory entries with automatic field detection"
               />
               
               {/* Loading indicator for long searches */}
@@ -240,7 +241,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                     setSuggestions([]);
                     setParsedQueryInfo('');
                   }}
-                  className="absolute right-5 top-1/2 transform -translate-y-1/2 text-blue-400 hover:text-blue-600 p-1 rounded-full hover:bg-blue-100 transition-all duration-200"
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-blue-400 hover:text-blue-600 w-6 h-6 flex items-center justify-center rounded-full hover:bg-blue-100 transition-all duration-200 z-10"
                   title="Clear search"
                   aria-label="Clear search"
                 >
@@ -251,8 +252,17 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
             </div>
             
+            {/* Help text for smart search */}
+            <div className="w-full max-w-2xl text-center">
+              <div className="text-sm text-blue-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
+                <strong>SMART SEARCH:</strong> Enter terms in any order, separated by commas
+                <br />
+                <span className="text-xs">Examples: <code className="bg-blue-100 px-1 rounded">ali, futha, male</code> or <code className="bg-blue-100 px-1 rounded">name:ali, address:futha</code> (explicit format also supported)</span>
+              </div>
+            </div>
+            
             {/* Google-style search buttons */}
-            <div className="flex space-x-4">
+            <div className="flex space-x-4 mt-2">
               <button
                 type="submit"
                 disabled={isLoading || !query.trim()}
@@ -263,10 +273,10 @@ const SearchBar: React.FC<SearchBarProps> = ({
             </div>
           </div>
           
-          {/* Parsed Query Info - Subtle display */}
+          {/* Parsed Query Info - Show field assignments */}
           {parsedQueryInfo && (
-            <div className="w-full max-w-2xl mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 text-center">
-              <strong>Smart search detected:</strong> {parsedQueryInfo}
+            <div className="w-full max-w-2xl mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 text-center">
+              <strong>Smart detection results:</strong> {parsedQueryInfo}
             </div>
           )}
           

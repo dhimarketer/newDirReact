@@ -50,3 +50,77 @@ localStorageMock.getItem.mockImplementation((key: string) => {
   }
   return null;
 });
+
+// Mock fetch globally to prevent real API calls
+global.fetch = vi.fn();
+
+// Mock axios to prevent real HTTP requests
+vi.mock('axios', () => ({
+  default: {
+    create: vi.fn(() => ({
+      request: vi.fn(),
+      get: vi.fn(),
+      post: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
+      interceptors: {
+        request: { use: vi.fn() },
+        response: { use: vi.fn() },
+      },
+    })),
+  },
+}));
+
+// Mock all service modules
+vi.mock('../services/familyService', () => ({
+  default: {
+    getFamilies: vi.fn(),
+    getFamilyById: vi.fn(),
+    createFamily: vi.fn(),
+    updateFamily: vi.fn(),
+    deleteFamily: vi.fn(),
+  },
+}));
+
+vi.mock('../services/directoryService', () => ({
+  default: {
+    searchDirectory: vi.fn(),
+    getDirectoryEntry: vi.fn(),
+    createDirectoryEntry: vi.fn(),
+    updateDirectoryEntry: vi.fn(),
+    deleteDirectoryEntry: vi.fn(),
+    getDirectoryStats: vi.fn(),
+  },
+}));
+
+vi.mock('../services/atollService', () => ({
+  default: {
+    getAtolls: vi.fn(),
+    getAtollById: vi.fn(),
+  },
+}));
+
+vi.mock('../services/islandService', () => ({
+  default: {
+    getIslands: vi.fn(),
+    getIslandById: vi.fn(),
+  },
+}));
+
+vi.mock('../services/partyService', () => ({
+  default: {
+    getParties: vi.fn(),
+    getPartyById: vi.fn(),
+  },
+}));
+
+// Mock API service
+vi.mock('../services/api', () => ({
+  default: {
+    request: vi.fn(),
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+}));

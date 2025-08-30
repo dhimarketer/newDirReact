@@ -1,7 +1,7 @@
 // 2025-01-27: Creating mobile menu overlay component for mobile navigation
+// 2025-01-29: Simplified - directly renders mobile sidebar without unnecessary wrapper
 
 import React from 'react';
-import { X } from 'lucide-react';
 import { useUI } from '../../store/uiStore';
 import Sidebar from './Sidebar';
 
@@ -20,7 +20,7 @@ const MobileMenu: React.FC = () => {
         onClick={() => setMobileMenuOpen(false)}
       />
       
-      {/* Mobile Menu */}
+      {/* Mobile Menu - Direct sidebar render */}
       <div className="fixed inset-y-0 left-0 z-50 w-80 max-w-xs bg-white shadow-xl">
         <Sidebar mobile={true} />
       </div>

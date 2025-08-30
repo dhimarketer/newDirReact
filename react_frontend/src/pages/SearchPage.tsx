@@ -1,7 +1,9 @@
 // 2025-01-27: Implementing functional SearchPage with SearchBar and SearchResults components
 // 2025-01-27: COMPLETELY SIMPLIFIED - Google-like minimal interface for better UX
+// 2025-01-29: ADDED - URL query parameter handling for header search bar integration
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import SearchBar from '../components/directory/SearchBar';
 import SearchResults from '../components/directory/SearchResults';
 import { SearchFilters, PhoneBookEntry, SearchResponse, SearchParams } from '../types/directory';
@@ -12,6 +14,7 @@ import { Link } from 'react-router-dom';
 
 const SearchPage: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState<SearchFilters>({
     query: '',
     name: '',
@@ -37,12 +40,26 @@ const SearchPage: React.FC = () => {
   const [searchStartTime, setSearchStartTime] = useState<number | null>(null);
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
 
+  // Handle URL query parameters on component mount
+  useEffect(() => {
+    const queryParam = searchParams.get('q');
+    if (queryParam) {
+      const newFilters = { ...filters, query: queryParam };
+      setFilters(newFilters);
+      // Clear the URL parameter after setting it
+      setSearchParams({}, { replace: true });
+      // Perform search with the query parameter
+      const searchParams: SearchParams = { ...newFilters, page: 1, page_size: pageSize };
+      performSearch(searchParams);
+    }
+  }, []);
+
   // Perform search with current filters
   const performSearch = async (searchParams: SearchParams) => {
     setIsLoading(true);
     setSearchStartTime(Date.now());
     setShowTimeoutWarning(false);
-    console.log('SearchPage: performSearch called with params:', searchParams);
+    console.log('🔍 SearchPage: performSearch called with params:', searchParams);
     
     // 2025-01-28: Add timeout warning for long searches
     const timeoutWarningTimer = setTimeout(() => {
@@ -50,30 +67,50 @@ const SearchPage: React.FC = () => {
     }, 15000); // Show warning after 15 seconds
     
     try {
+      console.log('🔍 SearchPage: Calling directoryService.searchEntries...');
       const response: SearchResponse = await directoryService.searchEntries(searchParams);
       
-      setSearchResults(response.results);
-      setTotalCount(response.total_count);
+      console.log('🔍 SearchPage: Response received:', response);
+      console.log('🔍 SearchPage: Response type:', typeof response);
+      console.log('🔍 SearchPage: Response.results type:', typeof response.results);
+      console.log('🔍 SearchPage: Response.results length:', response.results?.length);
+      console.log('🔍 SearchPage: Response.total_count:', response.total_count);
+      console.log('🔍 SearchPage: Response.results sample:', response.results?.slice(0, 2));
+      
+      // 2025-01-29: FIXED - Ensure results is always an array
+      const results = Array.isArray(response.results) ? response.results : [];
+      const totalCount = response.total_count || 0;
+      
+      console.log('🔍 SearchPage: Processed results length:', results.length);
+      console.log('🔍 SearchPage: Processed total_count:', totalCount);
+      
+      setSearchResults(results);
+      setTotalCount(totalCount);
+      
+      console.log('🔍 SearchPage: State updated - searchResults.length:', results.length);
+      console.log('🔍 SearchPage: State updated - totalCount:', totalCount);
       
       // Try to save search to history (optional feature)
       try {
         await directoryService.saveSearchHistory(
           searchParams.query || '',
           searchParams,
-          response.total_count
+          totalCount
         );
       } catch (historyError) {
         // Search history is optional, don't fail the search
         console.warn('Failed to save search history:', historyError);
       }
       
-      if (response.total_count === 0) {
+      if (totalCount === 0) {
         toast.success('No results found for your search criteria');
+      } else {
+        toast.success(`Found ${totalCount} results`);
       }
     } catch (error: any) {
+      console.error('🔍 SearchPage: Search error:', error);
+      console.error('🔍 SearchPage: Search params that failed:', searchParams);
       toast.error(error.message || 'Search failed. Please try again.');
-      console.error('Search error:', error);
-      console.error('Search params that failed:', searchParams);
       setSearchResults([]);
       setTotalCount(0);
     } finally {
@@ -81,6 +118,7 @@ const SearchPage: React.FC = () => {
       setSearchStartTime(null);
       setShowTimeoutWarning(false);
       clearTimeout(timeoutWarningTimer);
+      console.log('🔍 SearchPage: Search completed, isLoading set to false');
     }
   };
 
@@ -166,9 +204,9 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  // Initial search on component mount
+  // Initial search on component mount - only if no URL query parameter
   useEffect(() => {
-    if (filters.query) {
+    if (filters.query && !searchParams.get('q')) {
       const searchParams: SearchParams = { ...filters, page: 1, page_size: pageSize };
       performSearch(searchParams);
     }
@@ -176,14 +214,9 @@ const SearchPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Google-style search header */}
+      {/* Search page header - removed duplicate navigation */}
       <div className="flex justify-end p-4">
-        {user && (
-          <div className="flex items-center space-x-4 text-sm text-blue-600">
-            <Link to="/profile" className="hover:text-blue-800">Profile</Link>
-            <Link to="/settings" className="hover:text-blue-800">Settings</Link>
-          </div>
-        )}
+        {/* Navigation handled by sidebar - no duplicate links */}
       </div>
 
       {/* Main search area - Google style */}

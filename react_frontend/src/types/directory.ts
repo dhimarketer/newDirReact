@@ -12,7 +12,8 @@ export interface PhoneBookEntry {
   ward?: string;
   party?: string;
   DOB?: string;
-  status?: string;
+  status?: 'active' | 'deceased' | 'unlisted' | 'inactive' | 'outdated';  // 2025-01-29: ENHANCED - Standardized status choices
+  is_unlisted?: boolean;  // 2025-01-29: NEW - Boolean field to mark entries as unlisted
   remark?: string;
   email?: string;
   gender?: string;

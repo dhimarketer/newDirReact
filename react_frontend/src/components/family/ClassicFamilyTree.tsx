@@ -181,6 +181,8 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
 
     // 2025-01-28: ENHANCED: Use relationships data to determine family structure instead of hardcoded logic
     if (relationships && relationships.length > 0) {
+      console.log(`🔗 Processing ${relationships.length} relationships for family structure`);
+      
       // Build family structure from relationships
       const parentChildMap = new Map<number, number[]>(); // parent -> children
       const childParentMap = new Map<number, number[]>(); // child -> parents
@@ -219,6 +221,12 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
         }
       });
       
+      console.log(`📊 Relationship maps built:`, {
+        parentChildMap: parentChildMap.size,
+        childParentMap: childParentMap.size,
+        spouseMap: spouseMap.size
+      });
+      
       // Find people who are parents (have children)
       const parents = validMembers.filter(member => 
         parentChildMap.has(member.entry.pid) && parentChildMap.get(member.entry.pid)!.length > 0
@@ -229,8 +237,27 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
         childParentMap.has(member.entry.pid) && childParentMap.get(member.entry.pid)!.length > 0
       );
       
+      console.log(`👥 Relationship-based classification:`, {
+        parents: parents.map(p => p.entry.name),
+        children: children.map(c => c.entry.name),
+        parentCount: parents.length,
+        childCount: children.length
+      });
+      
+      // 2025-01-29: FIXED - Ensure all members are classified
+      // If we have relationships but some members aren't classified, add them to children
+      const classifiedMembers = new Set([...parents, ...children].map(m => m.entry.pid));
+      const unclassifiedMembers = validMembers.filter(member => !classifiedMembers.has(member.entry.pid));
+      
+      if (unclassifiedMembers.length > 0) {
+        console.log(`⚠️ Found ${unclassifiedMembers.length} unclassified members:`, unclassifiedMembers.map(m => m.entry.name));
+        // Add unclassified members to children by default
+        children.push(...unclassifiedMembers);
+      }
+      
       // If no clear parent-child relationships, fall back to sophisticated age-based logic
       if (parents.length === 0 && children.length === 0) {
+        console.log(`⚠️ No relationships could be processed, falling back to age-based logic`);
         // 2025-01-29: ENHANCED - Use sophisticated 3-pass parent detection algorithm
         const sortedByAge = [...validMembers].sort((a, b) => (b.entry.age || 0) - (a.entry.age || 0));
         
@@ -346,7 +373,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                 
                 if (bestSecondParent) {
                   potentialParents.push(bestSecondParent);
-                  console.log(`�� ${bestSecondParent.entry.name} added as second parent`);
+                  console.log(`💑 ${bestSecondParent.entry.name} added as second parent`);
                 } else {
                   console.log(`❌ No suitable second parent found`);
                 }
@@ -392,6 +419,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
         }
       }
       
+      // 2025-01-29: FIXED - Return all members properly classified
       const result = { 
         parents: parents.length > 0 ? parents : validMembers.slice(0, 2), 
         children: children.length > 0 ? children : validMembers.slice(2),
@@ -404,7 +432,8 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
         parents: result.parents.map(p => ({ name: p.entry.name, age: p.entry.age, gender: p.entry.gender })),
         children: result.children.map(c => ({ name: c.entry.name, age: c.entry.age, gender: c.entry.gender })),
         totalParents: result.parents.length,
-        totalChildren: result.children.length
+        totalChildren: result.children.length,
+        totalMembers: result.parents.length + result.children.length
       });
       
       return result;
@@ -514,7 +543,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
             continue;
           }
           
-          // Must have 10+ year gap to potential children (those with 10+ year gap from first parent)
+          // Must have 10+ year gap to potential children (those with 12+ year gap from first parent)
           let canBeSecondParent = true;
           
           // Calculate potential children based on first parent's age gap
@@ -541,7 +570,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
           
           if (canBeSecondParent) {
             bestSecondParent = member;
-            console.log(`    ✅ ${member.entry.name} (${memberAge}) can be second parent to all ${children.length} children`);
+            console.log(`    ✅ ${member.entry.name} (${memberAge}) can be second parent to all ${potentialChildren.length} potential children`);
             break;
           } else {
             console.log(`    ❌ ${member.entry.name} (${memberAge}) cannot be second parent - failed age gap validation`);
@@ -561,7 +590,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
     if (potentialParents.length > 0) {
       console.log(`🔍 STEP 3: Assigning children after identifying ${potentialParents.length} parent(s)`);
       
-      // Find all members that can be children (have 10+ year gap from at least one parent)
+      // Find all members that can be children (have 12+ year gap from at least one parent)
       const allChildren = sortedByAge.filter(member => {
         if (potentialParents.includes(member)) return false; // Exclude parents
         
@@ -585,16 +614,15 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
       console.log(`👶 Added ${allChildren.length} children:`, allChildren.map(c => c.entry.name));
     }
     
-    // Children are now properly assigned in Step 3
-    
     // If we still don't have any parents identified, all members go to children
     if (potentialParents.length === 0) {
       children.push(...sortedByAge);
     }
     
+    // 2025-01-29: FIXED - Remove hardcoded limits to show ALL family members
     const result = { 
-      parents: potentialParents.slice(0, 4), // Max 4 parents
-      children: children.slice(0, 12), // Max 12 children
+      parents: potentialParents, // No limit on parents
+      children: children, // No limit on children
       parentChildMap: new Map(),
       childParentMap: new Map(),
       spouseMap: new Map()
@@ -604,7 +632,8 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
       parents: result.parents.map(p => ({ name: p.entry.name, age: p.entry.age, gender: p.entry.gender })),
       children: result.children.map(c => ({ name: c.entry.name, age: c.entry.age, gender: c.entry.gender })),
       totalParents: result.parents.length,
-      totalChildren: result.children.length
+      totalChildren: result.children.length,
+      totalMembers: result.parents.length + result.children.length
     });
     
     return result;
@@ -647,8 +676,23 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
       optimalHeight = baseHeight + childRowHeight + 10; // Add small margin
     }
     
+    // 2025-01-29: FIXED - Ensure height is sufficient for ALL children
+    // Calculate minimum height needed for all children to be visible
+    const minHeightNeeded = baseHeight + (childCount * (nodeHeight + 10)); // 10px spacing between children
+    optimalHeight = Math.max(optimalHeight, minHeightNeeded);
+    
     // Ensure minimum height for visual appeal
     optimalHeight = Math.max(optimalHeight, 250);
+    
+    console.log(`📐 Tree dimensions calculated:`, {
+      parentCount,
+      childCount,
+      baseHeight,
+      minHeightNeeded,
+      optimalHeight,
+      containerWidth,
+      useMultiRowLayout
+    });
     
     return {
       nodeWidth,
@@ -880,27 +924,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                       </div>
                     </foreignObject>
                     
-                    {/* Parent contact */}
-                    <text
-                      x={x + treeDimensions.nodeWidth / 2}
-                      y={y + 40}
-                      textAnchor="middle"
-                      fontSize="9"
-                      fill="#8B4513"
-                    >
-                      {parent.entry.contact}
-                    </text>
-                    
-                    {/* Parent address */}
-                    <text
-                      x={x + treeDimensions.nodeWidth / 2}
-                      y={y + 55}
-                      textAnchor="middle"
-                      fontSize="8"
-                      fill="#8B4513"
-                    >
-                      {parent.entry.address}
-                    </text>
+                    {/* 2025-01-29: Removed parent contact and address display - keeping only member names for cleaner family tree */}
                   </g>
                 );
               })}
@@ -958,6 +982,10 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                 // 2025-01-29: UNIFIED LAYOUT LOGIC - Single consistent approach for both layouts
                 const totalChildren = organizedMembers.children.length;
                 
+                // 2025-01-29: DEBUG - Log children processing
+                console.log(`👶 RENDERING CHILDREN: ${totalChildren} children to render`);
+                console.log(`👶 Children names:`, organizedMembers.children.map(c => c.entry.name));
+                
                 if (totalChildren === 0) return null;
                 
                 // 2025-01-29: ENHANCED - Unified space calculation for optimal fit
@@ -969,6 +997,14 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                 // 2025-01-29: ENHANCED - Automatic layout decision based on available space
                 const singleRowWidth = totalChildren * treeDimensions.nodeWidth + (totalChildren > 1 ? (totalChildren - 1) * 20 : 0);
                 const useMultiRow = useMultiRowLayout && (singleRowWidth > availableWidth || totalChildren > 8);
+                
+                console.log(`📐 Layout decision:`, {
+                  totalChildren,
+                  singleRowWidth,
+                  availableWidth,
+                  useMultiRowLayout,
+                  useMultiRow
+                });
                 
                 if (useMultiRow) {
                   console.log('🔄 CREATING UNIFIED MULTI-ROW LAYOUT');
@@ -986,6 +1022,7 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                   });
                   
                   console.log(`📐 Unified multi-row distribution: ${totalChildren} children, ${numRows} rows, ${maxChildrenPerRow} max per row`);
+                  console.log(`📐 Rows breakdown:`, rows.map((row, i) => `Row ${i}: ${row.length} children`));
                   
                   // 2025-01-29: ENHANCED - Unified positioning calculation for all rows
                   const rowPositions = rows.map((row, rowIndex) => {
@@ -1005,6 +1042,13 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                   const rowHeight = treeDimensions.nodeHeight + 30; // 30px gap between rows
                   const totalRowsHeight = numRows * rowHeight;
                   const startY = 180 + (availableHeight - totalRowsHeight) / 2; // Center rows vertically
+                  
+                  console.log(`📐 Multi-row positioning:`, {
+                    rowHeight,
+                    totalRowsHeight,
+                    startY,
+                    availableHeight
+                  });
                   
                   return rows.flatMap((row, rowIndex) => 
                     row.map(({ child, index }, colIndex) => {
@@ -1061,6 +1105,8 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                       const controlPoint2Y = childTopY - 15;
                       
                       const pathData = `M ${parentCenterX} ${parentBottomY} C ${controlPoint1X} ${controlPoint1Y} ${controlPoint2X} ${controlPoint2Y} ${x + treeDimensions.nodeWidth / 2} ${childTopY}`;
+                      
+                      console.log(`👶 Rendering child ${child.entry.name} at position (${x}, ${y})`);
                       
                       return (
                         <g key={child.entry.pid} className="child-node multi-row">
@@ -1119,41 +1165,34 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                               {formatNameWithAge(child.entry.name, child)}
                             </div>
                           </foreignObject>
-                          
-                          {/* 2025-01-29: Removed contact display - keeping only member names for cleaner family tree */}
-                          
-                          {/* 2025-01-29: Removed address display - keeping only member names for cleaner family tree */}
-                          
-                          {/* 2025-01-29: ENHANCED - Optimized connection line from main vertical to child */}
-                          <line
-                            x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
-                            y1={130}
-                            x2={x + treeDimensions.nodeWidth / 2}
-                            y2={y - 5}
-                            stroke="#8B4513"
-                            strokeWidth="1"
-                            markerEnd="url(#arrowhead-classic)"
-                          />
                         </g>
                       );
                     })
                   );
                 } else {
-                  // 2025-01-29: ENHANCED - Unified single-row layout with optimal space utilization
-                  console.log('🔄 CREATING UNIFIED SINGLE-ROW LAYOUT');
+                  console.log('📐 CREATING SINGLE-ROW LAYOUT');
                   
-                  // Calculate optimal spacing for maximum space utilization
-                  const totalWidth = totalChildren * treeDimensions.nodeWidth;
-                  const optimalSpacing = totalChildren > 1 ? (availableWidth - totalWidth) / (totalChildren - 1) : 0;
-                  const finalSpacing = Math.max(optimalSpacing, 15); // Minimum 15px spacing for tight fit
+                  // Single-row layout for smaller families
+                  const totalNodeWidth = totalChildren * treeDimensions.nodeWidth;
+                  const remainingSpace = availableWidth - totalNodeWidth;
+                  const spacing = totalChildren > 1 ? remainingSpace / (totalChildren - 1) : 0;
+                  const finalSpacing = Math.max(spacing, 20); // Minimum 20px spacing
+                  const totalRowWidth = totalNodeWidth + ((totalChildren - 1) * finalSpacing);
+                  const startX = margin + (availableWidth - totalRowWidth) / 2;
+                  const startY = 180; // Fixed Y position for single row
                   
-                  // Center the row vertically in available space
-                  const y = 180 + (availableHeight - treeDimensions.nodeHeight) / 2;
+                  console.log(`📐 Single-row positioning:`, {
+                    totalNodeWidth,
+                    remainingSpace,
+                    finalSpacing,
+                    totalRowWidth,
+                    startX,
+                    startY
+                  });
                   
                   return organizedMembers.children.map((child, index) => {
-                    // Calculate position with optimal spacing
-                    let x = calculateCenteredPosition(index, totalChildren, finalSpacing);
-                    let y = 180 + (availableHeight - treeDimensions.nodeHeight) / 2;
+                    let x = startX + (index * (treeDimensions.nodeWidth + finalSpacing));
+                    let y = startY;
                     
                     // 2025-01-29: ENHANCED - Apply drag offset if member has been moved
                     const dragOffset = memberPositions.get(child.entry.pid);
@@ -1162,8 +1201,32 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                       y += dragOffset.y;
                     }
                     
+                    // 2025-01-29: ENHANCED - Unified connection logic for all layouts
+                    const parentCenterX = calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2;
+                    const parentBottomY = 130;
+                    const childTopY = y;
+                    
+                    // 2025-01-29: FIXED - Adjusted control points to prevent arrow overlap with nodes
+                    const controlPoint1X = parentCenterX;
+                    const controlPoint1Y = parentBottomY + (childTopY - parentBottomY) / 2;
+                    const controlPoint2X = x + treeDimensions.nodeWidth / 2;
+                    const controlPoint2Y = childTopY - 15;
+                    
+                    const pathData = `M ${parentCenterX} ${parentBottomY} C ${controlPoint1X} ${controlPoint1Y} ${controlPoint2X} ${controlPoint2Y} ${x + treeDimensions.nodeWidth / 2} ${childTopY}`;
+                    
+                    console.log(`👶 Rendering child ${child.entry.name} at position (${x}, ${y})`);
+                    
                     return (
                       <g key={child.entry.pid} className="child-node">
+                        {/* Curved connection line from parent to child */}
+                        <path
+                          d={pathData}
+                          fill="none"
+                          stroke="#8B4513"
+                          strokeWidth="2"
+                          markerEnd="url(#arrowhead-classic)"
+                        />
+                        
                         {/* Child node with drag functionality */}
                         <rect
                           x={x}
@@ -1208,21 +1271,6 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
                             {formatNameWithAge(child.entry.name, child)}
                           </div>
                         </foreignObject>
-                        
-                        {/* 2025-01-29: Removed contact display - keeping only member names for cleaner family tree */}
-                        
-                        {/* 2025-01-29: Removed address display - keeping only member names for cleaner family tree */}
-                        
-                        {/* 2025-01-29: ENHANCED - Optimized connection line from main vertical to child */}
-                        <line
-                          x1={calculateCenteredPosition(0, organizedMembers.parents.length, treeDimensions.parentSpacing) + treeDimensions.nodeWidth / 2}
-                          y1={130}
-                          x2={x + treeDimensions.nodeWidth / 2}
-                          y2={y - 5}
-                          stroke="#8B4513"
-                          strokeWidth="1"
-                          markerEnd="url(#arrowhead-classic)"
-                        />
                       </g>
                     );
                   });

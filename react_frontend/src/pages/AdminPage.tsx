@@ -102,8 +102,8 @@ const AdminPage: React.FC = () => {
             >
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
                 <div className="flex items-center mb-4">
-                  <div className={`p-3 rounded-lg ${feature.color} text-white mr-4`}>
-                    <IconComponent className="w-6 h-6" />
+                  <div className={`p-2 rounded-lg ${feature.color} text-white mr-4`}>
+                    <IconComponent className="w-4 h-4" />
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
                     {feature.title}
@@ -129,7 +129,7 @@ const AdminPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
-              <Users className="w-6 h-6 text-blue-600" />
+              <Users className="w-4 h-4 text-blue-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Users</p>
@@ -147,7 +147,7 @@ const AdminPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
             <div className="p-2 bg-purple-100 rounded-lg">
-              <Database className="w-6 h-6 text-purple-600" />
+              <Database className="w-4 h-4 text-purple-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Directory Entries</p>
@@ -163,7 +163,7 @@ const AdminPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
             <div className="p-2 bg-orange-100 rounded-lg">
-              <Shield className="w-6 h-6 text-orange-600" />
+              <Shield className="w-4 h-4 text-orange-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Admin Users</p>

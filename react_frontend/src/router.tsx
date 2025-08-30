@@ -1,4 +1,5 @@
 // 2025-01-27: Creating router configuration for Phase 2 React frontend
+// 2025-01-29: CHANGED - Made SearchPage the default page instead of HomePage
 
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './store/authStore';
@@ -40,7 +41,8 @@ function AppRoutes() {
           <Layout />
         </ProtectedRoute>
       }>
-        <Route index element={<HomePage />} />
+        <Route index element={<SearchPage />} />
+        <Route path="home" element={<HomePage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="directory" element={<DirectoryPage />} />

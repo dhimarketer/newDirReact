@@ -317,21 +317,46 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def update_score(self, request, pk=None):
         """Update user score"""
-        user = self.get_object()
-        points = request.data.get('points', 0)
-        reason = request.data.get('reason', 'Score update')
-        
-        user.score += points
-        user.save()
-        
-        # Log score change
-        EventLog.objects.create(
-            user=user,
-            event_type='score_change',
-            description=f'Score changed by {points} points: {reason}'
-        )
-        
-        return Response({'message': f'Score updated. New score: {user.score}'})
+        try:
+            user = self.get_object()
+            points = request.data.get('points', 0)
+            reason = request.data.get('reason', 'Score update')
+            
+            if points == 0:
+                return Response({
+                    'error': 'Points value cannot be zero'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not reason or not reason.strip():
+                return Response({
+                    'error': 'Reason is required for score changes'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Update user score
+            old_score = user.score
+            user.score += points
+            user.save()
+            
+            # Log score change event
+            EventLog.objects.create(
+                user=request.user,
+                event_type='score_change',
+                description=f'Admin {request.user.username} changed {user.username} score from {old_score} to {user.score} ({points:+d} points): {reason}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
+            
+            return Response({
+                'message': f'Score updated successfully. {user.username} score changed from {old_score} to {user.score} ({points:+d} points)',
+                'old_score': old_score,
+                'new_score': user.score,
+                'points_added': points
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to update score: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=True, methods=['post'])
     def change_password(self, request, pk=None):
@@ -368,6 +393,149 @@ class UserViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({
                 'error': f'Failed to change password: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'])
+    def activate_user(self, request, pk=None):
+        """Activate a user account"""
+        try:
+            user = self.get_object()
+            
+            if user.status == 'active':
+                return Response({
+                    'error': f'User {user.username} is already active'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            user.status = 'active'
+            user.is_banned = False
+            user.save()
+            
+            # Log activation event
+            EventLog.objects.create(
+                user=request.user,
+                event_type='score_change',  # Using existing event type
+                description=f'Admin {request.user.username} activated user {user.username}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
+            
+            return Response({
+                'message': f'User {user.username} activated successfully'
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to activate user: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'])
+    def ban_user(self, request, pk=None):
+        """Ban a user account"""
+        try:
+            user = self.get_object()
+            
+            if user.is_banned:
+                return Response({
+                    'error': f'User {user.username} is already banned'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if user.is_superuser or user.is_staff:
+                return Response({
+                    'error': 'Cannot ban superuser or staff accounts'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            user.is_banned = True
+            user.status = 'suspended'
+            user.save()
+            
+            # Log ban event
+            EventLog.objects.create(
+                user=request.user,
+                event_type='score_change',  # Using existing event type
+                description=f'Admin {request.user.username} banned user {user.username}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
+            
+            return Response({
+                'message': f'User {user.username} banned successfully'
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to ban user: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'])
+    def unban_user(self, request, pk=None):
+        """Unban a user account"""
+        try:
+            user = self.get_object()
+            
+            if not user.is_banned:
+                return Response({
+                    'error': f'User {user.username} is not banned'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            user.is_banned = False
+            user.status = 'active'
+            user.save()
+            
+            # Log unban event
+            EventLog.objects.create(
+                user=request.user,
+                event_type='score_change',  # Using existing event type
+                description=f'Admin {request.user.username} unbanned user {user.username}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
+            
+            return Response({
+                'message': f'User {user.username} unbanned successfully'
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to unban user: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'])
+    def change_user_type(self, request, pk=None):
+        """Change user type (promote/demote)"""
+        try:
+            user = self.get_object()
+            new_user_type = request.data.get('user_type')
+            
+            if not new_user_type:
+                return Response({
+                    'error': 'New user type is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if new_user_type not in ['basic', 'premium', 'moderator', 'admin']:
+                return Response({
+                    'error': 'Invalid user type'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            old_user_type = user.user_type
+            user.user_type = new_user_type
+            user.save()
+            
+            # Log user type change event
+            EventLog.objects.create(
+                user=request.user,
+                event_type='score_change',  # Using existing event type
+                description=f'Admin {request.user.username} changed {user.username} from {old_user_type} to {new_user_type}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
+            
+            return Response({
+                'message': f'User {user.username} type changed from {old_user_type} to {new_user_type}'
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to change user type: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def destroy(self, request, *args, **kwargs):
@@ -524,7 +692,41 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         validated_data = serializer.validated_data
         
-        # Create a pending change for admin approval
+        # 2025-01-29: ENHANCED - Special handling for status changes to deceased/unlisted
+        # These require admin approval due to sensitivity
+        status_changed = 'status' in validated_data and validated_data['status'] != instance.status
+        is_unlisted_changed = 'is_unlisted' in validated_data and validated_data['is_unlisted'] != instance.is_unlisted
+        
+        if status_changed or is_unlisted_changed:
+            # Create a pending change for admin approval
+            from dirReactFinal_moderation.models import PendingChange
+            
+            # Add special flag for status changes
+            change_data = validated_data.copy()
+            change_data['_status_change_requires_approval'] = True
+            
+            pending_change = PendingChange.objects.create(
+                change_type='edit',
+                status='pending',
+                new_data=change_data,
+                requested_by=self.request.user,
+                entry=instance  # Link to existing entry being edited
+            )
+            
+            # Log creation of pending change for status edit
+            EventLog.objects.create(
+                user=self.request.user,
+                event_type='pending_change_created',
+                description=f'Created pending change for status edit of entry: {instance.name} (status: {validated_data.get("status", "unchanged")}, unlisted: {validated_data.get("is_unlisted", "unchanged")})'
+            )
+            
+            # Don't update the entry yet - it will be updated after admin approval
+            raise serializers.ValidationError(
+                "Status change submitted successfully and is pending admin approval. "
+                "You will be notified once it's reviewed."
+            )
+        
+        # Create a pending change for admin approval for other fields
         from dirReactFinal_moderation.models import PendingChange
         
         pending_change = PendingChange.objects.create(
@@ -580,7 +782,31 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
     def advanced_search(self, request):
         """Advanced search with multiple criteria - accessible to everyone"""
         try:
-            serializer = SearchSerializer(data=request.data)
+            # 2025-01-29: FIXED - Handle request data properly for both DRF and regular requests
+            # The frontend sends JSON data, not form data
+            if hasattr(request, 'data'):
+                # DRF request object
+                search_data = request.data
+            elif request.body:
+                # Parse JSON from request body (frontend sends JSON)
+                try:
+                    import json
+                    search_data = json.loads(request.body.decode('utf-8'))
+                except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                    print(f"JSON parsing failed: {e}")
+                    search_data = {}
+            elif hasattr(request, 'POST'):
+                # Fallback to POST data (form data)
+                search_data = request.POST.dict()
+                # Convert empty strings to None for consistency
+                for key, value in search_data.items():
+                    if value == '':
+                        search_data[key] = None
+            else:
+                # No data found
+                search_data = {}
+            
+            serializer = SearchSerializer(data=search_data)
             if not serializer.is_valid():
                 print(f"SearchSerializer validation errors: {serializer.errors}")
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -597,6 +823,9 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
             
             # Handle comma-separated queries with AND logic
             if analysis['use_and_logic']:
+                print(f"DEBUG: Comma-separated query detected. Data keys: {list(data.keys())}")
+                print(f"DEBUG: enableSmartFieldDetection value: {data.get('enableSmartFieldDetection')}")
+                print(f"DEBUG: useAndLogic value: {data.get('useAndLogic')}")
                 queryset, response_data = search_service.handle_comma_separated_query(data, analysis)
                 
                 # Return early since we've handled the comma-separated query
@@ -608,20 +837,43 @@ class PhoneBookEntryViewSet(viewsets.ModelViewSet):
                 })
             
             # Handle field combination searches (address+island, address+party, etc.)
-            queryset = search_service.handle_field_combination_search(data, analysis)
+            field_combination_results = search_service.handle_field_combination_search(data, analysis)
+            
+            # 2025-01-29: FIXED - Only use field combination results if they exist
+            # Otherwise, keep the original queryset for general query search
+            if field_combination_results is not None:
+                queryset = field_combination_results
+                print(f"Using field combination search results: {queryset.count()} entries")
+            else:
+                print("No field combinations found, proceeding with general query search")
             
             # Handle general query search if no specific field filters
+            print(f"DEBUG: Checking has_query: {analysis['has_query']}")
             if analysis['has_query']:
+                print(f"DEBUG: Calling handle_general_query_search for query: '{data.get('query', 'NOT_FOUND')}'")
                 queryset = search_service.handle_general_query_search(data, queryset)
+            else:
+                print(f"DEBUG: has_query is False, not calling general query search")
             
-            # Apply individual field filters if no combinations were processed
-            if not any([
-                analysis['has_address_filter'] and analysis['has_island_filter'],
-                analysis['has_address_filter'] and analysis['has_party_filter'],
-                analysis['has_name_filter'] and analysis['has_party_filter'],
-                analysis['has_island_filter'] and analysis['has_party_filter'],
-                analysis['has_query']
-            ]):
+            # Apply individual field filters if we have specific field filters
+            # This handles single-field searches (like just address, just name, etc.)
+            has_specific_fields = any([
+                analysis['has_name_filter'],
+                analysis['has_address_filter'], 
+                analysis['has_island_filter'],
+                analysis['has_party_filter'],
+                analysis['has_contact_filter'],
+                analysis['has_nid_filter'],
+                analysis['has_profession_filter'],
+                analysis['has_gender_filter'],
+                analysis['has_min_age_filter'],
+                analysis['has_max_age_filter'],
+                analysis['has_remark_filter'],
+                analysis['has_pep_status_filter']
+            ])
+            
+            if has_specific_fields:
+                print(f"Applying individual field filters for specific fields")
                 queryset = search_service.apply_individual_filters(data, analysis, queryset)
             
             # 2025-01-28: Add query optimization and timeout handling for better performance
