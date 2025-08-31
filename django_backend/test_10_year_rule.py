@@ -135,15 +135,16 @@ def organize_members_by_generation(members):
             
             print(f"   📊 {child.name} can be parent to {valid_children_count}/{len(remaining_children)} remaining children")
             
-            # Prefer different gender from first parent, but accept same gender if no better option
-            is_different_gender = first_parent_gender and child_gender and first_parent_gender != child_gender
-            gender_bonus = 1 if is_different_gender else 0
-            total_score = valid_children_count + gender_bonus
+            # 2025-01-29: FIXED - Strict gender validation: second parent MUST be different gender
+            if first_parent_gender and child_gender and first_parent_gender == child_gender:
+                print(f"     ❌ {child.name} cannot be second parent - same gender as first parent ({first_parent_gender})")
+                continue
             
-            if valid_children_count > 0 and total_score > max_valid_children:
-                max_valid_children = total_score
+            # Only consider different gender candidates
+            if valid_children_count > 0 and valid_children_count > max_valid_children:
+                max_valid_children = valid_children_count
                 best_second_parent = child
-                print(f"   🎯 New best second parent: {child.name} (score: {total_score})")
+                print(f"   🎯 New best second parent: {child.name} (score: {valid_children_count})")
         
         if best_second_parent:
             potential_parents.append(best_second_parent)

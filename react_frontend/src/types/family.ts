@@ -1,13 +1,20 @@
 // 2025-01-27: Creating family type definitions for Phase 2 React frontend
 
+import { BaseEntity } from './common';
+import { PhoneBookEntry } from './directory';
+
 export interface FamilyGroup extends BaseEntity {
   name: string;
   description?: string;
+  address?: string;  // 2025-01-29: Added to match backend serializer
+  island?: string;   // 2025-01-29: Added to match backend serializer
   is_public: boolean;
   created_by: number;
   members: FamilyMember[];
+  relationships?: FamilyRelationship[];  // 2025-01-29: Added to match backend serializer
   privacy_settings: FamilyPrivacySettings;
   tags: string[];
+  member_count?: number;  // 2025-01-29: Added to match backend serializer
 }
 
 export interface FamilyMember extends BaseEntity {
@@ -19,6 +26,20 @@ export interface FamilyMember extends BaseEntity {
   joined_date: string;
   profile_picture?: string;
   notes?: string;
+  entry?: PhoneBookEntry;  // 2025-01-29: Added to match backend serializer
+  role_in_family?: string;  // 2025-01-29: Added to match backend serializer
+}
+
+export interface FamilyRelationship extends BaseEntity {
+  person1: number;
+  person2: number;
+  person1_name?: string;  // 2025-01-29: Added to match backend serializer
+  person2_name?: string;  // 2025-01-29: Added to match backend serializer
+  relationship_type: 'parent' | 'child' | 'spouse' | 'sibling' | 'grandparent' | 'grandchild' | 'aunt_uncle' | 'niece_nephew' | 'cousin' | 'other';
+  relationship_type_display?: string;  // 2025-01-29: Added to match backend serializer
+  family_group: number;
+  notes?: string;
+  is_active: boolean;
 }
 
 export interface FamilyRole {

@@ -11,6 +11,8 @@ import { familyService } from '../../services/familyService';
 import ClassicFamilyTree from './ClassicFamilyTree';
 import RelationshipManager from './RelationshipManager';
 import FamilyTreeDownloadButton from './FamilyTreeDownloadButton';
+import FamilyTableView from './FamilyTableView';
+import FamilyViewToggle, { ViewMode } from './FamilyViewToggle';
 import { PhoneBookEntry } from '../../types/directory';
 
 interface FamilyTreeWindowProps {
@@ -18,6 +20,7 @@ interface FamilyTreeWindowProps {
   onClose: () => void;
   address: string;
   island: string;
+  initialViewMode?: ViewMode; // 2025-01-29: NEW - Allow setting initial view mode
 }
 
 // 2025-01-28: FIXED - Use proper types from types directory to resolve TypeScript conflicts
@@ -40,7 +43,8 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   isOpen, 
   onClose, 
   address, 
-  island 
+  island,
+  initialViewMode = 'tree'
 }) => {
   const { user, isAuthenticated } = useAuthStore();
   
@@ -75,6 +79,20 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   // 2025-01-29: NEW - State for tracking unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // 2025-01-29: NEW - State for view mode toggle between tree and table views
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    // Try to get user's saved preference, fallback to initialViewMode prop
+    const savedPreference = localStorage.getItem('family-view-preference') as ViewMode;
+    return savedPreference || initialViewMode;
+  });
+
+  // 2025-01-29: NEW - Function to handle view mode changes and save user preference
+  const handleViewModeChange = (newViewMode: ViewMode) => {
+    setViewMode(newViewMode);
+    // Save user's preference to localStorage
+    localStorage.setItem('family-view-preference', newViewMode);
+  };
   
   const windowRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -472,13 +490,24 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
           onMouseDown={startDrag}
         >
           <div className="family-tree-title">
-            <h2>Family Tree - {address}, {island}</h2>
+            <h2>
+              {viewMode === 'tree' ? 'Family Tree' : 'Family Table'} - {address}, {island}
+            </h2>
             <div className="family-tree-subtitle">
-              {familyMembers.length} family members
+              {familyMembers.length} family members • {viewMode === 'tree' ? 'Visual' : 'Tabular'} view
             </div>
           </div>
           
           <div className="family-tree-controls">
+            {/* 2025-01-29: NEW - View mode toggle between tree and table views */}
+            {!isEditingMode && familyMembers.length > 0 && (
+              <FamilyViewToggle
+                currentView={viewMode}
+                onViewChange={handleViewModeChange}
+                className="mr-2"
+              />
+            )}
+            
             {/* 2025-01-29: NEW - Save Family button when in editing mode with unsaved changes */}
             {isEditingMode && hasUnsavedChanges && (
               <button
@@ -597,13 +626,21 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                   hasUnsavedChanges={hasUnsavedChanges}
                 />
               ) : (
-                /* Show ClassicFamilyTree when not editing */
-                <ClassicFamilyTree
-                  familyMembers={familyMembers}
-                  relationships={familyRelationships}
-                  useMultiRowLayout={useMultiRowLayout}
-                  svgRef={svgRef as React.RefObject<SVGSVGElement>}
-                />
+                /* Show either ClassicFamilyTree or FamilyTableView based on view mode */
+                viewMode === 'tree' ? (
+                  <ClassicFamilyTree
+                    familyMembers={familyMembers}
+                    relationships={familyRelationships}
+                    useMultiRowLayout={useMultiRowLayout}
+                    svgRef={svgRef as React.RefObject<SVGSVGElement>}
+                  />
+                ) : (
+                  <FamilyTableView
+                    familyMembers={familyMembers}
+                    address={address}
+                    island={island}
+                  />
+                )
               )}
             </>
           )}

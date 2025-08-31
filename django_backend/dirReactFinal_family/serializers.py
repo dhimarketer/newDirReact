@@ -46,12 +46,12 @@ class FamilyGroupDetailSerializer(FamilyGroupSerializer):
     
     def get_members(self, obj):
         """Get detailed member information including full entry data"""
-        members = obj.members.all()[:10]  # Limit to first 10 for performance
+        members = obj.members.all()  # 2025-01-30: FIXED - No limit on family members
         return FamilyMemberDetailSerializer(members, many=True).data
     
     def get_relationships(self, obj):
         """Get basic relationship information"""
-        relationships = obj.relationships.all()[:10]  # Limit to first 10 for performance
+        relationships = obj.relationships.all()  # 2025-01-30: FIXED - No limit on relationships
         return FamilyRelationshipSerializer(relationships, many=True).data
 
 class FamilyMemberSerializer(serializers.ModelSerializer):

@@ -57,6 +57,20 @@ class FamilyService {
     }
   }
 
+  // 2025-01-29: NEW - Method to get families created by the current user
+  async getMyFamilies(params?: {
+    page?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<FamilyGroup>> {
+    const response = await apiService.get<PaginatedResponse<FamilyGroup>>('/family/groups/', { 
+      params: { 
+        ...params,
+        created_by: 'me' // Backend will filter by current user
+      } 
+    });
+    return response.data;
+  }
+
   // Family Members
   async getFamilyMembers(familyId: number, params?: {
     page?: number;

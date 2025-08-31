@@ -51,7 +51,11 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
         # Filter by creator
         created_by = self.request.query_params.get('created_by', None)
         if created_by:
-            queryset = queryset.filter(created_by_id=created_by)
+            if created_by == 'me':
+                # Filter by current user
+                queryset = queryset.filter(created_by=self.request.user)
+            else:
+                queryset = queryset.filter(created_by_id=created_by)
         
         # Filter by privacy (public/private)
         is_public = self.request.query_params.get('is_public', None)

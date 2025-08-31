@@ -227,15 +227,47 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
         spouseMap: spouseMap.size
       });
       
-      // Find people who are parents (have children)
+      // Find people who are parents (have children) - with gender validation
       const parents = validMembers.filter(member => 
         parentChildMap.has(member.entry.pid) && parentChildMap.get(member.entry.pid)!.length > 0
       );
       
-      // Find people who are children (have parents)
-      const children = validMembers.filter(member => 
-        childParentMap.has(member.entry.pid) && childParentMap.get(member.entry.pid)!.length > 0
-      );
+      // Initialize children array
+      let children: typeof validMembers = [];
+      
+      // 2025-01-29: FIXED - Validate relationships for gender compatibility
+      // If we have 2 parents of the same gender, the relationships are invalid
+      if (parents.length >= 2) {
+        const parentGenders = parents.map(p => p.entry.gender).filter(g => g && g !== 'None');
+        const uniqueGenders = new Set(parentGenders);
+        
+        console.log(`🔍 GENDER VALIDATION: Checking ${parents.length} parents for gender diversity`);
+        console.log(`   Parent genders:`, parentGenders);
+        console.log(`   Unique genders:`, Array.from(uniqueGenders));
+        
+        if (uniqueGenders.size === 1 && parentGenders.length >= 2) {
+          console.log(`⚠️ INVALID RELATIONSHIPS: Found ${parents.length} parents of the same gender (${parentGenders[0]}). Relationships will be ignored.`);
+          console.log(`   Parents:`, parents.map(p => `${p.entry.name} (${p.entry.gender})`));
+          
+          // Clear invalid relationships and fall back to age-based logic
+          parents.length = 0;
+          children = [];
+          console.log(`🔄 Falling back to age-based logic due to invalid relationships`);
+        } else {
+          console.log(`✅ Relationships validated: ${parents.length} parents with gender diversity`);
+        }
+      } else if (parents.length === 1) {
+        console.log(`✅ Single parent detected: ${parents[0].entry.name} (${parents[0].entry.gender})`);
+      } else {
+        console.log(`ℹ️ No parents detected in relationships`);
+      }
+      
+      // Find people who are children (have parents) - only if relationships are valid
+      if (parents.length > 0) {
+        children = validMembers.filter(member => 
+          childParentMap.has(member.entry.pid) && childParentMap.get(member.entry.pid)!.length > 0
+        );
+      }
       
       console.log(`👥 Relationship-based classification:`, {
         parents: parents.map(p => p.entry.name),
@@ -410,8 +442,8 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
           }
           
           return { 
-            parents: potentialParents.slice(0, 4),
-            children: children.slice(0, 12),
+            parents: potentialParents, // 2025-01-29: FIXED - No limit on parents
+            children: children, // 2025-01-29: FIXED - No limit on children
             parentChildMap, 
             childParentMap, 
             spouseMap 
@@ -419,10 +451,21 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
         }
       }
       
-      // 2025-01-29: FIXED - Return all members properly classified
+      // 2025-01-29: FIXED - Return all members properly classified with deduplication
+      // Ensure no duplicate children by deduplicating the children array
+      const uniqueChildren = [];
+      const seenChildPids = new Set<number>();
+      
+      for (const child of children) {
+        if (!seenChildPids.has(child.entry.pid)) {
+          uniqueChildren.push(child);
+          seenChildPids.add(child.entry.pid);
+        }
+      }
+      
       const result = { 
         parents: parents.length > 0 ? parents : validMembers.slice(0, 2), 
-        children: children.length > 0 ? children : validMembers.slice(2),
+        children: uniqueChildren,
         parentChildMap,
         childParentMap,
         spouseMap
@@ -616,13 +659,138 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
     
     // If we still don't have any parents identified, all members go to children
     if (potentialParents.length === 0) {
-      children.push(...sortedByAge);
+      // 2025-01-29: FIXED - Prevent duplicate people by deduplicating children array
+      const uniqueChildren = [];
+      const seenPids = new Set<number>();
+      
+      for (const member of sortedByAge) {
+        if (!seenPids.has(member.entry.pid)) {
+          uniqueChildren.push(member);
+          seenPids.add(member.entry.pid);
+        }
+      }
+      
+      // 2025-01-29: FIXED - Handle 2 people with DOB case: if age difference > 12, older becomes parent
+      const peopleWithDob = uniqueChildren.filter(m => m.entry.DOB && m.entry.DOB !== 'None');
+      const peopleWithoutDob = uniqueChildren.filter(m => !m.entry.DOB || m.entry.DOB === 'None');
+      
+      if (peopleWithDob.length === 2) {
+        // Special case: exactly 2 people with DOB
+        const [person1, person2] = peopleWithDob;
+        const age1 = person1.entry.age || 0;
+        const age2 = person2.entry.age || 0;
+        const ageDifference = Math.abs(age1 - age2);
+        
+        console.log(`🎯 Special case: 2 people with DOB - ${person1.entry.name} (${age1}) and ${person2.entry.name} (${age2}), age difference: ${ageDifference} years`);
+        
+        if (ageDifference > 12) {
+          // Age difference is sufficient for parent-child relationship
+          const olderPerson = age1 > age2 ? person1 : person2;
+          const youngerPerson = age1 > age2 ? person2 : person1;
+          
+          console.log(`✅ Age difference ${ageDifference} > 12: ${olderPerson.entry.name} becomes parent, ${youngerPerson.entry.name} becomes child`);
+          
+          potentialParents.push(olderPerson);
+          children.push(youngerPerson);
+          
+          // Add people without DOB to children as well (they might be siblings)
+          if (peopleWithoutDob.length > 0) {
+            children.push(...peopleWithoutDob);
+          }
+                 } else {
+           // Age difference too small, they're likely siblings - create generic unnamed parent
+           console.log(`🎯 Age difference ${ageDifference} <= 12: ${person1.entry.name} and ${person2.entry.name} are likely siblings, creating generic unnamed parent`);
+           
+           // Create a generic unnamed parent for siblings
+           const genericParent = {
+             entry: {
+               pid: -1, // Special PID for generic parent
+               name: '', // Unnamed parent
+               age: undefined,
+               gender: undefined,
+               DOB: undefined,
+               contact: '',
+               profession: undefined,
+               address: uniqueChildren[0]?.entry.address || '',
+               island: uniqueChildren[0]?.entry.island || '',
+               change_status: 'active' // Required field
+             },
+             role: 'parent' as const
+           };
+           
+           // Add generic unnamed parent and set both people with DOB as children (siblings)
+           potentialParents.push(genericParent);
+           children.push(...peopleWithDob);
+           
+           // Add people without DOB to children as well (they might be other siblings)
+           if (peopleWithoutDob.length > 0) {
+             children.push(...peopleWithoutDob);
+           }
+           
+           console.log(`✅ Generic unnamed parent created for siblings with ${children.length} children`);
+         }
+      } else if (peopleWithDob.length > 2) {
+        // More than 2 people with DOB - create generic parent
+        console.log(`🎯 More than 2 people with DOB (${peopleWithDob.length}): creating generic parent`);
+        
+        // Create a generic parent entry
+        const genericParent = {
+          entry: {
+            pid: -1, // Special PID for generic parent
+            name: 'Family',
+            age: undefined,
+            gender: undefined,
+            DOB: undefined,
+            contact: '',
+            profession: undefined,
+            address: uniqueChildren[0]?.entry.address || '',
+            island: uniqueChildren[0]?.entry.island || '',
+            change_status: 'active' // Required field
+          },
+          role: 'parent' as const
+        };
+        
+        // Add generic parent and set all people with DOB as children
+        potentialParents.push(genericParent);
+        children.push(...peopleWithDob);
+        
+        // Add people without DOB to children as well (they might be siblings)
+        if (peopleWithoutDob.length > 0) {
+          children.push(...peopleWithoutDob);
+        }
+        
+        console.log(`✅ Generic parent created with ${children.length} children`);
+      } else if (peopleWithDob.length === 1) {
+        // Only 1 person with DOB - they become a child
+        console.log(`🎯 Only 1 person with DOB: ${peopleWithDob[0].entry.name} becomes child`);
+        children.push(...peopleWithDob);
+        
+        // Add people without DOB to children as well
+        if (peopleWithoutDob.length > 0) {
+          children.push(...peopleWithoutDob);
+        }
+      } else {
+        // No DOB data, just add all unique children
+        children.push(...uniqueChildren);
+        console.log(`⚠️ No DOB data available - added ${uniqueChildren.length} unique children without generic parent`);
+      }
     }
     
-    // 2025-01-29: FIXED - Remove hardcoded limits to show ALL family members
+    // 2025-01-29: FIXED - Remove hardcoded limits to show ALL family members with deduplication
+    // Ensure no duplicate children by deduplicating the children array
+    const uniqueChildren = [];
+    const seenChildPids = new Set<number>();
+    
+    for (const child of children) {
+      if (!seenChildPids.has(child.entry.pid)) {
+        uniqueChildren.push(child);
+        seenChildPids.add(child.entry.pid);
+      }
+    }
+    
     const result = { 
       parents: potentialParents, // No limit on parents
-      children: children, // No limit on children
+      children: uniqueChildren, // No limit on children
       parentChildMap: new Map(),
       childParentMap: new Map(),
       spouseMap: new Map()

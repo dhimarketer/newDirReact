@@ -56,6 +56,9 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   const [selectedAddress, setSelectedAddress] = useState('');
   const [selectedIsland, setSelectedIsland] = useState('');
   
+  // 2025-01-29: NEW - State for preferred view mode when opening family tree
+  const [preferredViewMode, setPreferredViewMode] = useState<'tree' | 'table'>('tree');
+  
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<PhoneBookEntry | null>(null);
@@ -311,6 +314,33 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         </div>
         
         <div className="flex items-center space-x-3">
+          {/* 2025-01-29: NEW - View mode preference toggle for family tree windows */}
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-blue-600">Family View:</span>
+            <button
+              onClick={() => setPreferredViewMode('tree')}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                preferredViewMode === 'tree'
+                  ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              title="Open family trees in visual tree view"
+            >
+              🌳 Tree
+            </button>
+            <button
+              onClick={() => setPreferredViewMode('table')}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                preferredViewMode === 'table'
+                  ? 'bg-green-100 text-green-700 border border-green-300'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              title="Open family trees in table view"
+            >
+              📋 Table
+            </button>
+          </div>
+          
           <button
             onClick={onExport}
             className="px-4 py-2 text-sm font-medium text-blue-700 bg-white border border-blue-300 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -431,13 +461,14 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         </div>
       </div>
 
-              {/* Family Tree Window */}
-              <FamilyTreeWindow
-                isOpen={familyTreeWindowOpen}
-                onClose={() => setFamilyTreeWindowOpen(false)}
-                address={selectedAddress}
-                island={selectedIsland}
-              />
+                    {/* Family Tree Window */}
+      <FamilyTreeWindow
+        isOpen={familyTreeWindowOpen}
+        onClose={() => setFamilyTreeWindowOpen(false)}
+        address={selectedAddress}
+        island={selectedIsland}
+        initialViewMode={preferredViewMode}
+      />
 
               {/* Edit Directory Entry Modal */}
               <EditDirectoryEntryModal

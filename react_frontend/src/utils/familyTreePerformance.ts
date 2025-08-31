@@ -69,10 +69,10 @@ export function useFamilyMemberOrganization(
       return isGrandparent;
     });
 
-    // Assign to appropriate generation with limits
-    organized.grandparents = grandparents.slice(0, 4); // Max 4 grandparents
-    organized.parents = rootMembers.slice(0, 6); // Max 6 parents
-    organized.children = children.slice(0, 12); // Max 12 children
+    // Assign to appropriate generation - 2025-01-30: FIXED - No hardcoded limits
+    organized.grandparents = grandparents; // No limit on grandparents
+    organized.parents = rootMembers; // No limit on parents
+    organized.children = children; // No limit on children
 
     return organized;
   }, [familyMembers, relationships]);

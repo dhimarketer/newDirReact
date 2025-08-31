@@ -5,9 +5,11 @@
 import React, { useState, useEffect } from 'react';
 import SearchBar from '../components/directory/SearchBar';
 import SearchResults from '../components/directory/SearchResults';
-import { DeleteUpdatedFamilyModal } from '../components/family';
+import { DeleteUpdatedFamilyModal, FamilyDetailsModal } from '../components/family';
 import { PhoneBookEntry, SearchFilters } from '../types/directory';
+import { FamilyGroup } from '../types/family';
 import { useAuthStore } from '../store/authStore';
+import { familyService } from '../services/familyService';
 
 interface DetectedFamily {
   id: string;
@@ -26,14 +28,44 @@ const FamilyPage: React.FC = () => {
   const [detectedFamilies, setDetectedFamilies] = useState<DetectedFamily[]>([]);
   const [selectedFamily, setSelectedFamily] = useState<DetectedFamily | null>(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [showFamilyEditor, setShowFamilyEditor] = useState(false);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   
   // 2025-01-28: Added state for delete updated families modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  // 2025-01-29: Added state for saved families
+  const [savedFamilies, setSavedFamilies] = useState<FamilyGroup[]>([]);
+  const [isLoadingSavedFamilies, setIsLoadingSavedFamilies] = useState(false);
+
+  // 2025-01-29: Added state for family details modal
+  const [selectedSavedFamily, setSelectedSavedFamily] = useState<FamilyGroup | null>(null);
+  const [showFamilyDetailsModal, setShowFamilyDetailsModal] = useState(false);
+
   // Check if user is admin
   const isAdmin = user?.is_staff || user?.is_superuser;
+
+  // 2025-01-29: Load saved families on component mount
+  useEffect(() => {
+    if (user) {
+      loadSavedFamilies();
+    }
+  }, [user]);
+
+  // 2025-01-29: Load user's saved families
+  const loadSavedFamilies = async () => {
+    if (!user) return;
+    
+    setIsLoadingSavedFamilies(true);
+    try {
+      const response = await familyService.getMyFamilies();
+      setSavedFamilies(response.results || []);
+    } catch (error) {
+      console.error('Failed to load saved families:', error);
+      setSavedFamilies([]);
+    } finally {
+      setIsLoadingSavedFamilies(false);
+    }
+  };
 
   // Handle search from the search bar
   const handleSearch = async (filters: SearchFilters) => {
@@ -257,7 +289,7 @@ const FamilyPage: React.FC = () => {
   // Handle family customization
   const handleCustomizeFamily = (family: DetectedFamily) => {
     setSelectedFamily(family);
-    setShowFamilyEditor(true);
+    // 2025-01-29: Removed family editor modal - using FamilyTreeWindow edit functionality instead
   };
 
   // Save customized family
@@ -285,8 +317,10 @@ const FamilyPage: React.FC = () => {
         setDetectedFamilies(prev => 
           prev.map(f => f.id === customizedFamily.id ? { ...f, isCustomized: true } : f)
         );
-        setShowFamilyEditor(false);
         setSelectedFamily(null);
+        
+        // 2025-01-29: Refresh saved families list after saving
+        await loadSavedFamilies();
       }
     } catch (error) {
       console.error('Failed to save family:', error);
@@ -299,6 +333,9 @@ const FamilyPage: React.FC = () => {
     setDetectedFamilies([]);
     setSearchResults([]);
     setSearchQuery('');
+    
+    // 2025-01-29: Refresh saved families list after deletion
+    loadSavedFamilies();
   };
 
   return (
@@ -311,6 +348,69 @@ const FamilyPage: React.FC = () => {
             Search for people and discover family relationships automatically based on address and island.
           </p>
         </div>
+
+        {/* Saved Families Section */}
+        {user && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">My Saved Families</h2>
+              <button
+                onClick={loadSavedFamilies}
+                className="px-3 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-200 transition-colors"
+                disabled={isLoadingSavedFamilies}
+              >
+                {isLoadingSavedFamilies ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+            
+            {isLoadingSavedFamilies ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-2 text-sm text-gray-600">Loading your families...</p>
+              </div>
+            ) : savedFamilies.length > 0 ? (
+              <div className="space-y-2">
+                {savedFamilies.map(family => (
+                  <div 
+                    key={family.id} 
+                    className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 hover:shadow-sm transition-all cursor-pointer"
+                    onClick={() => {
+                      setSelectedSavedFamily(family);
+                      setShowFamilyDetailsModal(true);
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-900">{family.name}</h3>
+                        <p className="text-sm text-gray-600">{family.description}</p>
+                        <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                          <span>📍 {family.address || 'No address'}, {family.island || 'No island'}</span>
+                          <span>👥 {family.member_count || family.members?.length || 0} members</span>
+                          <span>📅 {new Date(family.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      <div className="text-gray-400">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No saved families yet</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Search for people and save detected families to see them here.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Admin Section */}
         {isAdmin && (
@@ -458,35 +558,7 @@ const FamilyPage: React.FC = () => {
         )}
       </div>
 
-      {/* Family Editor Modal - TODO: Implement this component */}
-      {showFamilyEditor && selectedFamily && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Customize Family: {selectedFamily.address}, {selectedFamily.island}
-            </h2>
-            <p className="text-gray-600 mb-4">
-              Review and customize the detected family relationships before saving.
-            </p>
-            
-            {/* TODO: Add family editor interface here */}
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowFamilyEditor(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleSaveFamily(selectedFamily)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Save Family
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Delete Updated Families Modal */}
       {showDeleteModal && (
@@ -494,6 +566,15 @@ const FamilyPage: React.FC = () => {
           isOpen={showDeleteModal}
           onClose={() => setShowDeleteModal(false)}
           onSuccess={handleFamilyDeleted}
+        />
+      )}
+
+      {/* Family Details Modal */}
+      {selectedSavedFamily && showFamilyDetailsModal && (
+        <FamilyDetailsModal
+          isOpen={showFamilyDetailsModal}
+          onClose={() => setShowFamilyDetailsModal(false)}
+          family={selectedSavedFamily}
         />
       )}
     </div>

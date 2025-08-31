@@ -34,6 +34,60 @@ def normalize_text(text):
         return ""
     return " ".join(text.strip().lower().split())
 
+def patterns_compatible(pattern1, pattern2):
+    """
+    Check if two NID patterns are compatible for merging.
+    X characters are treated as placeholders that can represent any digit.
+    
+    Examples:
+    - "386" and "386" -> True (identical)
+    - "386" and "XXX" -> True (X can represent 386)
+    - "3X6" and "386" -> True (X can represent 8)
+    - "386" and "123" -> False (different values)
+    """
+    if pattern1 == pattern2:
+        return True
+    
+    # If both patterns are all digits, they must be identical
+    if pattern1.isdigit() and pattern2.isdigit():
+        return pattern1 == pattern2
+    
+    # If one pattern has X characters, check compatibility
+    if 'X' in pattern1.upper() or 'X' in pattern2.upper():
+        # Convert to uppercase for comparison
+        p1 = pattern1.upper()
+        p2 = pattern2.upper()
+        
+        # Check if patterns have same length
+        if len(p1) != len(p2):
+            return False
+        
+        # Check each position for compatibility
+        for i in range(len(p1)):
+            char1 = p1[i]
+            char2 = p2[i]
+            
+            # If both are X, they're compatible
+            if char1 == 'X' and char2 == 'X':
+                continue
+            
+            # If one is X, it can represent the other
+            if char1 == 'X' or char2 == 'X':
+                continue
+            
+            # If both are digits, they must match
+            if char1.isdigit() and char2.isdigit():
+                if char1 != char2:
+                    return False
+            
+            # If one is digit and one is letter (not X), they're not compatible
+            elif char1.isdigit() != char2.isdigit():
+                return False
+        
+        return True
+    
+    return False
+
 def find_mergeable_contacts():
     """
     Find contacts that can be merged based on the specified criteria
@@ -64,16 +118,93 @@ def find_mergeable_contacts():
     
     print(f"Groups with multiple entries: {len(duplicate_groups)}")
     
-    # Analyze each duplicate group for mergeability
+    # Analyze each duplicate group for mergeability with enhanced criteria
     mergeable_candidates = []
     
     for (name, address), entries in duplicate_groups.items():
         if len(entries) < 2:
             continue
             
-        # Check mergeability criteria
+        # Check mergeability criteria with enhanced validation
         nid_entries = [e for e in entries if e.nid and e.nid.strip()]
         island_entries = [e for e in entries if e.island]
+        
+        # ENHANCED: Check NID compatibility (same NID or A-prefix with matching last 3 digits)
+        non_blank_nids = [e.nid.strip() for e in entries if e.nid and e.nid.strip()]
+        nid_compatible = True
+        group_nid_value = None
+        
+        if len(set(non_blank_nids)) > 1:
+            # Check if all NIDs are A-prefix format and have matching last 3 digits
+            a_prefixed_nids = [nid for nid in non_blank_nids if nid.startswith('A')]
+            
+            if len(a_prefixed_nids) == len(non_blank_nids) and len(a_prefixed_nids) > 0:
+                # All NIDs are A-prefix format, now check last 3 digits
+                # Handle both formats: Axxxxxx (7 chars), Axxx (4 chars), and AXXX (with X placeholders)
+                last_three_patterns = []
+                for nid in a_prefixed_nids:
+                    if len(nid) >= 3:
+                        # Extract last 3 characters (could be digits or X placeholders)
+                        last_three = nid[-3:]
+                        last_three_patterns.append(last_three)
+                        print(f"   {nid} -> last 3: {last_three}")
+                    else:
+                        # NID too short, not compatible
+                        nid_compatible = False
+                        break
+                
+                if nid_compatible:
+                    # Check if last 3 patterns are compatible
+                    # Patterns are compatible if:
+                    # 1. All are identical, OR
+                    # 2. All have same non-X positions with same values, OR  
+                    # 3. X positions can represent any digit
+                    
+                    # First, try exact match
+                    if len(set(last_three_patterns)) == 1:
+                        # All identical - compatible!
+                        group_nid_value = f"A***{last_three_patterns[0]} (exact match)"
+                        print(f"✅ INCLUDED: {name} - {address} has identical A-prefix NIDs: {set(last_three_patterns)}")
+                        print(f"   NIDs: {non_blank_nids}")
+                    else:
+                        # Check if patterns are compatible (X positions can be any digit)
+                        compatible_patterns = True
+                        reference_pattern = last_three_patterns[0]
+                        
+                        for pattern in last_three_patterns[1:]:
+                            if not patterns_compatible(reference_pattern, pattern):
+                                compatible_patterns = False
+                                break
+                        
+                        if compatible_patterns:
+                            # Patterns are compatible - X positions can represent any digit
+                            group_nid_value = f"A***{reference_pattern} (compatible X patterns)"
+                            print(f"✅ INCLUDED: {name} - {address} has compatible A-prefix NID patterns: {set(last_three_patterns)}")
+                            print(f"   NIDs: {non_blank_nids}")
+                        else:
+                            # Patterns not compatible
+                            nid_compatible = False
+                            print(f"❌ EXCLUDED: {name} - {address} has incompatible A-prefix NID patterns: {set(last_three_patterns)}")
+                            print(f"   NIDs: {non_blank_nids}")
+            else:
+                # Mixed NID formats or non-A-prefix - not compatible
+                nid_compatible = False
+                print(f"❌ EXCLUDED: {name} - {address} has different NID formats: {set(non_blank_nids)}")
+        elif len(non_blank_nids) == 1:
+            # Only one NID, use it as group value
+            group_nid_value = non_blank_nids[0]
+        else:
+            # No NIDs, compatible
+            group_nid_value = None
+        
+        if not nid_compatible:
+            continue
+        
+        # CRITICAL: Check if there are conflicting islands (different non-blank islands)
+        non_blank_islands = [e.island.name for e in entries if e.island]
+        if len(set(non_blank_islands)) > 1:
+            print(f"❌ EXCLUDED: {name} - {address} has different islands: {set(non_blank_islands)}")
+            continue
         
         # Criteria: at least one entry should have NID, and at least one should have island
         if len(nid_entries) >= 1 and len(island_entries) >= 1:
@@ -89,10 +220,12 @@ def find_mergeable_contacts():
                     'nid_entries': nid_entries,
                     'island_entries': island_entries,
                     'missing_nid_count': missing_nid_count,
-                    'missing_island_count': missing_island_count
+                    'missing_island_count': missing_island_count,
+                    'nid_value': group_nid_value,
+                    'island_value': non_blank_islands[0] if non_blank_islands else None
                 })
     
-    print(f"Mergeable candidates found: {len(mergeable_candidates)}")
+    print(f"Mergeable candidates found (after enhanced validation): {len(mergeable_candidates)}")
     print("=" * 80)
     
     return mergeable_candidates
@@ -115,10 +248,11 @@ def export_to_csv(candidates, filename=None):
     # CSV headers
     headers = [
         'Group_ID', 'Name', 'Address', 'Total_Entries', 'Entries_with_NID', 'Entries_with_Island',
-        'Entry_PID', 'Entry_NID', 'Entry_Island', 'Entry_Contact', 'Entry_Party', 'Entry_DOB',
-        'Entry_Remark', 'Entry_Gender', 'Entry_Profession', 'Entry_Email', 'Entry_Status',
-        'Primary_Entry_PID', 'Primary_Entry_Reason', 'Contacts_to_Merge', 'Remarks_to_Merge',
-        'Parties_to_Merge', 'DOBs_to_Merge', 'Professions_to_Merge', 'Emails_to_Merge'
+        'Group_NID_Value', 'Group_Island_Value', 'Entry_PID', 'Entry_NID', 'Entry_Island', 
+        'Entry_Contact', 'Entry_Party', 'Entry_DOB', 'Entry_Remark', 'Entry_Gender', 
+        'Entry_Profession', 'Entry_Email', 'Entry_Status', 'Primary_Entry_PID', 
+        'Primary_Entry_Reason', 'Contacts_to_Merge', 'Remarks_to_Merge', 'Parties_to_Merge', 
+        'DOBs_to_Merge', 'Professions_to_Merge', 'Emails_to_Merge'
     ]
     
     with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
@@ -129,6 +263,8 @@ def export_to_csv(candidates, filename=None):
             entries = candidate['entries']
             nid_entries = candidate['nid_entries']
             island_entries = candidate['island_entries']
+            group_nid = candidate.get('nid_value', '')
+            group_island = candidate.get('island_value', '')
             
             # Find the best entry to keep (one with NID and island)
             best_entry = None
@@ -164,6 +300,8 @@ def export_to_csv(candidates, filename=None):
                     len(entries),  # Total_Entries
                     len(nid_entries),  # Entries_with_NID
                     len(island_entries),  # Entries_with_Island
+                    group_nid,  # Group_NID_Value
+                    group_island,  # Group_Island_Value
                     entry.pid,  # Entry_PID
                     entry.nid or '',  # Entry_NID
                     entry.island.name if entry.island else '',  # Entry_Island
