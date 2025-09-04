@@ -128,35 +128,217 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
         
         return Response(stats)
     
+    @action(detail=False, methods=['post'])
+    def create_sub_family(self, request):
+        """2025-01-31: NEW - Create a new sub-family when relationships change"""
+        address = request.data.get('address')
+        island = request.data.get('island')
+        parent_family_id = request.data.get('parent_family_id')
+        members = request.data.get('members', [])
+        relationships = request.data.get('relationships', [])
+        family_name = request.data.get('family_name', '')
+        
+        if not address or not island:
+            return Response(
+                {'error': 'Both address and island are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get the parent family if specified
+            parent_family = None
+            if parent_family_id:
+                try:
+                    parent_family = FamilyGroup.objects.get(id=parent_family_id)
+                except FamilyGroup.DoesNotExist:
+                    return Response(
+                        {'error': 'Parent family not found'}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            
+            # Create new sub-family
+            family_name = family_name.strip() or f"Family at {address} ({len(members)} members)"
+            family_group = FamilyGroup.objects.create(
+                name=family_name,
+                description=f"Sub-family from {address}, {island}",
+                address=address,
+                island=island,
+                parent_family=parent_family,
+                created_by=request.user
+            )
+            
+            # Add members to the new family
+            for member_data in members:
+                entry_id = member_data.get('entry_id')
+                role = member_data.get('role', 'member')
+                
+                if entry_id:
+                    try:
+                        entry = PhoneBookEntry.objects.get(pid=entry_id)
+                        FamilyMember.objects.create(
+                            entry=entry,
+                            family_group=family_group,
+                            role_in_family=role
+                        )
+                    except PhoneBookEntry.DoesNotExist:
+                        continue
+            
+            # Add relationships within the new family
+            for rel_data in relationships:
+                person1_id = rel_data.get('person1_id')
+                person2_id = rel_data.get('person2_id')
+                relationship_type = rel_data.get('relationship_type', 'other')
+                notes = rel_data.get('notes', '')
+                
+                if person1_id and person2_id:
+                    try:
+                        person1 = PhoneBookEntry.objects.get(pid=person1_id)
+                        person2 = PhoneBookEntry.objects.get(pid=person2_id)
+                        
+                        # Check if both members are in this family
+                        if (family_group.members.filter(entry=person1).exists() and 
+                            family_group.members.filter(entry=person2).exists()):
+                            
+                            FamilyRelationship.objects.create(
+                                person1=person1,
+                                person2=person2,
+                                relationship_type=relationship_type,
+                                notes=notes,
+                                family_group=family_group
+                            )
+                    except PhoneBookEntry.DoesNotExist:
+                        continue
+            
+            # Mark as manually updated
+            family_group.mark_as_manually_updated()
+            
+            serializer = self.get_serializer(family_group)
+            return Response({
+                'success': True,
+                'message': f'Sub-family "{family_name}" created successfully',
+                'data': serializer.data
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            print(f"Error creating sub-family: {str(e)}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     @action(detail=False, methods=['get'])
     def by_address(self, request):
-        """Get family group by address and island"""
+        """Get all family groups at a specific address and island"""
         address = request.query_params.get('address')
         island = request.query_params.get('island')
         
         if not address or not island:
             return Response(
-                {'error': 'Both address and island parameters are required'}, 
+                {'error': 'Both address and island are required'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         try:
-            family_group = FamilyGroup.get_by_address(address, island)
-            if family_group:
-                # 2025-01-28: FIXED - Use FamilyGroupDetailSerializer to include members and relationships
-                from .serializers import FamilyGroupDetailSerializer
-                serializer = FamilyGroupDetailSerializer(family_group)
-                return Response(serializer.data)
-            else:
-                # 2025-01-28: FIXED - Updated error message to reflect that family groups can be created for all addresses
+            # 2025-01-31: ENHANCED - Get all families at the same address with fuzzy matching
+            family_groups = FamilyGroup.get_all_by_address(address, island)
+            
+            # 2025-01-31: DEBUG - Log what we found for troubleshooting
+            print(f"DEBUG: get_all_by_address search for '{address}', '{island}' returned {family_groups.count()} families")
+            for fg in family_groups:
+                print(f"DEBUG: Found family {fg.id}: address='{fg.address}', island='{fg.island}'")
+            
+            if not family_groups.exists():
                 return Response({
-                    'error': 'No family group found for this address',
-                    'message': 'Family groups can be created for any address. If no family group exists, try creating one or contact an administrator.',
-                    'address': address,
-                    'island': island,
-                    'suggestion': 'Try creating a family group or search for a different address'
+                    'success': False,
+                    'message': f'No families found at {address}, {island}',
+                    'data': []
                 }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Serialize all families with their members and relationships
+            families_data = []
+            for family_group in family_groups:
+                serializer = FamilyGroupDetailSerializer(family_group)
+                families_data.append(serializer.data)
+            
+            return Response({
+                'success': True,
+                'message': f'Found {len(families_data)} families at {address}, {island}',
+                'data': families_data,
+                'total_families': len(families_data)
+            }, status=status.HTTP_200_OK)
+            
         except Exception as e:
+            print(f"Error getting families by address: {str(e)}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['get'])
+    def by_address_only(self, request):
+        """2025-01-31: NEW - Get all family groups at a specific address (ignoring island) for debugging"""
+        address = request.query_params.get('address')
+        
+        if not address:
+            return Response(
+                {'error': 'Address is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Search for families by address only (ignoring island)
+            family_groups = FamilyGroup.objects.filter(address=address).order_by('created_at')
+            
+            print(f"DEBUG: by_address_only search for '{address}' returned {family_groups.count()} families")
+            for fg in family_groups:
+                print(f"DEBUG: Found family {fg.id}: address='{fg.address}', island='{fg.island}'")
+            
+            if not family_groups.exists():
+                return Response({
+                    'success': False,
+                    'message': f'No families found at address {address}',
+                    'data': []
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Serialize all families with their members and relationships
+            families_data = []
+            for family_group in family_groups:
+                serializer = FamilyGroupDetailSerializer(family_group)
+                families_data.append(serializer.data)
+            
+            return Response({
+                'success': True,
+                'message': f'Found {len(families_data)} families at address {address}',
+                'data': families_data,
+                'total_families': len(families_data)
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"Error getting families by address only: {str(e)}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['get'])
+    def debug_all_families(self, request):
+        """2025-01-31: NEW - Debug endpoint to list all families in the database"""
+        try:
+            # Get all families with basic info
+            all_families = FamilyGroup.objects.all().order_by('address', 'created_at')
+            
+            debug_data = []
+            for family in all_families:
+                debug_data.append({
+                    'id': family.id,
+                    'name': family.name,
+                    'address': family.address,
+                    'island': family.island,
+                    'member_count': family.members.count(),
+                    'created_at': family.created_at,
+                    'is_manually_updated': family.is_manually_updated,
+                    'parent_family_id': family.parent_family.id if family.parent_family else None
+                })
+            
+            return Response({
+                'success': True,
+                'total_families': len(debug_data),
+                'families': debug_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"Error in debug_all_families: {str(e)}")
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=False, methods=['post'])

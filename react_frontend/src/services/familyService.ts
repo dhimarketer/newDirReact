@@ -39,8 +39,27 @@ class FamilyService {
     return response.data;
   }
 
-  async deleteFamilyGroup(id: number): Promise<void> {
-    await apiService.delete(`/family/groups/${id}/`);
+  async deleteFamilyGroup(id: number): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      console.log('DEBUG: Deleting family group:', id);
+      
+      const response = await apiService.delete(`/family/groups/${id}/`);
+      
+      return {
+        success: true,
+        message: 'Family group deleted successfully'
+      };
+    } catch (error: any) {
+      console.error('Error deleting family group:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to delete family group'
+      };
+    }
   }
 
   // 2025-01-28: NEW - Method to mark family as manually updated
@@ -245,6 +264,8 @@ class FamilyService {
     return response.data;
   }
 
+
+
   // 2025-01-29: NEW - Method to save family changes with current state
   async saveFamilyChanges(address: string, island: string, members: any[], relationships: any[]): Promise<{
     success: boolean;
@@ -398,26 +419,173 @@ class FamilyService {
       } else {
         return {
           success: false,
-          error: response.data?.error || response.data?.message || 'Family inference failed'
+          error: response.data?.error || 'Failed to infer family'
         };
       }
     } catch (error: any) {
       console.error('Error inferring family by address:', error);
-      
-      if (error.response?.status === 404) {
-        return {
-          success: false,
-          error: 'No family members found with DOB for this address'
-        };
-      }
-      
       return {
         success: false,
-        error: 'Failed to infer family relationships'
+        error: error.response?.data?.error || 'Failed to infer family'
+      };
+    }
+  }
+  
+  // 2025-01-31: NEW - Method to create sub-families when relationships change
+  async createSubFamily(data: {
+    address: string;
+    island: string;
+    parent_family_id?: number;
+    members: Array<{
+      entry_id: number;
+      role: string;
+    }>;
+    relationships: Array<{
+      person1_id: number;
+      person2_id: number;
+      relationship_type: string;
+      notes?: string;
+    }>;
+    family_name?: string;
+  }): Promise<{
+    success: boolean;
+    data?: any;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      console.log('DEBUG: Creating sub-family for:', data);
+      
+      const response = await apiService.post('/family/groups/create_sub_family/', data);
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data?.error || 'Failed to create sub-family'
+        };
+      }
+    } catch (error: any) {
+      console.error('Error creating sub-family:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to create sub-family'
+      };
+    }
+  }
+  
+  // 2025-01-31: ENHANCED - Method to get all families at a specific address
+  async getAllFamiliesByAddress(address: string, island: string): Promise<{
+    success: boolean;
+    data?: any[];
+    message?: string;
+    total_families?: number;
+    error?: string;
+  }> {
+    try {
+      console.log('DEBUG: Getting all families for:', { address, island });
+      
+      const response = await apiService.get('/family/groups/by_address/', {
+        params: { address, island }
+      });
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message,
+          total_families: response.data.total_families
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data?.error || 'Failed to get families'
+        };
+      }
+    } catch (error: any) {
+      console.error('Error getting families by address:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to get families'
       };
     }
   }
 
+  // 2025-01-31: NEW - Method to get all families at a specific address (ignoring island) for debugging
+  async getAllFamiliesByAddressOnly(address: string): Promise<{
+    success: boolean;
+    data?: any[];
+    message?: string;
+    total_families?: number;
+    error?: string;
+  }> {
+    try {
+      console.log('DEBUG: Getting all families by address only for:', { address });
+      
+      const response = await apiService.get('/family/groups/by_address_only/', {
+        params: { address }
+      });
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message,
+          total_families: response.data.total_families
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data?.error || 'Failed to get families by address only'
+        };
+      }
+    } catch (error: any) {
+      console.error('Error getting families by address only:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to get families by address only'
+      };
+    }
+  }
+
+  // 2025-01-31: NEW - Debug method to get all families in the database
+  async debugAllFamilies(): Promise<{
+    success: boolean;
+    total_families?: number;
+    families?: any[];
+    error?: string;
+  }> {
+    try {
+      console.log('DEBUG: Getting all families in database for debugging');
+      
+      const response = await apiService.get('/family/groups/debug_all_families/');
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          total_families: response.data.total_families,
+          families: response.data.families
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data?.error || 'Failed to get all families'
+        };
+      }
+    } catch (error: any) {
+      console.error('Error getting all families:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to get all families'
+      };
+    }
+  }
+  
   // 2025-01-28: Added method to get family by address for family tree window
   async getFamilyByAddress(address: string, island: string): Promise<{
     success: boolean;

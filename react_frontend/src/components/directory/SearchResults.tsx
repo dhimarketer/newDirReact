@@ -59,6 +59,10 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   // 2025-01-29: NEW - State for preferred view mode when opening family tree
   const [preferredViewMode, setPreferredViewMode] = useState<'tree' | 'table'>('tree');
   
+  // 2025-01-31: NEW - State for tracking family information for addresses
+  const [addressFamilyInfo, setAddressFamilyInfo] = useState<Map<string, { count: number; names: string[] }>>(new Map());
+  const [isLoadingFamilyInfo, setIsLoadingFamilyInfo] = useState(false);
+  
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<PhoneBookEntry | null>(null);
@@ -90,6 +94,50 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     }
   }, [user, adminSearchFieldSettings, fetchAdminSearchFieldSettings]);
 
+  // 2025-01-31: NEW - Preload family information for addresses in search results
+  useEffect(() => {
+    if (results.length > 0) {
+      preloadFamilyInfoForAddresses();
+    }
+  }, [results]);
+
+  // 2025-01-31: NEW - Function to preload family information for addresses
+  const preloadFamilyInfoForAddresses = async () => {
+    setIsLoadingFamilyInfo(true);
+    const newAddressFamilyInfo = new Map<string, { count: number; names: string[] }>();
+    
+    // Get unique address-island combinations from results
+    const uniqueAddresses = new Set<string>();
+    results.forEach(entry => {
+      if (entry.address && entry.island) {
+        const key = `${entry.address}|${entry.island_name || entry.island}`;
+        uniqueAddresses.add(key);
+      }
+    });
+
+    // Check family information for each unique address
+    for (const addressKey of uniqueAddresses) {
+      const [address, island] = addressKey.split('|');
+      
+      try {
+        const familyResponse = await familyService.getAllFamiliesByAddress(address, island);
+        if (familyResponse.success && familyResponse.data) {
+          const familyCount = familyResponse.data.length;
+          const familyNames = familyResponse.data.map((family: any) => family.name);
+          newAddressFamilyInfo.set(addressKey, { count: familyCount, names: familyNames });
+        } else {
+          newAddressFamilyInfo.set(addressKey, { count: 0, names: [] });
+        }
+      } catch (error) {
+        console.error(`Error checking families for ${address}, ${island}:`, error);
+        newAddressFamilyInfo.set(addressKey, { count: 0, names: [] });
+      }
+    }
+    
+    setAddressFamilyInfo(newAddressFamilyInfo);
+    setIsLoadingFamilyInfo(false);
+  };
+
   // Format age from DOB
   const formatAge = (dob?: string): string => {
     if (!dob) return 'N/A';
@@ -120,32 +168,58 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   const handleAddressClick = async (address: string, island: string) => {
     console.log('Address clicked:', { address, island });
     
-    // 2025-01-29: ENHANCED - First check if there's a saved family for this address
+    // 2025-01-31: ENHANCED - Check for all related families at this address
     try {
-      const familyResponse = await familyService.getFamilyByAddress(address, island);
+      const allFamiliesResponse = await familyService.getAllFamiliesByAddress(address, island);
       
-      if (familyResponse.success && familyResponse.data && familyResponse.data.id) {
-        // There's a saved family - open it directly
-        console.log('Found saved family for address:', address);
-        setSelectedAddress(address);
-        setSelectedIsland(island);
-        setFamilyTreeWindowOpen(true);
-      } else {
-        // No saved family - create one automatically using backend inference
-        console.log('No saved family found, creating one automatically for address:', address);
+      if (allFamiliesResponse.success && allFamiliesResponse.data && allFamiliesResponse.data.length > 0) {
+        // Found families at this address
+        const familyCount = allFamiliesResponse.data.length;
+        console.log(`Found ${familyCount} families for address:`, address);
         
-        // 2025-01-29: FIXED - Allow family tree generation even without DOB data
-        // The backend will handle family inference and create the family group
+        if (familyCount === 1) {
+          // Single family - open directly
+          setSelectedAddress(address);
+          setSelectedIsland(island);
+          setFamilyTreeWindowOpen(true);
+        } else {
+          // Multiple families - show options to user
+          const familyNames = allFamiliesResponse.data.map((family: any) => family.name).join(', ');
+          const message = `Found ${familyCount} families at this address:\n${familyNames}\n\nWould you like to view all families together?`;
+          
+          if (confirm(message)) {
+            setSelectedAddress(address);
+            setSelectedIsland(island);
+            setFamilyTreeWindowOpen(true);
+          }
+        }
+      } else {
+        // No families found - check if we should create one
+        console.log('No families found for address:', address);
+        
+        const shouldCreate = confirm(
+          `No families found at ${address}, ${island}.\n\nWould you like to create a family tree for this address?`
+        );
+        
+        if (shouldCreate) {
+          setSelectedAddress(address);
+          setSelectedIsland(island);
+          setFamilyTreeWindowOpen(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for families:', error);
+      
+      // Fallback - ask user if they want to try opening family tree
+      const shouldTry = confirm(
+        `Unable to check for existing families at ${address}, ${island}.\n\nWould you like to try opening the family tree?`
+      );
+      
+      if (shouldTry) {
         setSelectedAddress(address);
         setSelectedIsland(island);
         setFamilyTreeWindowOpen(true);
       }
-    } catch (error) {
-      console.error('Error checking for saved family:', error);
-      // Fallback to opening family tree window - let backend handle inference
-      setSelectedAddress(address);
-      setSelectedIsland(island);
-      setFamilyTreeWindowOpen(true);
     }
   };
 
@@ -156,8 +230,12 @@ const SearchResults: React.FC<SearchResultsProps> = ({
 
   // 2025-01-28: NEW - Get tooltip text for address click
   const getAddressTooltip = (entry: PhoneBookEntry): string => {
-    // 2025-01-29: FIXED - Family trees are always available, regardless of DOB data
-    return 'Click to view family tree';
+    // 2025-01-31: ENHANCED - Show more informative tooltip about family tree availability
+    if (entry.DOB && entry.DOB !== 'None' && entry.DOB.trim() !== '') {
+      return 'Click to view family tree (has age data for better family inference)';
+    } else {
+      return 'Click to view family tree (will create family structure from available data)';
+    }
   };
 
   // Get field value for display
@@ -234,30 +312,49 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     if (field.field_name === 'address' && entry.island) {
       const hasDOB = hasDOBData(entry);
       const tooltipText = getAddressTooltip(entry);
+      const addressKey = `${entry.address}|${entry.island_name || entry.island}`;
+      const familyInfo = addressFamilyInfo.get(addressKey);
       
-      if (hasDOB) {
-        // Address has DOB data - make it clickable for family tree
-        return (
+      // 2025-01-31: ENHANCED - Always make address clickable for family tree access
+      return (
+        <div className="flex items-center space-x-2">
           <button
             onClick={() => handleAddressClick(value, entry.island_name || entry.island || '')}
-            className="text-sm text-blue-400 hover:text-blue-300 underline cursor-pointer truncate-text"
+            className={`text-sm underline cursor-pointer truncate-text ${
+              hasDOB ? 'text-blue-400 hover:text-blue-300' : 'text-blue-500 hover:text-blue-400'
+            }`}
             title={tooltipText}
           >
             {value}
           </button>
-        );
-      } else {
-        // Address has no DOB data - show as non-clickable with info tooltip
-        return (
-          <div 
-            className="text-sm text-gray-500 truncate-text cursor-help"
-            title={tooltipText}
-          >
-            {value}
-            <span className="ml-1 text-xs text-gray-400">(no family tree)</span>
-          </div>
-        );
-      }
+          
+          {/* 2025-01-31: NEW - Family count badge */}
+          {isLoadingFamilyInfo ? (
+            <div className="flex items-center space-x-1">
+              <span className="text-xs px-2 py-1 bg-gray-100 text-gray-500 rounded-full font-medium">
+                <div className="inline-block w-3 h-3 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+                <span className="ml-1">checking...</span>
+              </span>
+            </div>
+          ) : familyInfo && familyInfo.count > 0 ? (
+            <div className="flex items-center space-x-1">
+              <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
+                {familyInfo.count} family{familyInfo.count !== 1 ? 'ies' : 'y'}
+              </span>
+              {familyInfo.count > 1 && (
+                <span className="text-xs text-gray-500" title={familyInfo.names.join(', ')}>
+                  (click to view all)
+                </span>
+              )}
+            </div>
+          ) : null}
+          
+          {/* 2025-01-31: NEW - DOB indicator */}
+          {hasDOB && (
+            <span className="text-xs text-green-500">(age data available)</span>
+          )}
+        </div>
+      );
     }
 
     return (

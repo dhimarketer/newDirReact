@@ -22,3 +22,6 @@ export { default as ClassicFamilyTree } from './ClassicFamilyTree';
 export { default as FamilyTreeDownloadButton } from './FamilyTreeDownloadButton';  // 2025-01-29: NEW - Download button for family tree graphics
 export { default as FamilyTableView } from './FamilyTableView';  // 2025-01-29: NEW - Family table view component for tabular data display
 export { default as FamilyViewToggle } from './FamilyViewToggle';  // 2025-01-29: NEW - Toggle component for switching between tree and table views
+export { default as BulkFamilyDeleteModal } from './BulkFamilyDeleteModal';  // 2025-01-31: NEW - Bulk family delete modal for admin operations
+export { default as ReactFlowFamilyTree } from './ReactFlowFamilyTree';  // 2025-01-31: NEW - ReactFlow-based family tree with automatic layout
+export { default as FamilyTreeComparison } from './FamilyTreeComparison';  // 2025-01-31: NEW - A/B testing component for comparing SVG vs ReactFlow implementations

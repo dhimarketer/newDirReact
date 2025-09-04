@@ -30,6 +30,7 @@ interface RelationshipManagerProps {
   isEditable: boolean;
   onSaveFamily?: () => void; // 2025-01-29: NEW - Callback to save family changes
   hasUnsavedChanges?: boolean; // 2025-01-29: NEW - Track if there are unsaved changes
+  familyGroupData?: any; // 2025-01-31: NEW - Current family group data for sub-family creation
 }
 
 interface DragState {
@@ -65,7 +66,8 @@ const RelationshipManager: React.FC<RelationshipManagerProps> = ({
   onFamilyMembersChange,
   isEditable,
   onSaveFamily,
-  hasUnsavedChanges = false
+  hasUnsavedChanges = false,
+  familyGroupData
 }) => {
   const [dragState, setDragState] = useState<DragState>({
     sourceMember: null,
@@ -274,8 +276,120 @@ const RelationshipManager: React.FC<RelationshipManagerProps> = ({
     setDeleteFamilyReason('');
   }, []);
 
+  // 2025-01-31: NEW - Function to create new family when relationships change
+  const createNewFamilyFromRelationship = useCallback(async (
+    sourceMember: FamilyMember, 
+    targetMember: FamilyMember, 
+    relationshipType: string
+  ) => {
+    // 2025-01-31: FIXED - Only create sub-families when user explicitly requests it
+    if (relationshipType === 'parent' || relationshipType === 'child') {
+      try {
+        // Get the address from the members
+        const address = sourceMember.entry.address || targetMember.entry.address;
+        const island = sourceMember.entry.island || targetMember.entry.island;
+        
+        if (!address || !island) {
+          alert('Cannot create new family: Missing address or island information');
+          return false;
+        }
+        
+        // Determine which member is the parent and which is the child
+        let parentMember: FamilyMember;
+        let childMember: FamilyMember;
+        
+        if (relationshipType === 'parent') {
+          // sourceMember is parent of targetMember
+          parentMember = sourceMember;
+          childMember = targetMember;
+        } else {
+          // targetMember is parent of sourceMember
+          parentMember = targetMember;
+          childMember = sourceMember;
+        }
+        
+        // Create new family with these members
+        const newFamilyData = {
+          address,
+          island,
+          parent_family_id: undefined, // Will be set to current family ID if available
+          members: [
+            {
+              entry_id: parentMember.entry.pid,
+              role: 'parent'
+            },
+            {
+              entry_id: childMember.entry.pid,
+              role: 'child'
+            }
+          ],
+          relationships: [
+            {
+              person1_id: parentMember.entry.pid,
+              person2_id: childMember.entry.pid,
+              relationship_type: 'parent',
+              notes: 'Created from relationship change'
+            }
+          ],
+          family_name: `${parentMember.entry.name} & ${childMember.entry.name} Family`
+        };
+        
+        // 2025-01-31: FIXED - Try to get the current family ID to set as parent_family
+        if (familyGroupData && familyGroupData.id) {
+          newFamilyData.parent_family_id = familyGroupData.id;
+          console.log('🔍 RelationshipManager: Setting parent_family_id to:', familyGroupData.id);
+        } else {
+          console.warn('No family group ID available for parent_family relationship');
+        }
+        
+        // Call the family service to create the new family
+        const { familyService } = await import('../../services/familyService');
+        const result = await familyService.createSubFamily(newFamilyData);
+        
+        if (result.success) {
+          alert(`New family "${newFamilyData.family_name}" created successfully!`);
+          
+          // Notify parent component about the new family
+          if (onFamilyMembersChange) {
+            // Remove these members from the current family
+            const remainingMembers = familyMembers.filter(member => 
+              member.entry.pid !== parentMember.entry.pid && 
+              member.entry.pid !== childMember.entry.pid
+            );
+            onFamilyMembersChange(remainingMembers);
+          }
+          
+          // Remove relationships involving these members
+          const updatedRelationships = relationships.filter(rel => 
+            rel.person1 !== parentMember.entry.pid && 
+            rel.person2 !== parentMember.entry.pid &&
+            rel.person1 !== childMember.entry.pid && 
+            rel.person2 !== childMember.entry.pid
+          );
+          onRelationshipChange(updatedRelationships);
+          
+          // Close any open modals
+          setShowNewFamilyModal(false);
+          setSelectedMembersForNewFamily(new Set());
+          setNewFamilyAddress('');
+          setNewFamilyName('');
+          
+          return true;
+        } else {
+          alert(`Failed to create new family: ${result.error}`);
+          return false;
+        }
+      } catch (error) {
+        console.error('Error creating new family from relationship:', error);
+        alert(`Error creating new family: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        return false;
+      }
+    }
+    return false;
+  }, [familyMembers, relationships, onFamilyMembersChange, onRelationshipChange, familyGroupData]);
+
   // Create relationship between two members
-  const createRelationship = useCallback((source: FamilyMember, target: FamilyMember) => {
+  const createRelationship = useCallback(async (source: FamilyMember, target: FamilyMember) => {
     // Check if relationship already exists
     const existingRelationship = getExistingRelationship(source, target);
     
@@ -334,9 +448,11 @@ const RelationshipManager: React.FC<RelationshipManagerProps> = ({
       is_active: true
     };
     
-    // Add to relationships
-    const updatedRelationships = [...relationships, newRelationship];
-    onRelationshipChange(updatedRelationships);
+    // SIMPLIFIED: Create relationships within the same family only
+    // No more confusing sub-family creation prompts
+    
+    // Create the relationship normally (within the same family)
+    onRelationshipChange([...relationships, newRelationship]);
     
     // Reset state
     setDragState(prev => ({
@@ -348,10 +464,19 @@ const RelationshipManager: React.FC<RelationshipManagerProps> = ({
     
     // Show success message
     alert(`Created ${dragState.relationshipType} relationship between ${source.entry.name} and ${target.entry.name}`);
-  }, [relationships, dragState.relationshipType, relationshipNotes, onRelationshipChange, getExistingRelationship]);
+  }, [
+    relationships, 
+    dragState.relationshipType, 
+    relationshipNotes, 
+    onRelationshipChange, 
+    getExistingRelationship, 
+    createNewFamilyFromRelationship
+  ]);
+
+
 
   // Handle member click for relationship creation
-  const handleMemberClick = useCallback((member: FamilyMember) => {
+  const handleMemberClick = useCallback(async (member: FamilyMember) => {
     if (!isEditable) return;
     
     if (!dragState.sourceMember) {
@@ -376,7 +501,12 @@ const RelationshipManager: React.FC<RelationshipManagerProps> = ({
       }));
       
       // Create the relationship
-      createRelationship(dragState.sourceMember, member);
+      try {
+        await createRelationship(dragState.sourceMember, member);
+      } catch (error) {
+        console.error('Error creating relationship:', error);
+        alert('Failed to create relationship. Please try again.');
+      }
     }
   }, [dragState.sourceMember, isEditable, createRelationship]);
 

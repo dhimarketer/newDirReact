@@ -3,7 +3,7 @@
 
 import React from 'react';
 
-export type ViewMode = 'tree' | 'table';
+export type ViewMode = 'tree' | 'table' | 'comparison';
 
 interface FamilyViewToggleProps {
   currentView: ViewMode;
@@ -48,9 +48,23 @@ const FamilyViewToggle: React.FC<FamilyViewToggleProps> = ({
         <span>Table View</span>
       </button>
 
+      {/* Comparison View Button */}
+      <button
+        onClick={() => onViewChange('comparison')}
+        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center space-x-2 ${
+          currentView === 'comparison'
+            ? 'bg-purple-100 text-purple-700 border-2 border-purple-300 shadow-sm'
+            : 'bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200 hover:text-gray-700'
+        }`}
+        title="Compare SVG vs ReactFlow implementations"
+      >
+        <span className="text-base">⚖️</span>
+        <span>Compare</span>
+      </button>
+
       {/* View Mode Indicator */}
       <div className="ml-2 text-xs text-gray-500">
-        {currentView === 'tree' ? 'Visual' : 'Tabular'} format
+        {currentView === 'tree' ? 'Visual' : currentView === 'table' ? 'Tabular' : 'Comparison'} format
       </div>
     </div>
   );

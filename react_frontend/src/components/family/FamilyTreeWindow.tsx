@@ -2,17 +2,17 @@
 // 2025-01-28: Replaces embedded modal approach with focused, expandable window
 // 2025-01-28: Implements responsive design and proper window sizing
 // 2025-01-28: ENHANCED: Added drag-and-drop family relationship editing functionality
+// 2025-01-31: ENHANCED: Support for multiple families at the same address
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { STORAGE_KEYS } from '../../utils/constants';
-import { useAuthStore } from '../../store/authStore';
 import { familyService } from '../../services/familyService';
 import ClassicFamilyTree from './ClassicFamilyTree';
 import RelationshipManager from './RelationshipManager';
 import FamilyTreeDownloadButton from './FamilyTreeDownloadButton';
 import FamilyTableView from './FamilyTableView';
 import FamilyViewToggle, { ViewMode } from './FamilyViewToggle';
+import FamilyTreeComparison from './FamilyTreeComparison';
 import { PhoneBookEntry } from '../../types/directory';
 
 interface FamilyTreeWindowProps {
@@ -28,6 +28,10 @@ interface FamilyMember {
   entry: PhoneBookEntry;
   role: 'parent' | 'child' | 'other';
   relationship?: string;
+  familyGroupId?: number; // 2025-01-31: NEW - Family group identifier for multiple families
+  familyGroupName?: string; // 2025-01-31: NEW - Family group name for display
+  originalRole?: 'parent' | 'child' | 'other'; // 2025-01-31: NEW - Original role when families are manually created
+  originalFamilyId?: number; // 2025-01-31: NEW - Original family ID when families are manually created
 }
 
 interface FamilyRelationship {
@@ -37,6 +41,21 @@ interface FamilyRelationship {
   relationship_type: 'parent' | 'child' | 'spouse' | 'sibling' | 'grandparent' | 'grandchild' | 'aunt_uncle' | 'niece_nephew' | 'cousin' | 'other';
   notes?: string;
   is_active: boolean;
+  familyGroupId?: number; // 2025-01-31: NEW - Family group identifier for multiple families
+}
+
+// 2025-01-31: NEW - Interface for family groups
+interface FamilyGroup {
+  id: number;
+  name: string;
+  description?: string;
+  address: string;
+  island: string;
+  parent_family?: number;
+  parent_family_name?: string;
+  members: FamilyMember[];
+  relationships: FamilyRelationship[];
+  created_at: string;
 }
 
 const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({ 
@@ -46,11 +65,15 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   island,
   initialViewMode = 'tree'
 }) => {
-  const { user, isAuthenticated } = useAuthStore();
+  // const { user } = useAuthStore(); // Currently unused but kept for future use
   
   // State for family tree data
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [familyRelationships, setFamilyRelationships] = useState<FamilyRelationship[]>([]);
+  
+  // 2025-01-31: NEW - State for multiple families
+  const [families, setFamilies] = useState<FamilyGroup[]>([]);
+  const [hasMultipleFamilies, setHasMultipleFamilies] = useState(false);
   
   // 2025-01-28: ADDED - State to track if a family group exists (even with no members)
   const [familyGroupExists, setFamilyGroupExists] = useState(false);
@@ -99,8 +122,8 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   const resizeHandleRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
-  // Check if user is admin
-  const isAdmin = user?.is_staff || user?.is_superuser || user?.user_type === 'admin';
+  // Check if user is admin (currently unused but kept for future use)
+  // const isAdmin = user?.is_staff || user?.is_superuser || user?.user_type === 'admin';
 
   // 2025-01-28: FIXED - Recalculate center position when window opens
   useEffect(() => {
@@ -222,48 +245,153 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     setIsLoading(true);
     setError(null);
     
-    console.log('=== FAMILY TREE WINDOW: Starting fetchFamilyMembers ===');
-    console.log('Address:', address);
-    console.log('Island:', island);
+
     
     try {
-      const response = await familyService.getFamilyByAddress(address, island);
+      // 2025-01-31: ENHANCED - Try to get all families at the address first
+      const allFamiliesResponse = await familyService.getAllFamiliesByAddress(address, island);
       
-      // 2025-01-28: DEBUG - Log the actual response structure
-      console.log('=== FAMILY TREE WINDOW DEBUG ===');
-      console.log('DEBUG: API response:', response);
-      console.log('DEBUG: Response success:', response.success);
-      console.log('DEBUG: Response data:', response.data);
-      console.log('DEBUG: Response notFound:', response.notFound);
-      console.log('DEBUG: Members array:', response.data?.members);
-      console.log('DEBUG: Relationships array:', response.data?.relationships);
-      console.log('=== END FAMILY TREE WINDOW DEBUG ===');
+      if (allFamiliesResponse.success && allFamiliesResponse.data && allFamiliesResponse.data.length > 0) {
+        
+        // Transform the families data
+        const transformedFamilies: FamilyGroup[] = allFamiliesResponse.data.map((family: any) => ({
+          id: family.id,
+          name: family.name,
+          description: family.description,
+          address: family.address,
+          island: family.island,
+          parent_family: family.parent_family,
+          parent_family_name: family.parent_family_name,
+          created_at: family.created_at,
+          members: (family.members || []).map((member: any, index: number) => ({
+            entry: {
+              pid: member.entry?.pid || member.entry_id || member.id || index + 1,
+              name: member.entry?.name || member.entry_name || member.name || '',
+              contact: member.entry?.contact || member.entry_contact || member.contact || '',
+              address: member.entry?.address || member.entry_address || member.address || '',
+              island: member.entry?.island || member.entry_island || member.island || '',
+              atoll: member.entry?.atoll || '',
+              street: member.entry?.street || '',
+              ward: member.entry?.ward || '',
+              party: member.entry?.party || '',
+              DOB: member.entry?.DOB || member.entry_dob || member.dob || member.entry?.dob || '',
+              status: member.entry?.status || '',
+              remark: member.entry?.remark || '',
+              email: member.entry?.email || '',
+              gender: member.entry?.gender || '',
+              extra: member.entry?.extra || '',
+              profession: member.entry?.profession || '',
+              pep_status: member.entry?.pep_status || '',
+              change_status: member.entry?.change_status || 'Active',
+              requested_by: member.entry?.requested_by || '',
+              batch: member.entry?.batch || '',
+              image_status: member.entry?.image_status || '',
+              family_group_id: member.entry?.family_group_id || undefined,
+              nid: member.entry?.nid || undefined,
+              age: member.entry?.age || undefined
+            },
+            role: member.role_in_family || member.role || 'other',
+            relationship: member.relationship || ''
+          })),
+          relationships: (family.relationships || []).map((rel: any) => ({
+            id: rel.id,
+            person1: rel.person1?.pid || rel.person1_id || rel.person1,
+            person2: rel.person2?.pid || rel.person2_id || rel.person2,
+            relationship_type: rel.relationship_type as 'parent' | 'child' | 'spouse' | 'sibling' | 'grandparent' | 'grandchild' | 'aunt_uncle' | 'niece_nephew' | 'cousin' | 'other',
+            notes: rel.notes || '',
+            is_active: rel.is_active !== false
+          }))
+        }));
+        
+        setFamilies(transformedFamilies);
+        setHasMultipleFamilies(transformedFamilies.length > 1);
+        
+        // 2025-01-31: FIXED - Combine all families' members and relationships for unified display
+        if (transformedFamilies.length > 0) {
+          // Combine all members from all families
+          const allMembers: FamilyMember[] = [];
+          const allRelationships: FamilyRelationship[] = [];
+          
+          transformedFamilies.forEach((family, familyIndex) => {
+            // Add family members with family group info
+            family.members.forEach(member => {
+              allMembers.push({
+                ...member,
+                // Add family group identifier for visual distinction
+                familyGroupId: family.id,
+                familyGroupName: family.name || `Family ${familyIndex + 1}`,
+                // 2025-01-31: NEW - Preserve original role when families are manually created
+                originalRole: member.role,
+                originalFamilyId: family.id
+              });
+            });
+            
+            // Add family relationships
+            family.relationships.forEach(relationship => {
+              allRelationships.push({
+                ...relationship,
+                // Add family group identifier
+                familyGroupId: family.id
+              });
+            });
+          });
+          
+          setFamilyMembers(allMembers);
+          setFamilyRelationships(allRelationships);
+          setFamilyGroupExists(true);
+          setFamilyGroupData(transformedFamilies[0]); // Use first family as primary
+          
+          // Debug logging
+          console.log('🔍 FamilyTreeWindow: Set family data:', {
+            membersCount: allMembers.length,
+            relationshipsCount: allRelationships.length,
+            relationships: allRelationships,
+            members: allMembers.map(m => ({ id: m.entry.pid, name: m.entry.name }))
+          });
+          
+          console.log('🔍 FamilyTreeWindow: Set family data:', {
+            familyGroupExists: true,
+            familyGroupData: transformedFamilies[0],
+            familiesCount: transformedFamilies.length,
+            membersCount: allMembers.length,
+            relationshipsCount: allRelationships.length
+          });
+          
+          // 2025-01-31: DISABLED - Infinite loop prevention - relationship recreation logic disabled
+          // The backend relationship creation logic needs to be fixed first
+          if (allRelationships.length === 0 && allMembers.length > 0) {
+            console.log('⚠️ Family found but has no relationships - backend relationship creation needs to be fixed');
+            console.log('🔧 Using frontend fallback connections instead of recreating family');
+          }
+          
+          // 2025-01-31: NEW - Set multiple families flag to true when we have multiple families
+          // This ensures proper visual distinction and bypasses parent detection logic
+          setHasMultipleFamilies(transformedFamilies.length > 1);
+        }
+        
+        return;
+      }
+      
+      // Fallback to single family approach if no families found
+      const response = await familyService.getFamilyByAddress(address, island);
       
       // 2025-01-28: ENHANCED - If family not found, always attempt to create it automatically
       if (response.notFound) {
-        console.log('Family not found for:', { address, island });
-        console.log('Attempting to automatically create family group...');
-        
         try {
           // Always attempt to create the family group automatically
-          console.log('Calling createOrUpdateFamilyByAddress...');
           const createResponse = await familyService.createOrUpdateFamilyByAddress(address, island);
-          console.log('Create response:', createResponse);
           
           if (createResponse.success && createResponse.data) {
-            console.log('Successfully created family group automatically');
             // Fetch the newly created family data
             await fetchFamilyMembers();
             return;
           } else {
-            console.error('Failed to automatically create family group:', createResponse.error);
             // 2025-01-28: UPDATED - Show more accurate message since backend now allows family creation for all addresses
             setError(`Unable to create family group automatically: ${createResponse.error || 'Unknown error'}`);
             setFamilyGroupExists(false);
             setFamilyGroupData(null);
           }
         } catch (createError) {
-          console.error('Error automatically creating family group:', createError);
           // 2025-01-28: UPDATED - Show more accurate message since backend now allows family creation for all addresses
           setError(`Unable to create family group due to a system error: ${createError instanceof Error ? createError.message : 'Unknown error'}`);
           setFamilyGroupExists(false);
@@ -276,10 +404,7 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
         const members = response.data.members || [];
         const relationships = response.data.relationships || [];
         
-        // 2025-01-28: DEBUG - Log the processed data
-        console.log('DEBUG: Processed members:', members);
-        console.log('DEBUG: Processed relationships:', relationships);
-        console.log('DEBUG: First member structure:', members[0]);
+        console.log('🔗 Raw API response relationships:', relationships);
         
         // 2025-01-28: FIXED - Transform API data to match expected types
         const transformedMembers: FamilyMember[] = members.map((member: any, index: number) => ({
@@ -313,19 +438,102 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
           relationship: member.relationship || ''
         }));
         
-        const transformedRelationships: FamilyRelationship[] = relationships.map((rel: any) => ({
-          id: rel.id,
-          person1: rel.person1?.pid || rel.person1_id || rel.person1,
-          person2: rel.person2?.pid || rel.person2_id || rel.person2,
-          relationship_type: rel.relationship_type as 'parent' | 'child' | 'spouse' | 'sibling' | 'grandparent' | 'grandchild' | 'aunt_uncle' | 'niece_nephew' | 'cousin' | 'other',
-          notes: rel.notes || '',
-          is_active: rel.is_active !== false
-        }));
+        const transformedRelationships: FamilyRelationship[] = relationships.map((rel: any) => {
+          const transformed = {
+            id: rel.id,
+            person1: rel.person1?.pid || rel.person1_id || rel.person1,
+            person2: rel.person2?.pid || rel.person2_id || rel.person2,
+            relationship_type: rel.relationship_type as 'parent' | 'child' | 'spouse' | 'sibling' | 'grandparent' | 'grandchild' | 'aunt_uncle' | 'niece_nephew' | 'cousin' | 'other',
+            notes: rel.notes || '',
+            is_active: rel.is_active !== false
+          };
+          console.log('🔗 Transformed relationship:', transformed);
+          return transformed;
+        });
         
         setFamilyMembers(transformedMembers);
         setFamilyRelationships(transformedRelationships);
         setFamilyGroupExists(true); // Assume family group exists if data is returned
         setFamilyGroupData(response.data); // Store full response data
+        
+        // Set as single family
+        setFamilies([{
+          id: response.data.id,
+          name: response.data.name,
+          description: response.data.description,
+          address: response.data.address,
+          island: response.data.island,
+          parent_family: (response.data as any).parent_family || undefined,
+          created_at: (response.data as any).created_at || new Date().toISOString(),
+          members: transformedMembers,
+          relationships: transformedRelationships
+        }]);
+        setHasMultipleFamilies(false);
+        
+        // 2025-01-31: NEW - Check if we need to update families state for multiple families
+        // This ensures that if multiple families exist, we show them properly
+        if (response.data.id) {
+          try {
+            const allFamiliesCheck = await familyService.getAllFamiliesByAddress(address, island);
+            if (allFamiliesCheck.success && allFamiliesCheck.data && allFamiliesCheck.data.length > 1) {
+              
+              // Transform the families data
+              const fallbackTransformedFamilies: FamilyGroup[] = allFamiliesCheck.data.map((family: any) => ({
+                id: family.id,
+                name: family.name,
+                description: family.description,
+                address: family.address,
+                island: family.island,
+                parent_family: family.parent_family,
+                parent_family_name: family.parent_family_name,
+                created_at: family.created_at,
+                members: (family.members || []).map((member: any, index: number) => ({
+                  entry: {
+                    pid: member.entry?.pid || member.entry_id || member.id || index + 1,
+                    name: member.entry?.name || member.entry_name || member.name || '',
+                    contact: member.entry?.contact || member.entry_contact || member.contact || '',
+                    address: member.entry?.address || member.entry_address || member.address || '',
+                    island: member.entry?.island || member.entry_island || member.island || '',
+                    atoll: member.entry?.atoll || '',
+                    street: member.entry?.street || '',
+                    ward: member.entry?.ward || '',
+                    party: member.entry?.party || '',
+                    DOB: member.entry?.DOB || member.entry_dob || member.dob || member.entry?.dob || '',
+                    status: member.entry?.status || '',
+                    remark: member.entry?.remark || '',
+                    email: member.entry?.email || '',
+                    gender: member.entry?.gender || '',
+                    extra: member.entry?.extra || '',
+                    profession: member.entry?.profession || '',
+                    pep_status: member.entry?.pep_status || '',
+                    change_status: member.entry?.change_status || 'Active',
+                    requested_by: member.entry?.requested_by || '',
+                    batch: member.entry?.batch || '',
+                    image_status: member.entry?.image_status || '',
+                    family_group_id: member.entry?.family_group_id || undefined,
+                    nid: member.entry?.nid || undefined,
+                    age: member.entry?.age || undefined
+                  },
+                  role: member.role_in_family || member.role || 'other',
+                  relationship: member.relationship || ''
+                })),
+                relationships: (family.relationships || []).map((rel: any) => ({
+                  id: rel.id,
+                  person1: rel.person1?.pid || rel.person1_id || rel.person1,
+                  person2: rel.person2?.pid || rel.person2_id || rel.person2,
+                  relationship_type: rel.relationship_type as 'parent' | 'child' | 'spouse' | 'sibling' | 'grandparent' | 'grandchild' | 'aunt_uncle' | 'niece_nephew' | 'cousin' | 'other',
+                  notes: rel.notes || '',
+                  is_active: rel.is_active !== false
+                }))
+              }));
+              
+              setFamilies(fallbackTransformedFamilies);
+              setHasMultipleFamilies(true);
+            }
+          } catch (error) {
+            // Silently handle error
+          }
+        }
       } else {
         // 2025-01-28: NEW - Only show error for actual failures, not for missing family groups
         setError(response.error || 'Failed to fetch family data');
@@ -333,7 +541,6 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
         setFamilyGroupData(null);
       }
     } catch (err) {
-      console.error('Error fetching family members:', err);
       setError('Error loading family data');
       setFamilyGroupExists(false);
       setFamilyGroupData(null);
@@ -351,7 +558,16 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     }
     // 2025-01-29: NEW - Track unsaved changes
     setHasUnsavedChanges(true);
-    console.log('Relationships updated:', updatedRelationships);
+    
+    // 2025-01-31: NEW - Check if we need to refresh family data due to new family creation
+    // If relationships were significantly reduced, it might indicate a new family was created
+    if (updatedRelationships.length < familyRelationships.length - 2) {
+      // Refresh family data to see if new families were created
+      // Use a longer delay to ensure backend transaction is committed
+      setTimeout(() => {
+        fetchFamilyMembers();
+      }, 2000);
+    }
   };
 
   // 2025-01-28: ENHANCED: Handle family member changes (exclusions/inclusions)
@@ -363,7 +579,15 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     }
     // 2025-01-29: NEW - Track unsaved changes
     setHasUnsavedChanges(true);
-    console.log('Family members updated:', updatedMembers);
+    
+    // 2025-01-31: NEW - Check if members were removed (indicating new family creation)
+    if (updatedMembers.length < familyMembers.length - 1) {
+      // Refresh family data to see if new families were created
+      // Use a longer delay to ensure backend transaction is committed
+      setTimeout(() => {
+        fetchFamilyMembers();
+      }, 2000);
+    }
   };
   
   // 2025-01-28: NEW - Function to mark family as manually updated
@@ -371,16 +595,22 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     try {
       // Call backend to mark family as manually updated
       await familyService.markFamilyAsManuallyUpdated(familyId);
-      console.log('Family marked as manually updated');
     } catch (error) {
-      console.error('Failed to mark family as manually updated:', error);
+      // Silently handle error
     }
   };
 
   // 2025-01-29: NEW - Function to delete family group and clear saved relationships
   const handleDeleteFamily = async () => {
+    console.log('🗑️ handleDeleteFamily called:', { 
+      familyGroupData, 
+      familyGroupExists, 
+      hasFamilyGroupId: !!familyGroupData?.id 
+    });
+    
     if (!familyGroupData?.id) {
-      console.error('No family group ID available for deletion');
+      console.error('❌ Cannot delete family: No family group ID available');
+      setError('Cannot delete family: No family group ID available');
       return;
     }
 
@@ -391,12 +621,9 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
 
     try {
       setIsLoading(true);
-      console.log('Deleting family group:', familyGroupData.id);
       
       // Call backend to delete the family group
       await familyService.deleteFamilyGroup(familyGroupData.id);
-      
-      console.log('Family group deleted successfully');
       
       // Clear local state
       setFamilyMembers([]);
@@ -408,10 +635,9 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
       setError(null);
       
       // Automatically regenerate family tree
-      console.log('Regenerating family tree with corrected logic...');
+      console.log('🔄 Regenerating family tree after deletion...');
       await fetchFamilyMembers();
     } catch (error) {
-      console.error('Failed to delete family group:', error);
       setError(`Failed to delete family group: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
@@ -452,13 +678,13 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     setIsEditingMode(!isEditingMode);
   };
 
-  // Handle window close
-  const handleClose = () => {
-    setFamilyMembers([]);
-    setFamilyRelationships([]);
-    setError(null);
-    onClose();
-  };
+  // Handle window close (currently unused but kept for future use)
+  // const handleClose = () => {
+  //   setFamilyMembers([]);
+  //   setFamilyRelationships([]);
+  //   setError(null);
+  //   onClose();
+  // };
 
   // Don't render if no address provided
   if (!address) {
@@ -491,10 +717,18 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
         >
           <div className="family-tree-title">
             <h2>
-              {viewMode === 'tree' ? 'Family Tree' : 'Family Table'} - {address}, {island}
+              {viewMode === 'tree' ? 'Family Tree' : viewMode === 'comparison' ? 'Family Tree Comparison' : 'Family Table'} - {address}, {island}
             </h2>
             <div className="family-tree-subtitle">
-              {familyMembers.length} family members • {viewMode === 'tree' ? 'Visual' : 'Tabular'} view
+              {hasMultipleFamilies ? (
+                <>
+                  {families.length} families • {families.reduce((total, family) => total + family.members.length, 0)} total members • {viewMode === 'tree' ? 'Combined' : viewMode === 'comparison' ? 'Comparison' : 'Tabular'} view
+                </>
+              ) : (
+                <>
+                  {familyMembers.length} family members • {viewMode === 'tree' ? 'Visual' : viewMode === 'comparison' ? 'Comparison' : 'Tabular'} view
+                </>
+              )}
             </div>
           </div>
           
@@ -521,7 +755,7 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
             )}
             
             {/* 2025-01-29: NEW - Added Delete Family button to clear saved relationships */}
-            {familyGroupExists && (
+            {familyGroupExists && familyGroupData?.id && (
               <button
                 onClick={handleDeleteFamily}
                 className="delete-family-btn"
@@ -540,6 +774,8 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
             >
               {useMultiRowLayout ? '📐 Single Row' : '📐 Multi Row'}
             </button>
+            
+
             
             {/* 2025-01-29: NEW - Added Download Family Tree button */}
             {familyGroupExists && familyMembers.length > 0 && (
@@ -587,33 +823,68 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
               <p className="text-sm text-gray-500 mt-2">
                 Family tree is being generated automatically...
               </p>
-              {/* 2025-01-29: ADDED - Debug information and retry button */}
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800 mb-2">
-                  <strong>Debug Info:</strong>
-                </p>
-                <p className="text-xs text-blue-700 mb-1">
-                  Address: {address} | Island: {island}
-                </p>
-                <p className="text-xs text-blue-700 mb-1">
-                  Family Group Exists: {familyGroupExists ? 'Yes' : 'No'}
-                </p>
-                <p className="text-xs text-blue-700 mb-1">
-                  Loading: {isLoading ? 'Yes' : 'No'}
-                </p>
-                <p className="text-xs text-blue-700 mb-1">
-                  Error: {error || 'None'}
-                </p>
-                <button
-                  onClick={() => fetchFamilyMembers()}
-                  className="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                >
-                  Retry Family Creation
-                </button>
-              </div>
             </div>
           ) : (
             <>
+
+
+
+
+
+
+
+
+
+              
+              {/* 2025-01-31: NEW - Multiple families notification banner */}
+              {hasMultipleFamilies && families.length > 1 && (
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-blue-800">
+                        🌳 Multiple Families Detected
+                      </h3>
+                      <p className="text-sm text-blue-700 mt-1">
+                        Found {families.length} families at this address. Showing combined family tree view.
+                      </p>
+                      {families.some(f => f.parent_family) && (
+                        <p className="text-xs text-blue-600 mt-2">
+                          💡 Some families are sub-families with parent-child relationships.
+                        </p>
+                      )}
+                      
+                      {/* 2025-01-31: NEW - Family group color legend */}
+                      <div className="mt-3 flex flex-wrap gap-4">
+                        <p className="text-xs text-blue-600 font-medium">Family Groups:</p>
+                        {families.map((family, index) => (
+                          <div key={family.id} className="flex items-center gap-2">
+                            <div 
+                              className={`w-4 h-4 rounded border-2 ${
+                                index % 2 === 0 
+                                  ? 'bg-blue-100 border-blue-600' 
+                                  : 'bg-orange-100 border-orange-600'
+                              }`}
+                            />
+                            <span className="text-xs text-blue-700">
+                              {family.name || `Family ${index + 1}`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        console.log('🔍 FamilyTreeWindow: Toggling to single family view');
+                        setHasMultipleFamilies(false);
+                      }}
+                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                    >
+                      Show Single Family
+                    </button>
+                  </div>
+                </div>
+              )}
+              
               {/* 2025-01-28: ENHANCED: Show RelationshipManager when in editing mode */}
               {isEditingMode ? (
                 <RelationshipManager
@@ -624,14 +895,43 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                   isEditable={true}
                   onSaveFamily={handleSaveFamily}
                   hasUnsavedChanges={hasUnsavedChanges}
+                  familyGroupData={familyGroupData}
                 />
               ) : (
-                /* Show either ClassicFamilyTree or FamilyTableView based on view mode */
+                /* Show family tree visualization */
                 viewMode === 'tree' ? (
-                  <ClassicFamilyTree
+                  (() => {
+                    // 2025-01-31: FIXED - Always use ClassicFamilyTree for both single and multiple families
+                    console.log('🔍 FamilyTreeWindow: Rendering ClassicFamilyTree with combined data:', {
+                      viewMode,
+                      hasMultipleFamilies,
+                      familiesCount: families.length,
+                      familyMembersCount: familyMembers.length,
+                      relationshipsCount: familyRelationships.length,
+                      relationships: familyRelationships
+                    });
+                    
+                    return (
+                      <ClassicFamilyTree
+                        familyMembers={familyMembers}
+                        relationships={familyRelationships}
+                        useMultiRowLayout={useMultiRowLayout}
+                        svgRef={svgRef as React.RefObject<SVGSVGElement>}
+                      />
+                    );
+                  })()
+                ) : viewMode === 'comparison' ? (
+                  <FamilyTreeComparison
                     familyMembers={familyMembers}
                     relationships={familyRelationships}
-                    useMultiRowLayout={useMultiRowLayout}
+                    onRelationshipChange={(relationship) => {
+                      // Handle single relationship change by updating the relationships array
+                      const updatedRelationships = familyRelationships.map(rel => 
+                        rel.id === relationship.id ? relationship : rel
+                      );
+                      handleRelationshipChange(updatedRelationships);
+                    }}
+                    hasMultipleFamilies={hasMultipleFamilies}
                     svgRef={svgRef as React.RefObject<SVGSVGElement>}
                   />
                 ) : (

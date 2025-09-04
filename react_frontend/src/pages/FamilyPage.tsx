@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import SearchBar from '../components/directory/SearchBar';
 import SearchResults from '../components/directory/SearchResults';
-import { DeleteUpdatedFamilyModal, FamilyDetailsModal } from '../components/family';
+import { DeleteUpdatedFamilyModal, FamilyDetailsModal, BulkFamilyDeleteModal } from '../components/family';
 import { PhoneBookEntry, SearchFilters } from '../types/directory';
 import { FamilyGroup } from '../types/family';
 import { useAuthStore } from '../store/authStore';
@@ -40,6 +40,9 @@ const FamilyPage: React.FC = () => {
   // 2025-01-29: Added state for family details modal
   const [selectedSavedFamily, setSelectedSavedFamily] = useState<FamilyGroup | null>(null);
   const [showFamilyDetailsModal, setShowFamilyDetailsModal] = useState(false);
+
+  // 2025-01-31: Added state for bulk family delete modal
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   // Check if user is admin
   const isAdmin = user?.is_staff || user?.is_superuser;
@@ -423,12 +426,20 @@ const FamilyPage: React.FC = () => {
                   while removing family relationships.
                 </p>
               </div>
-              <button
-                onClick={() => setShowDeleteModal(true)}
-                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors"
-              >
-                Delete Updated Family
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors"
+                >
+                  Delete Updated Family
+                </button>
+                <button
+                  onClick={() => setShowBulkDeleteModal(true)}
+                  className="px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-md hover:bg-orange-700 transition-colors"
+                >
+                  Bulk Delete Families
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -575,6 +586,15 @@ const FamilyPage: React.FC = () => {
           isOpen={showFamilyDetailsModal}
           onClose={() => setShowFamilyDetailsModal(false)}
           family={selectedSavedFamily}
+        />
+      )}
+
+      {/* Bulk Family Delete Modal */}
+      {showBulkDeleteModal && (
+        <BulkFamilyDeleteModal
+          isOpen={showBulkDeleteModal}
+          onClose={() => setShowBulkDeleteModal(false)}
+          onSuccess={handleFamilyDeleted}
         />
       )}
     </div>

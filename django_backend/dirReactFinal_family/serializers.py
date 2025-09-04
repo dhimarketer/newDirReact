@@ -21,11 +21,13 @@ class FamilyGroupSerializer(serializers.ModelSerializer):
     """Basic serializer for family groups"""
     created_by = serializers.ReadOnlyField(source='created_by.username')
     member_count = serializers.SerializerMethodField()
+    parent_family = serializers.PrimaryKeyRelatedField(read_only=True)
+    parent_family_name = serializers.SerializerMethodField()
     
     class Meta:
         model = FamilyGroup
         fields = [
-            'id', 'name', 'description', 'address', 'island', 'created_by', 'created_at', 
+            'id', 'name', 'description', 'address', 'island', 'parent_family', 'parent_family_name', 'created_by', 'created_at', 
             'updated_at', 'member_count'
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
@@ -35,6 +37,12 @@ class FamilyGroupSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'member_count'):
             return obj.member_count
         return obj.members.count()
+    
+    def get_parent_family_name(self, obj):
+        """Get the name of the parent family if it exists"""
+        if obj.parent_family:
+            return obj.parent_family.name
+        return None
 
 class FamilyGroupDetailSerializer(FamilyGroupSerializer):
     """Detailed serializer for family groups with nested members"""
