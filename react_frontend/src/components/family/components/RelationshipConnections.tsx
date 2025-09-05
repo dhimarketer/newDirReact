@@ -161,40 +161,46 @@ export const RelationshipConnections: React.FC<RelationshipConnectionsProps> = (
       });
     }
     
-    // SIMPLIFIED: Only create fallback connections if NO actual relationships exist
+    // CLEAN ORG CHART: Only create fallback connections if NO actual relationships exist
     if (connections.length === 0 && organizedMembers.parents.length > 0 && organizedMembers.children.length > 0) {
-      console.log(`🔗 Creating SIMPLE fallback connections: ${organizedMembers.parents.length} parents, ${organizedMembers.children.length} children`);
+      console.log(`🔗 Creating CLEAN ORG CHART fallback connections: ${organizedMembers.parents.length} parents, ${organizedMembers.children.length} children`);
       
-      // Simple direct connections from each parent to each child
-      organizedMembers.parents.forEach((parent, parentIndex) => {
-        const parentX = calculateCenteredPosition(
-          parentIndex, 
-          organizedMembers.parents.length, 
-          treeDimensions.parentSpacing,
+      // CLEAN ORG CHART: Create single main vertical connector from parent center to children level
+      const mainVerticalX = calculateCenteredPosition(
+        0, 
+        organizedMembers.parents.length, 
+        treeDimensions.parentSpacing,
+        treeDimensions.nodeWidth,
+        treeDimensions.containerWidth
+      ) + treeDimensions.nodeWidth / 2;
+      const parentY = (organizedMembers.grandparents.length > 0 ? 140 : 50) + treeDimensions.nodeHeight / 2;
+      const childY = 220 + treeDimensions.nodeHeight / 2;
+      
+      // Main vertical connector
+      connections.push({
+        from: { x: mainVerticalX, y: parentY + treeDimensions.nodeHeight / 2 },
+        to: { x: mainVerticalX, y: childY },
+        type: 'vertical-connector'
+      });
+      
+      // Individual horizontal connections from main vertical to each child
+      organizedMembers.children.forEach((child, childIndex) => {
+        const childX = calculateCenteredPosition(
+          childIndex, 
+          organizedMembers.children.length, 
+          treeDimensions.childSpacing,
           treeDimensions.nodeWidth,
           treeDimensions.containerWidth
         ) + treeDimensions.nodeWidth / 2;
-        const parentY = (organizedMembers.grandparents.length > 0 ? 140 : 50) + treeDimensions.nodeHeight / 2;
         
-        organizedMembers.children.forEach((child, childIndex) => {
-          const childX = calculateCenteredPosition(
-            childIndex, 
-            organizedMembers.children.length, 
-            treeDimensions.childSpacing,
-            treeDimensions.nodeWidth,
-            treeDimensions.containerWidth
-          ) + treeDimensions.nodeWidth / 2;
-          const childY = 220 + treeDimensions.nodeHeight / 2;
-          
-          // Apply drag offsets
-          const actualParentPos = getActualPosition(parent.entry.pid, parentX, parentY);
-          const actualChildPos = getActualPosition(child.entry.pid, childX, childY);
-          
-          connections.push({
-            from: actualParentPos,
-            to: actualChildPos,
-            type: 'parent-child'
-          });
+        // Apply drag offsets
+        const actualChildPos = getActualPosition(child.entry.pid, childX, childY);
+        const actualMainPos = getActualPosition(0, mainVerticalX, childY); // Use 0 as dummy ID for main vertical
+        
+        connections.push({
+          from: actualMainPos,
+          to: actualChildPos,
+          type: 'parent-child'
         });
       });
       
@@ -365,6 +371,11 @@ export const RelationshipConnections: React.FC<RelationshipConnectionsProps> = (
             markerEnd = "";
             strokeDasharray = "8,4"; // Dashed line with more visible dashes
             break;
+          default:
+            strokeColor = "#8B4513"; // Default brown
+            strokeWidth = "2";
+            markerEnd = "";
+            strokeDasharray = "none";
         }
         
         // Debug logging for connection styling
