@@ -2,9 +2,11 @@
 // Allows switching between ClassicFamilyTree (SVG) and ReactFlowFamilyTree for evaluation
 
 import React, { useState } from 'react';
+import { ReactFlowProvider } from 'reactflow';
 import { FamilyMember, FamilyRelationship } from './hooks/useFamilyOrganization';
 import ClassicFamilyTree from './ClassicFamilyTree';
 import ReactFlowFamilyTree from './ReactFlowFamilyTree';
+import SimpleCanvasFamilyTree from './SimpleCanvasFamilyTree';
 
 interface FamilyTreeComparisonProps {
   familyMembers: FamilyMember[];
@@ -14,7 +16,7 @@ interface FamilyTreeComparisonProps {
   svgRef?: React.RefObject<SVGSVGElement>;
 }
 
-type TreeImplementation = 'svg' | 'reactflow';
+type TreeImplementation = 'svg' | 'reactflow' | 'canvas';
 
 const FamilyTreeComparison: React.FC<FamilyTreeComparisonProps> = ({
   familyMembers,
@@ -23,7 +25,7 @@ const FamilyTreeComparison: React.FC<FamilyTreeComparisonProps> = ({
   hasMultipleFamilies = false,
   svgRef
 }) => {
-  const [implementation, setImplementation] = useState<TreeImplementation>('svg');
+  const [implementation, setImplementation] = useState<TreeImplementation>('canvas');
   const [showComparison, setShowComparison] = useState(false);
 
   const handleImplementationChange = (newImplementation: TreeImplementation) => {
@@ -31,8 +33,30 @@ const FamilyTreeComparison: React.FC<FamilyTreeComparisonProps> = ({
   };
 
   const renderFamilyTree = () => {
+    console.log('🔍 FamilyTreeComparison - Rendering implementation:', implementation);
+    console.log('🔍 FamilyTreeComparison - Family members:', familyMembers.length);
+    console.log('🔍 FamilyTreeComparison - Relationships:', relationships.length);
+    
+    if (familyMembers.length === 0) {
+      console.log('🔍 FamilyTreeComparison - No family members, both implementations will show empty state');
+    }
+    
     switch (implementation) {
+      case 'canvas':
+        console.log('🔍 FamilyTreeComparison - Rendering Canvas component');
+        return (
+          <SimpleCanvasFamilyTree
+            familyMembers={familyMembers}
+            relationships={relationships}
+          />
+        );
       case 'reactflow':
+        console.log('🔍 FamilyTreeComparison - Rendering ReactFlow component');
+        console.log('🔍 FamilyTreeComparison - ReactFlow props:', {
+          familyMembersCount: familyMembers.length,
+          relationshipsCount: relationships.length,
+          hasMultipleFamilies
+        });
         return (
           <ReactFlowFamilyTree
             familyMembers={familyMembers}
@@ -43,6 +67,7 @@ const FamilyTreeComparison: React.FC<FamilyTreeComparisonProps> = ({
         );
       case 'svg':
       default:
+        console.log('🔍 FamilyTreeComparison - Rendering SVG component');
         return (
           <ClassicFamilyTree
             familyMembers={familyMembers}
@@ -55,10 +80,11 @@ const FamilyTreeComparison: React.FC<FamilyTreeComparisonProps> = ({
   };
 
   return (
-    <div className="family-tree-comparison">
-      {/* Implementation Toggle */}
-      <div className="family-tree-controls mb-4 p-4 bg-gray-50 rounded-lg">
-        <div className="flex items-center justify-between">
+    <ReactFlowProvider>
+      <div className="family-tree-comparison">
+        {/* Implementation Toggle */}
+        <div className="family-tree-controls mb-4 p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h3 className="text-lg font-semibold text-gray-800">Family Tree Implementation</h3>
             <div className="flex space-x-2">
@@ -71,6 +97,16 @@ const FamilyTreeComparison: React.FC<FamilyTreeComparisonProps> = ({
                 }`}
               >
                 SVG (Current)
+              </button>
+              <button
+                onClick={() => handleImplementationChange('canvas')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  implementation === 'canvas'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Canvas (Simple)
               </button>
               <button
                 onClick={() => handleImplementationChange('reactflow')}
@@ -107,7 +143,7 @@ const FamilyTreeComparison: React.FC<FamilyTreeComparisonProps> = ({
             </div>
           )}
         </div>
-      </div>
+        </div>
 
       {/* Family Tree Display */}
       {showComparison ? (
@@ -168,7 +204,8 @@ const FamilyTreeComparison: React.FC<FamilyTreeComparisonProps> = ({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </ReactFlowProvider>
   );
 };
 

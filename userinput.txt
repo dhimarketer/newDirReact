@@ -113,3 +113,13 @@ the family is gulalaage,  sh. maroshi. 3 person are identified in faily tree. mo
 [2025-01-31 23:59] | USER INPUT: check our previous work on @PROJECT_STATUS.txt last 30 lines to see when we were able to succesfully show relationship arrows and lines in family tree react flow layout. although there were styling issues we were able to show edges. need to restore up to there
 [2025-01-31 23:59] | USER INPUT: we were trying to fix styling issues in family tree react flow component. svg is still much better. fix comprehensively the styling issues . see images
 [2025-01-31 23:59] | USER INPUT: still there are no lines. see image
+[2025-01-31 23:59] | USER INPUT: still not working. revert from the last git commit
+[2025-01-31 23:59] | USER INPUT: good. now cleanup making sure the lines and arrows remain visible while you do style cleanup to make it look like svg layout
+[2025-01-31 23:59] | USER INPUT: the arrows and lines are not  visible in react flow layout. see image
+[2025-01-31 23:59] | USER INPUT: still no lines  or arrows=== FAMILY CREATION DEBUG START === familyService.ts:352:15
+[2025-01-31 23:59] | USER INPUT: [plugin:vite:react-babel] /home/mine/Documents/codingProjects/DirReactFinal/react_frontend/src/components/family/FamilyTreeComparison.tsx: Unterminated JSX contents. (178:24)
+[2025-01-31 23:59] | USER INPUT: [plugin:vite:react-babel] /home/mine/Documents/codingProjects/DirReactFinal/react_frontend/src/components/family/FamilyTreeComparison.tsx: Unterminated JSX contents. (178:24)
+[2025-01-31 23:59] | USER INPUT: still no errors or lines visible "EBUG: Request URL: /family/groups/by_address/ api.ts:56:17
+[2025-01-31 23:59] | USER INPUT: still react flow doesn't show  arrows and lines but svg does. here is the logs  "DEBUG: Full headers:
+[2025-01-31 23:59] | USER INPUT: 🔍 SearchResults: Component rendered with props: 
+Object { resultsLength: 20, totalCount: 680, currentPage: 1, pageSize: 20, isLoading: false, searchFilters: {…} }

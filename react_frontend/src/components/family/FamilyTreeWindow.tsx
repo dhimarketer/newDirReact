@@ -112,6 +112,7 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
 
   // 2025-01-29: NEW - Function to handle view mode changes and save user preference
   const handleViewModeChange = (newViewMode: ViewMode) => {
+    console.log('🔍 FamilyTreeWindow: View mode changing from', viewMode, 'to', newViewMode);
     setViewMode(newViewMode);
     // Save user's preference to localStorage
     localStorage.setItem('family-view-preference', newViewMode);
@@ -921,19 +922,29 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                     );
                   })()
                 ) : viewMode === 'comparison' ? (
-                  <FamilyTreeComparison
-                    familyMembers={familyMembers}
-                    relationships={familyRelationships}
-                    onRelationshipChange={(relationship) => {
-                      // Handle single relationship change by updating the relationships array
-                      const updatedRelationships = familyRelationships.map(rel => 
-                        rel.id === relationship.id ? relationship : rel
-                      );
-                      handleRelationshipChange(updatedRelationships);
-                    }}
-                    hasMultipleFamilies={hasMultipleFamilies}
-                    svgRef={svgRef as React.RefObject<SVGSVGElement>}
-                  />
+                  (() => {
+                    console.log('🔍 FamilyTreeWindow: Rendering FamilyTreeComparison with:', {
+                      viewMode,
+                      familyMembersCount: familyMembers.length,
+                      relationshipsCount: familyRelationships.length,
+                      hasMultipleFamilies
+                    });
+                    return (
+                      <FamilyTreeComparison
+                        familyMembers={familyMembers}
+                        relationships={familyRelationships}
+                        onRelationshipChange={(relationship) => {
+                          // Handle single relationship change by updating the relationships array
+                          const updatedRelationships = familyRelationships.map(rel => 
+                            rel.id === relationship.id ? relationship : rel
+                          );
+                          handleRelationshipChange(updatedRelationships);
+                        }}
+                        hasMultipleFamilies={hasMultipleFamilies}
+                        svgRef={svgRef as React.RefObject<SVGSVGElement>}
+                      />
+                    );
+                  })()
                 ) : (
                   <FamilyTableView
                     familyMembers={familyMembers}
