@@ -3,7 +3,8 @@
 // Replaces complex SVG rendering with maintainable, scalable solution
 
 import React, { useMemo } from 'react';
-import ReactFlow, {
+import {
+  ReactFlow,
   Node,
   Edge,
   ReactFlowProvider,
@@ -12,9 +13,8 @@ import ReactFlow, {
   MiniMap,
   NodeTypes,
   EdgeTypes
-} from 'reactflow';
-import 'reactflow/dist/style.css';
-import dagre from 'dagre';
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { useFamilyOrganization, FamilyMember, FamilyRelationship } from './hooks/useFamilyOrganization';
 
 interface ReactFlowFamilyTreeProps {
@@ -81,37 +81,81 @@ const nodeTypes: NodeTypes = {
   familyMember: FamilyMemberNode,
 };
 
-// Dagre layout configuration
-const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
-  const g = new dagre.graphlib.Graph();
-  g.setGraph({ 
-    rankdir: 'TB',        // Top to bottom
-    nodesep: 100,         // Node separation
-    ranksep: 150,         // Rank separation
-    marginx: 20,          // X margin
-    marginy: 20           // Y margin
-  });
-  g.setDefaultEdgeLabel(() => ({}));
+// Manual layout configuration to match SVG hierarchical structure
+const getLayoutedElements = (nodes: Node[], edges: Edge[], organizedMembers: any) => {
+  const nodeWidth = 150;
+  const nodeHeight = 80;
+  const horizontalSpacing = 200;
+  const verticalSpacing = 150;
+  const startX = 100;
+  const startY = 50;
 
-  // Add nodes
-  nodes.forEach((node) => {
-    g.setNode(node.id, { width: 120, height: 80 });
-  });
+  // Create a map of node positions by generation
+  const positionedNodes = new Map();
+  let currentY = startY;
 
-  // Add edges
-  edges.forEach((edge) => {
-    g.setEdge(edge.source, edge.target);
-  });
+  // Position grandparents (if any)
+  if (organizedMembers.grandparents.length > 0) {
+    const grandparentY = currentY;
+    organizedMembers.grandparents.forEach((member: any, index: number) => {
+      const nodeId = String(member.entry.pid);
+      const x = startX + (index * horizontalSpacing);
+      positionedNodes.set(nodeId, { x, y: grandparentY });
+    });
+    currentY += verticalSpacing;
+  }
 
-  dagre.layout(g);
+  // Position parents
+  if (organizedMembers.parents.length > 0) {
+    const parentY = currentY;
+    const parentCount = organizedMembers.parents.length;
+    const totalWidth = (parentCount - 1) * horizontalSpacing;
+    const startParentX = startX - (totalWidth / 2);
+
+    organizedMembers.parents.forEach((member: any, index: number) => {
+      const nodeId = String(member.entry.pid);
+      const x = startParentX + (index * horizontalSpacing);
+      positionedNodes.set(nodeId, { x, y: parentY });
+    });
+    currentY += verticalSpacing;
+  }
+
+  // Position children
+  if (organizedMembers.children.length > 0) {
+    const childY = currentY;
+    const childCount = organizedMembers.children.length;
+    const totalWidth = (childCount - 1) * horizontalSpacing;
+    const startChildX = startX - (totalWidth / 2);
+
+    organizedMembers.children.forEach((member: any, index: number) => {
+      const nodeId = String(member.entry.pid);
+      const x = startChildX + (index * horizontalSpacing);
+      positionedNodes.set(nodeId, { x, y: childY });
+    });
+    currentY += verticalSpacing;
+  }
+
+  // Position grandchildren (if any)
+  if (organizedMembers.grandchildren.length > 0) {
+    const grandchildY = currentY;
+    const grandchildCount = organizedMembers.grandchildren.length;
+    const totalWidth = (grandchildCount - 1) * horizontalSpacing;
+    const startGrandchildX = startX - (totalWidth / 2);
+
+    organizedMembers.grandchildren.forEach((member: any, index: number) => {
+      const nodeId = String(member.entry.pid);
+      const x = startGrandchildX + (index * horizontalSpacing);
+      positionedNodes.set(nodeId, { x, y: grandchildY });
+    });
+  }
 
   // Update node positions
   return {
     nodes: nodes.map((node) => {
-      const dagreNode = g.node(node.id);
+      const position = positionedNodes.get(node.id) || { x: 0, y: 0 };
       return { 
         ...node, 
-        position: { x: dagreNode.x, y: dagreNode.y },
+        position,
         type: 'familyMember'
       };
     }),
@@ -229,14 +273,21 @@ const ReactFlowFamilyTree: React.FC<ReactFlowFamilyTreeProps> = ({
     });
 
     // CRITICAL FIX: Process actual relationships from backend first
+    console.log('🔍 ReactFlowFamilyTree: Processing relationships:', relationships);
     relationships.forEach(rel => {
+      console.log('🔍 ReactFlowFamilyTree: Processing relationship:', rel);
       if (rel.is_active) {
         const sourceId = String(rel.person1);
         const targetId = String(rel.person2);
         
+        console.log('🔍 ReactFlowFamilyTree: Looking for nodes:', { sourceId, targetId });
+        console.log('🔍 ReactFlowFamilyTree: Available node IDs:', flowNodes.map(n => n.id));
+        
         // Ensure both nodes exist
         const sourceExists = flowNodes.some(node => node.id === sourceId);
         const targetExists = flowNodes.some(node => node.id === targetId);
+        
+        console.log('🔍 ReactFlowFamilyTree: Node existence check:', { sourceExists, targetExists });
         
         if (sourceExists && targetExists) {
           let edgeStyle = { stroke: '#8B4513', strokeWidth: 2 };
@@ -246,20 +297,25 @@ const ReactFlowFamilyTree: React.FC<ReactFlowFamilyTreeProps> = ({
           switch (rel.relationship_type) {
             case 'parent':
             case 'child':
-              edgeStyle = { stroke: '#8B4513', strokeWidth: 2 };
+              edgeStyle = { stroke: '#8B4513', strokeWidth: 3 };
+              edgeType = 'straight';
               break;
             case 'spouse':
               edgeStyle = { stroke: '#FF69B4', strokeWidth: 2, strokeDasharray: '5,5' };
+              edgeType = 'straight';
               break;
             case 'grandparent':
             case 'grandchild':
-              edgeStyle = { stroke: '#9370DB', strokeWidth: 2 };
+              edgeStyle = { stroke: '#9370DB', strokeWidth: 3 };
+              edgeType = 'straight';
               break;
             case 'sibling':
               edgeStyle = { stroke: '#32CD32', strokeWidth: 2 };
+              edgeType = 'straight';
               break;
             default:
-              edgeStyle = { stroke: '#666', strokeWidth: 1 };
+              edgeStyle = { stroke: '#8B4513', strokeWidth: 3 };
+              edgeType = 'straight';
           }
           
           flowEdges.push({
@@ -269,6 +325,18 @@ const ReactFlowFamilyTree: React.FC<ReactFlowFamilyTreeProps> = ({
             animated: false,
             style: edgeStyle,
             type: edgeType,
+            markerEnd: {
+              type: 'arrowclosed',
+              color: edgeStyle.stroke,
+              width: 15,
+              height: 15,
+            },
+            markerStart: {
+              type: 'arrowclosed',
+              color: edgeStyle.stroke,
+              width: 15,
+              height: 15,
+            },
             data: { relationship: rel }
           });
           
@@ -280,20 +348,35 @@ const ReactFlowFamilyTree: React.FC<ReactFlowFamilyTreeProps> = ({
     });
 
     // Fallback: If no relationships found, create connections based on family structure
+    console.log('🔍 ReactFlowFamilyTree: Checking fallback connections:', {
+      flowEdgesLength: flowEdges.length,
+      parentsCount: organizedMembers.parents.length,
+      childrenCount: organizedMembers.children.length
+    });
+    
     if (flowEdges.length === 0 && organizedMembers.parents.length > 0 && organizedMembers.children.length > 0) {
       console.log('🔍 ReactFlowFamilyTree: No relationships found, creating fallback connections');
       organizedMembers.parents.forEach(parent => {
         organizedMembers.children.forEach(child => {
-          flowEdges.push({
+          const edge = {
             id: `fallback-${parent.entry.pid}-${child.entry.pid}`,
             source: String(parent.entry.pid),
             target: String(child.entry.pid),
             animated: false,
-            style: { stroke: '#8B4513', strokeWidth: 2 },
-            type: 'smoothstep',
-          });
+            style: { stroke: '#8B4513', strokeWidth: 3 },
+            type: 'straight',
+            markerEnd: {
+              type: 'arrowclosed',
+              color: '#8B4513',
+              width: 20,
+              height: 20,
+            },
+          };
+          console.log('🔍 ReactFlowFamilyTree: Creating fallback edge:', edge);
+          flowEdges.push(edge);
         });
       });
+      console.log('🔍 ReactFlowFamilyTree: Created fallback edges:', flowEdges.length);
     }
 
     // Add spouse edges from organized members (bidirectional, avoid duplicates)
@@ -311,7 +394,7 @@ const ReactFlowFamilyTree: React.FC<ReactFlowFamilyTreeProps> = ({
               id: `spouse-${personId}-${spouseId}`,
               source: String(personId),
               target: String(spouseId),
-              type: 'smoothstep',
+              type: 'straight',
               style: { stroke: '#FF69B4', strokeWidth: 2, strokeDasharray: '5,5' },
             });
           }
@@ -328,16 +411,16 @@ const ReactFlowFamilyTree: React.FC<ReactFlowFamilyTreeProps> = ({
     return { nodes: flowNodes, edges: flowEdges };
   }, [organizedMembers, hasMultipleFamilies, relationships]);
 
-  // Apply Dagre layout
+  // Apply manual layout
   const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
-    const layouted = getLayoutedElements(nodes, edges);
-    console.log('🔍 ReactFlowFamilyTree: After Dagre layout:', {
+    const layouted = getLayoutedElements(nodes, edges, organizedMembers);
+    console.log('🔍 ReactFlowFamilyTree: After manual layout:', {
       nodesCount: layouted.nodes.length,
       edgesCount: layouted.edges.length,
       edges: layouted.edges
     });
     return layouted;
-  }, [nodes, edges]);
+  }, [nodes, edges, organizedMembers]);
 
   // Don't render if no members
   if (familyMembers.length === 0) {
@@ -350,6 +433,41 @@ const ReactFlowFamilyTree: React.FC<ReactFlowFamilyTreeProps> = ({
 
   return (
     <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: 8 }}>
+      {/* Debug info */}
+      <div style={{ padding: '10px', background: '#f0f0f0', fontSize: '12px' }}>
+        <strong>Debug Info:</strong> Nodes: {layoutedNodes.length}, Edges: {layoutedEdges.length}
+        {layoutedEdges.length > 0 && (
+          <div>
+            <strong>Edges:</strong> {layoutedEdges.map(e => `${e.source}→${e.target}`).join(', ')}
+          </div>
+        )}
+      </div>
+      <style>{`
+        .react-flow__edge-path {
+          stroke: #8B4513 !important;
+          stroke-width: 4px !important;
+          stroke-opacity: 1 !important;
+        }
+        .react-flow__edge-arrowhead {
+          fill: #8B4513 !important;
+          stroke: #8B4513 !important;
+        }
+        .react-flow__edge {
+          z-index: 1000 !important;
+        }
+        .react-flow__edge.selected .react-flow__edge-path {
+          stroke: #8B4513 !important;
+        }
+        .react-flow__edge:hover .react-flow__edge-path {
+          stroke: #8B4513 !important;
+        }
+        .react-flow__edge-text {
+          fill: #8B4513 !important;
+        }
+        .react-flow__edge-textbg {
+          fill: white !important;
+        }
+      `}</style>
       <ReactFlow
         nodes={layoutedNodes}
         edges={layoutedEdges}
@@ -361,6 +479,7 @@ const ReactFlowFamilyTree: React.FC<ReactFlowFamilyTreeProps> = ({
         zoomOnPinch={true}
         panOnScroll={false}
         attributionPosition="bottom-left"
+        style={{ background: '#f8f9fa' }}
       >
         <Controls />
         <MiniMap
