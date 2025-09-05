@@ -111,3 +111,5 @@ the family is gulalaage,  sh. maroshi. 3 person are identified in faily tree. mo
 [2025-01-31 23:59] | USER INPUT: see our latest works in @PROJECT_STATUS.txt last 30 lines. now we can see family tree in both layouts. svg and react flow. still react flow layout needs more styling fixes .see images
 [2025-01-31 23:59] | USER INPUT: we were fixing styling issues in family tree react flow layout. still there a re issues.  check both images. the svg type looks better. react flow type layout now have no lines or arrows. fix it.
 [2025-01-31 23:59] | USER INPUT: check our previous work on @PROJECT_STATUS.txt last 30 lines to see when we were able to succesfully show relationship arrows and lines in family tree react flow layout. although there were styling issues we were able to show edges. need to restore up to there
+[2025-01-31 23:59] | USER INPUT: we were trying to fix styling issues in family tree react flow component. svg is still much better. fix comprehensively the styling issues . see images
+[2025-01-31 23:59] | USER INPUT: still there are no lines. see image
