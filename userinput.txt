@@ -121,5 +121,7 @@ the family is gulalaage,  sh. maroshi. 3 person are identified in faily tree. mo
 [2025-01-31 23:59] | USER INPUT: [plugin:vite:react-babel] /home/mine/Documents/codingProjects/DirReactFinal/react_frontend/src/components/family/FamilyTreeComparison.tsx: Unterminated JSX contents. (178:24)
 [2025-01-31 23:59] | USER INPUT: still no errors or lines visible "EBUG: Request URL: /family/groups/by_address/ api.ts:56:17
 [2025-01-31 23:59] | USER INPUT: still react flow doesn't show  arrows and lines but svg does. here is the logs  "DEBUG: Full headers:
+[2025-01-31 23:59] | USER INPUT: we were continuing to fix the issues related to react flow family tree layout. read last 30 lines of @PROJECT_STATUS.txt  right now i can see the test edges created. see the image. but we need the layout to be as polished as the svg laout. (both images attached. see).
+[2025-01-31 23:59] | USER INPUT: still i see no change. are you still using the old @ReactFlowFamilyTree.tsx   ? we have earlier discussed to use the newer file @SimpleReactFlowFamilyTree.tsx
 [2025-01-31 23:59] | USER INPUT: 🔍 SearchResults: Component rendered with props: 
 Object { resultsLength: 20, totalCount: 680, currentPage: 1, pageSize: 20, isLoading: false, searchFilters: {…} }
