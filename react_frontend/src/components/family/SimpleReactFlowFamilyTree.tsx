@@ -285,77 +285,6 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
       }
     });
 
-    // FORCE TEST: Always create test edges to verify ReactFlow is working
-    if (flowNodes.length >= 2) {
-      console.log('🔍 FORCE TEST: Creating test edges to verify ReactFlow rendering');
-      
-      // Create multiple test edges with different styles
-      const testEdge1: Edge = {
-        id: 'test-edge-force-1',
-        source: flowNodes[0].id,
-        target: flowNodes[1].id,
-        type: 'straight',
-        style: { 
-          stroke: '#ff0000', 
-          strokeWidth: 8,
-          zIndex: 1000
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: '#ff0000',
-          width: 20,
-          height: 20,
-        }
-      };
-      flowEdges.push(testEdge1);
-      
-      // Create a second test edge with different style
-      const testEdge2: Edge = {
-        id: 'test-edge-force-2',
-        source: flowNodes[0].id,
-        target: flowNodes[1].id,
-        type: 'smoothstep',
-        style: { 
-          stroke: '#00ff00', 
-          strokeWidth: 6,
-          zIndex: 1001
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: '#00ff00',
-          width: 15,
-          height: 15,
-        }
-      };
-      flowEdges.push(testEdge2);
-      
-      console.log('🔍 FORCE TEST: Added test edges:', [testEdge1, testEdge2]);
-    }
-
-    // ADDITIONAL TEST: Create edges between all nodes to test ReactFlow
-    if (flowNodes.length > 1) {
-      console.log('🔍 ADDITIONAL TEST: Creating edges between all nodes');
-      for (let i = 0; i < flowNodes.length - 1; i++) {
-        const edge: Edge = {
-          id: `test-all-${flowNodes[i].id}-${flowNodes[i + 1].id}`,
-          source: flowNodes[i].id,
-          target: flowNodes[i + 1].id,
-          type: 'straight',
-          style: { 
-            stroke: '#00ff00', 
-            strokeWidth: 3
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: '#00ff00',
-            width: 15,
-            height: 15,
-          }
-        };
-        flowEdges.push(edge);
-      }
-      console.log('🔍 ADDITIONAL TEST: Added', flowNodes.length - 1, 'test edges');
-    }
 
     // Create clean, professional edges based on family structure
     // Parent-child relationships - clean organizational chart style
@@ -543,46 +472,22 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
     }}>
       <style>{`
         .react-flow__edge {
-          stroke: #ff0000 !important;
-          stroke-width: 10px !important;
-          z-index: 9999 !important;
-          opacity: 1 !important;
-          visibility: visible !important;
+          stroke: #8B4513 !important;
+          stroke-width: 2px !important;
         }
         .react-flow__edge-path {
-          stroke: #ff0000 !important;
-          stroke-width: 10px !important;
-          z-index: 9999 !important;
-          opacity: 1 !important;
-          visibility: visible !important;
+          stroke: #8B4513 !important;
+          stroke-width: 2px !important;
         }
         .react-flow__edge-arrowhead {
-          fill: #ff0000 !important;
-          stroke: #ff0000 !important;
-          z-index: 9999 !important;
-          opacity: 1 !important;
-          visibility: visible !important;
+          fill: #8B4513 !important;
+          stroke: #8B4513 !important;
         }
         .react-flow__renderer {
-          background: #ffffff !important;
-        }
-        .react-flow__edge.selected {
-          stroke: #ff0000 !important;
-          stroke-width: 10px !important;
-        }
-        .react-flow__edge:hover {
-          stroke: #ff0000 !important;
-          stroke-width: 10px !important;
-        }
-        .react-flow__viewport {
-          background: #f0f0f0 !important;
+          background: #ffffff;
         }
         .react-flow__node {
-          z-index: 1 !important;
-        }
-        .react-flow__edge * {
-          stroke: #ff0000 !important;
-          fill: #ff0000 !important;
+          cursor: default;
         }
       `}</style>
       <ReactFlow
@@ -612,67 +517,8 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
         }}
         onInit={() => {
           console.log('🔍 SimpleReactFlow onInit - Nodes:', nodes.length, 'Edges:', edges.length);
-          
-          // DOM inspection to check if edges are rendered
-          setTimeout(() => {
-            const edgeElements = document.querySelectorAll('.react-flow__edge');
-            const edgePathElements = document.querySelectorAll('.react-flow__edge-path');
-            const edgeArrowElements = document.querySelectorAll('.react-flow__edge-arrowhead');
-            
-            console.log('🔍 DOM INSPECTION - Edge elements found:', {
-              edges: edgeElements.length,
-              edgePaths: edgePathElements.length,
-              edgeArrows: edgeArrowElements.length,
-              edgeElements: Array.from(edgeElements).map(el => ({
-                tagName: el.tagName,
-                className: el.className,
-                style: el.getAttribute('style'),
-                id: el.id
-              }))
-            });
-            
-            // Check if any edges are visible
-            edgeElements.forEach((edge, index) => {
-              const rect = edge.getBoundingClientRect();
-              const computedStyle = window.getComputedStyle(edge);
-              console.log(`🔍 Edge ${index}:`, {
-                rect: rect,
-                display: computedStyle.display,
-                visibility: computedStyle.visibility,
-                opacity: computedStyle.opacity,
-                stroke: computedStyle.stroke,
-                strokeWidth: computedStyle.strokeWidth
-              });
-            });
-          }, 1000);
         }}
       />
-      
-      {/* FORCE TEST: Direct SVG overlay to test if edges are being created */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-        zIndex: 10000
-      }}>
-        <svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0 }}>
-          <line 
-            x1="100" 
-            y1="100" 
-            x2="300" 
-            y2="200" 
-            stroke="#ff0000" 
-            strokeWidth="10"
-            style={{ zIndex: 10001 }}
-          />
-          <text x="50" y="50" fill="#ff0000" fontSize="20" style={{ zIndex: 10001 }}>
-            TEST LINE - If you see this, SVG works
-          </text>
-        </svg>
-      </div>
     </div>
   );
 };

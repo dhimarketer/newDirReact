@@ -125,3 +125,4 @@ the family is gulalaage,  sh. maroshi. 3 person are identified in faily tree. mo
 [2025-01-31 23:59] | USER INPUT: still i see no change. are you still using the old @ReactFlowFamilyTree.tsx   ? we have earlier discussed to use the newer file @SimpleReactFlowFamilyTree.tsx
 [2025-01-31 23:59] | USER INPUT: 🔍 SearchResults: Component rendered with props: 
 Object { resultsLength: 20, totalCount: 680, currentPage: 1, pageSize: 20, isLoading: false, searchFilters: {…} }
+[2025-01-31 23:59] | USER INPUT: now we have fixed layout issues in  react flow layout we need to fix the remaining problems. see @PROJECT_STATUS.txt . in react flow layout one parent was detected. see image. in svg layout two parents are correctly identified. see image. lets sort this out.
