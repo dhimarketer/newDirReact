@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ReactFlow, Node, Edge, useNodesState, useEdgesState, MarkerType, ReactFlowProvider } from '@xyflow/react';
+import { ReactFlow, Node, Edge, MarkerType, ReactFlowProvider, useNodesState, useEdgesState } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useFamilyOrganization } from './hooks/useFamilyOrganization';
 
@@ -29,174 +29,6 @@ interface SimpleReactFlowFamilyTreeProps {
   hasMultipleFamilies?: boolean;
 }
 
-// Professional node component matching clean SVG styling
-const FamilyMemberNode: React.FC<{ data: any }> = ({ data }) => {
-  const { member, generation } = data;
-  
-  // Clean, professional styling matching SVG implementation
-  const getNodeStyle = () => {
-    switch (generation) {
-      case 'grandparent':
-        return { 
-          backgroundColor: '#FFF8DC', 
-          borderColor: '#DAA520',
-          textColor: '#8B4513'
-        };
-      case 'parent':
-        return { 
-          backgroundColor: '#fef3c7', 
-          borderColor: '#8B4513',
-          textColor: '#1f2937'
-        };
-      case 'child':
-        return { 
-          backgroundColor: '#dbeafe', 
-          borderColor: '#8B4513',
-          textColor: '#1f2937'
-        };
-      case 'grandchild':
-        return { 
-          backgroundColor: '#F5F5DC', 
-          borderColor: '#DEB887',
-          textColor: '#8B4513'
-        };
-      default:
-        return { 
-          backgroundColor: '#dbeafe', 
-          borderColor: '#8B4513',
-          textColor: '#1f2937'
-        };
-    }
-  };
-
-  const nodeStyle = getNodeStyle();
-  
-  return (
-    <div
-      style={{
-        padding: '8px 12px',
-        backgroundColor: nodeStyle.backgroundColor,
-        border: `2px solid ${nodeStyle.borderColor}`,
-        borderRadius: '8px',
-        minWidth: '120px',
-        textAlign: 'center',
-        fontSize: '12px',
-        fontWeight: '500',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        color: nodeStyle.textColor
-      }}
-    >
-      <div style={{ 
-        fontWeight: 'bold', 
-        marginBottom: '2px', 
-        fontSize: '12px',
-        lineHeight: '1.2'
-      }}>
-        {member.entry.name}
-      </div>
-      <div style={{ 
-        fontSize: '10px', 
-        color: '#6b7280', 
-        fontWeight: '400',
-        lineHeight: '1.2'
-      }}>
-        {member.entry.age ? `${member.entry.age} years` : 'Age unknown'}
-      </div>
-    </div>
-  );
-};
-
-// Custom node types
-const nodeTypes = {
-  familyMember: FamilyMemberNode,
-};
-
-// Professional hierarchical layout matching clean SVG organizational chart structure
-const getLayoutedElements = (nodes: Node[], edges: Edge[], organizedMembers: any) => {
-  const horizontalSpacing = 160; // Optimized for clean layout
-  const verticalSpacing = 120;   // Optimized for better proportions
-  const startX = 400;            // Centered starting position
-  const startY = 80;             // Optimized top margin
-
-  // Create a map of node positions by generation
-  const positionedNodes = new Map();
-  let currentY = startY;
-
-  // Position grandparents (if any) - top level
-  if (organizedMembers.grandparents.length > 0) {
-    const grandparentY = currentY;
-    const grandparentCount = organizedMembers.grandparents.length;
-    const totalWidth = Math.max((grandparentCount - 1) * horizontalSpacing, 200);
-    const startGrandparentX = startX - (totalWidth / 2);
-
-    organizedMembers.grandparents.forEach((member: any, index: number) => {
-      const nodeId = String(member.entry.pid);
-      const x = startGrandparentX + (index * horizontalSpacing);
-      positionedNodes.set(nodeId, { x, y: grandparentY });
-    });
-    currentY += verticalSpacing;
-  }
-
-  // Position parents - center them horizontally (main level)
-  if (organizedMembers.parents.length > 0) {
-    const parentY = currentY;
-    const parentCount = organizedMembers.parents.length;
-    const totalWidth = Math.max((parentCount - 1) * horizontalSpacing, 200);
-    const startParentX = startX - (totalWidth / 2);
-
-    organizedMembers.parents.forEach((member: any, index: number) => {
-      const nodeId = String(member.entry.pid);
-      const x = startParentX + (index * horizontalSpacing);
-      positionedNodes.set(nodeId, { x, y: parentY });
-    });
-    currentY += verticalSpacing;
-  }
-
-  // Position children - center them horizontally (main level)
-  if (organizedMembers.children.length > 0) {
-    const childY = currentY;
-    const childCount = organizedMembers.children.length;
-    const totalWidth = Math.max((childCount - 1) * horizontalSpacing, 200);
-    const startChildX = startX - (totalWidth / 2);
-
-    organizedMembers.children.forEach((member: any, index: number) => {
-      const nodeId = String(member.entry.pid);
-      const x = startChildX + (index * horizontalSpacing);
-      positionedNodes.set(nodeId, { x, y: childY });
-    });
-    currentY += verticalSpacing;
-  }
-
-  // Position grandchildren (if any) - bottom level
-  if (organizedMembers.grandchildren.length > 0) {
-    const grandchildY = currentY;
-    const grandchildCount = organizedMembers.grandchildren.length;
-    const totalWidth = Math.max((grandchildCount - 1) * horizontalSpacing, 200);
-    const startGrandchildX = startX - (totalWidth / 2);
-
-    organizedMembers.grandchildren.forEach((member: any, index: number) => {
-      const nodeId = String(member.entry.pid);
-      const x = startGrandchildX + (index * horizontalSpacing);
-      positionedNodes.set(nodeId, { x, y: grandchildY });
-    });
-  }
-
-  // Update node positions with professional spacing
-  const layoutedNodes = nodes.map((node) => {
-    const position = positionedNodes.get(node.id) || { x: 0, y: 0 };
-    return { 
-      ...node, 
-      position,
-      type: 'familyMember'
-    };
-  });
-
-  return {
-    nodes: layoutedNodes,
-    edges,
-  };
-};
-
 const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
   familyMembers,
   relationships = [],
@@ -208,146 +40,113 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
     hasMultipleFamilies
   });
 
-  // Reuse existing data processing logic
+  // Use proper family organization logic
   const organizedMembers = useFamilyOrganization(familyMembers, relationships);
 
-  // Convert to ReactFlow format
-  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
-    const flowNodes: Node[] = [];
-    const flowEdges: Edge[] = [];
-    const addedNodeIds = new Set<string>(); // Prevent duplicate nodes
-
-    // Add grandparents (only if not already added)
-    organizedMembers.grandparents.forEach((member: any) => {
-      const nodeId = String(member.entry.pid);
-      if (!addedNodeIds.has(nodeId)) {
-        flowNodes.push({
-          id: nodeId,
-          data: { 
-            member, 
-            generation: 'grandparent',
-            label: `${member.entry.name} (${member.entry.age || 'N/A'})`
-          },
-          position: { x: 0, y: 0 }, // Will be set by layout
-        });
-        addedNodeIds.add(nodeId);
-      }
+  // Create organized family tree nodes - SIMPLIFIED APPROACH
+  const nodes: Node[] = useMemo(() => {
+    if (familyMembers.length === 0) return [];
+    
+    const nodes: Node[] = [];
+    const horizontalSpacing = 200;
+    const verticalSpacing = 150;
+    const startX = 300;
+    const startY = 50;
+    
+    console.log('🔍 SimpleReactFlowFamilyTree - Organized members:', {
+      parents: organizedMembers.parents.length,
+      children: organizedMembers.children.length,
+      grandparents: organizedMembers.grandparents.length,
+      grandchildren: organizedMembers.grandchildren.length
     });
-
-    // Add parents (only if not already added)
-    organizedMembers.parents.forEach((member: any) => {
-      const nodeId = String(member.entry.pid);
-      if (!addedNodeIds.has(nodeId)) {
-        flowNodes.push({
-          id: nodeId,
-          data: { 
-            member, 
-            generation: 'parent',
-            label: `${member.entry.name} (${member.entry.age || 'N/A'})`
-          },
-          position: { x: 0, y: 0 }, // Will be set by layout
-        });
-        addedNodeIds.add(nodeId);
-      }
+    
+    // Position parents at top center
+    organizedMembers.parents.forEach((parent, index) => {
+      const parentX = startX - ((organizedMembers.parents.length - 1) * horizontalSpacing) / 2 + (index * horizontalSpacing);
+      nodes.push({
+        id: String(parent.entry.pid),
+        type: 'default',
+        draggable: true,
+        data: { 
+          label: (
+            <div style={{ 
+              padding: '8px 12px', 
+              backgroundColor: '#fef3c7', 
+              border: '2px solid #8B4513',
+              borderRadius: '8px',
+              minWidth: '120px',
+              textAlign: 'center',
+              fontSize: '12px',
+              fontWeight: '500',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              color: '#1f2937'
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>{parent.entry.name}</div>
+              <div style={{ fontSize: '10px', color: '#6b7280' }}>
+                {parent.entry.age ? `${parent.entry.age} years` : 'Age unknown'}
+              </div>
+            </div>
+          )
+        },
+        position: { x: parentX, y: startY },
+      });
     });
-
-    // Add children (only if not already added)
-    organizedMembers.children.forEach((member: any) => {
-      const nodeId = String(member.entry.pid);
-      if (!addedNodeIds.has(nodeId)) {
-        flowNodes.push({
-          id: nodeId,
-          data: { 
-            member, 
-            generation: 'child',
-            label: `${member.entry.name} (${member.entry.age || 'N/A'})`
-          },
-          position: { x: 0, y: 0 }, // Will be set by layout
-        });
-        addedNodeIds.add(nodeId);
-      }
+    
+    // Position children below parents
+    const childrenY = startY + verticalSpacing;
+    organizedMembers.children.forEach((child, index) => {
+      const childX = startX - ((organizedMembers.children.length - 1) * horizontalSpacing) / 2 + (index * horizontalSpacing);
+      nodes.push({
+        id: String(child.entry.pid),
+        type: 'default',
+        draggable: true,
+        data: { 
+          label: (
+            <div style={{ 
+              padding: '8px 12px', 
+              backgroundColor: '#dbeafe', 
+              border: '2px solid #8B4513',
+              borderRadius: '8px',
+              minWidth: '120px',
+              textAlign: 'center',
+              fontSize: '12px',
+              fontWeight: '500',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              color: '#1f2937'
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>{child.entry.name}</div>
+              <div style={{ fontSize: '10px', color: '#6b7280' }}>
+                {child.entry.age ? `${child.entry.age} years` : 'Age unknown'}
+              </div>
+            </div>
+          )
+        },
+        position: { x: childX, y: childrenY },
+      });
     });
+    
+    return nodes;
+  }, [familyMembers, organizedMembers]);
 
-    // Add grandchildren (only if not already added)
-    organizedMembers.grandchildren.forEach((member: any) => {
-      const nodeId = String(member.entry.pid);
-      if (!addedNodeIds.has(nodeId)) {
-        flowNodes.push({
-          id: nodeId,
-          data: { 
-            member, 
-            generation: 'grandchild',
-            label: `${member.entry.name} (${member.entry.age || 'N/A'})`
-          },
-          position: { x: 0, y: 0 }, // Will be set by layout
-        });
-        addedNodeIds.add(nodeId);
-      }
-    });
-
-
-    // Create clean, professional edges based on family structure
-    // Parent-child relationships - clean organizational chart style
+  // Create organizational chart style edges - MATCHING SVG STRUCTURE
+  const edges: Edge[] = useMemo(() => {
+    if (organizedMembers.parents.length + organizedMembers.children.length < 2) return [];
+    
+    const edges: Edge[] = [];
+    
+    // ORGANIZATIONAL CHART STRUCTURE: Individual parent-child connections
     if (organizedMembers.parents.length > 0 && organizedMembers.children.length > 0) {
-      // Create individual parent-to-child connections
-      organizedMembers.parents.forEach((parent: any) => {
-        organizedMembers.children.forEach((child: any) => {
-          const edge: Edge = {
+      // Individual parent-to-child connections (organizational chart style)
+      organizedMembers.parents.forEach((parent) => {
+        organizedMembers.children.forEach((child) => {
+          edges.push({
             id: `parent-child-${parent.entry.pid}-${child.entry.pid}`,
             source: String(parent.entry.pid),
             target: String(child.entry.pid),
             type: 'straight',
             style: { 
               stroke: '#8B4513', 
-              strokeWidth: 3 
-            },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              color: '#8B4513',
-              width: 15,
-              height: 15,
-            }
-          };
-          flowEdges.push(edge);
-        });
-      });
-    }
-
-    // Sibling relationships (if no parents detected, connect all children as siblings)
-    if (organizedMembers.parents.length === 0 && organizedMembers.children.length > 1) {
-      console.log('🔍 No parents detected, creating sibling connections between all children');
-      for (let i = 0; i < organizedMembers.children.length; i++) {
-        for (let j = i + 1; j < organizedMembers.children.length; j++) {
-          const child1 = organizedMembers.children[i];
-          const child2 = organizedMembers.children[j];
-          const edge: Edge = {
-            id: `sibling-${child1.entry.pid}-${child2.entry.pid}`,
-            source: String(child1.entry.pid),
-            target: String(child2.entry.pid),
-            type: 'straight',
-            style: { 
-              stroke: '#8B4513', 
-              strokeWidth: 1,
-              strokeDasharray: '5,5'
-            }
-          };
-          flowEdges.push(edge);
-        }
-      }
-    }
-
-    // Grandparent-grandchild relationships
-    if (organizedMembers.grandparents.length > 0 && organizedMembers.grandchildren.length > 0) {
-      organizedMembers.grandparents.forEach((grandparent: any) => {
-        organizedMembers.grandchildren.forEach((grandchild: any) => {
-          const edge: Edge = {
-            id: `grandparent-grandchild-${grandparent.entry.pid}-${grandchild.entry.pid}`,
-            source: String(grandparent.entry.pid),
-            target: String(grandchild.entry.pid),
-            type: 'straight',
-            style: { 
-              stroke: '#8B4513', 
-              strokeWidth: 2 
+              strokeWidth: 2
             },
             markerEnd: {
               type: MarkerType.ArrowClosed,
@@ -355,17 +154,16 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
               width: 12,
               height: 12,
             }
-          };
-          flowEdges.push(edge);
+          });
         });
       });
     }
-
-    // Spouse relationships (horizontal dashed lines, no arrows)
+    
+    // Spouse connections between parents (horizontal dashed lines)
     if (organizedMembers.parents.length >= 2) {
       const parent1 = organizedMembers.parents[0];
       const parent2 = organizedMembers.parents[1];
-      const edge: Edge = {
+      edges.push({
         id: `spouse-${parent1.entry.pid}-${parent2.entry.pid}`,
         source: String(parent1.entry.pid),
         target: String(parent2.entry.pid),
@@ -375,69 +173,50 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
           strokeWidth: 2,
           strokeDasharray: '8,4'
         }
-      };
-      flowEdges.push(edge);
+      });
     }
-
-    // Fallback: If no edges created and we have family members, create basic connections
-    if (flowEdges.length === 0 && flowNodes.length > 1) {
-      console.log('🔍 No specific relationships detected, creating basic family connections');
-      for (let i = 0; i < flowNodes.length; i++) {
-        for (let j = i + 1; j < flowNodes.length; j++) {
-          const node1 = flowNodes[i];
-          const node2 = flowNodes[j];
-          const edge: Edge = {
-            id: `family-${node1.id}-${node2.id}`,
-            source: node1.id,
-            target: node2.id,
+    
+    // Fallback: If no parents detected, create sibling connections
+    if (organizedMembers.parents.length === 0 && organizedMembers.children.length > 1) {
+      for (let i = 0; i < organizedMembers.children.length; i++) {
+        for (let j = i + 1; j < organizedMembers.children.length; j++) {
+          const child1 = organizedMembers.children[i];
+          const child2 = organizedMembers.children[j];
+          edges.push({
+            id: `sibling-${child1.entry.pid}-${child2.entry.pid}`,
+            source: String(child1.entry.pid),
+            target: String(child2.entry.pid),
             type: 'straight',
             style: { 
               stroke: '#8B4513', 
               strokeWidth: 1,
-              strokeDasharray: '8,4'
+              strokeDasharray: '5,5'
             }
-          };
-          flowEdges.push(edge);
+          });
         }
       }
     }
-
-    console.log('🔍 SimpleReactFlowFamilyTree - Final data:', {
-      nodesCount: flowNodes.length,
-      edgesCount: flowEdges.length,
-      nodeIds: flowNodes.map(n => n.id)
-    });
     
-    return { nodes: flowNodes, edges: flowEdges };
-  }, [organizedMembers, hasMultipleFamilies, relationships]);
+    return edges;
+  }, [organizedMembers]);
 
-  // Apply manual layout
-  const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
-    return getLayoutedElements(initialNodes, initialEdges, organizedMembers);
-  }, [initialNodes, initialEdges, organizedMembers]);
+  console.log('🔍 SimpleReactFlowFamilyTree - Created:', { nodes: nodes.length, edges: edges.length });
 
   // Use ReactFlow hooks for proper state management
-  const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
+  const [reactFlowNodes, setNodes, onNodesChange] = useNodesState(nodes);
+  const [reactFlowEdges, setEdges, onEdgesChange] = useEdgesState(edges);
 
-  // Update nodes and edges when layouted data changes
+  // Update nodes and edges when data changes
   React.useEffect(() => {
-    console.log('🔍 SimpleReactFlowFamilyTree - Updating nodes and edges:', {
-      nodesCount: layoutedNodes.length,
-      edgesCount: layoutedEdges.length,
-      edgeDetails: layoutedEdges.map(e => ({ id: e.id, source: e.source, target: e.target }))
-    });
-    setNodes(layoutedNodes);
-    setEdges(layoutedEdges);
-  }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
+    setNodes(nodes);
+    setEdges(edges);
+  }, [nodes, edges, setNodes, setEdges]);
 
-  // Don't render if no members
   if (familyMembers.length === 0) {
-    console.log('🔍 SimpleReactFlowFamilyTree - No family members, showing empty state');
     return (
       <div style={{ 
         width: '100%', 
-        height: '600px', 
+        height: '400px', 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
@@ -453,22 +232,13 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
     );
   }
 
-  console.log('🔍 SimpleReactFlowFamilyTree - Rendering with:', {
-    nodesCount: nodes.length,
-    edgesCount: edges.length,
-    firstNode: nodes[0],
-    firstEdge: edges[0],
-    allEdges: edges.map(e => ({ id: e.id, source: e.source, target: e.target, style: e.style }))
-  });
-
   return (
     <div style={{ 
       width: '100%', 
-      height: '600px', 
-      border: '1px solid #e0e0e0', 
-      borderRadius: 8, 
-      background: '#ffffff',
-      position: 'relative'
+      height: '500px', 
+      border: '1px solid #e0e0e0',
+      borderRadius: 8,
+      background: '#ffffff'
     }}>
       <style>{`
         .react-flow__edge {
@@ -487,13 +257,18 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
           background: #ffffff;
         }
         .react-flow__node {
-          cursor: default;
+          cursor: grab !important;
+        }
+        .react-flow__node:active {
+          cursor: grabbing !important;
+        }
+        .react-flow__node:hover {
+          cursor: grab !important;
         }
       `}</style>
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
+        nodes={reactFlowNodes}
+        edges={reactFlowEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         fitView
@@ -504,19 +279,18 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
         zoomOnPinch={true}
         panOnScroll={false}
         attributionPosition="bottom-left"
-        style={{ background: '#ffffff' }}
         defaultEdgeOptions={{
-          style: { stroke: '#8B4513', strokeWidth: 3 },
+          style: { stroke: '#8B4513', strokeWidth: 2 },
           type: 'straight',
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: '#8B4513',
-            width: 15,
-            height: 15,
+            width: 12,
+            height: 12,
           }
         }}
         onInit={() => {
-          console.log('🔍 SimpleReactFlow onInit - Nodes:', nodes.length, 'Edges:', edges.length);
+          console.log('🔍 SimpleReactFlowFamilyTree - ReactFlow initialized with:', { nodes: reactFlowNodes.length, edges: reactFlowEdges.length });
         }}
       />
     </div>
