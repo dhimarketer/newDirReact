@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { familyService } from '../../services/familyService';
 import ClassicFamilyTree from './ClassicFamilyTree';
+import CleanReactFlowFamilyTree from './CleanReactFlowFamilyTree';
 import FamilyTableView from './FamilyTableView';
 import FamilyViewToggle, { ViewMode } from './FamilyViewToggle';
 import { PhoneBookEntry } from '../../types/directory';
@@ -33,7 +34,7 @@ interface FamilyRelationship {
 const EmbeddedFamilyTree: React.FC<EmbeddedFamilyTreeProps> = ({ 
   address, 
   island,
-  initialViewMode = 'tree'
+  initialViewMode = 'svg-tree'
 }) => {
   const { user, isAuthenticated } = useAuthStore();
   
@@ -50,8 +51,6 @@ const EmbeddedFamilyTree: React.FC<EmbeddedFamilyTreeProps> = ({
     return savedPreference || initialViewMode;
   });
   
-  // State for multi-row layout toggle
-  const [useMultiRowLayout, setUseMultiRowLayout] = useState(false);
   
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -154,10 +153,10 @@ const EmbeddedFamilyTree: React.FC<EmbeddedFamilyTreeProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium text-gray-900">
-              {viewMode === 'tree' ? 'Family Tree' : 'Family Table'} - {address}, {island}
+              {viewMode === 'table' ? 'Family Table' : viewMode === 'svg-tree' ? 'Family Tree (SVG)' : 'Family Tree (ReactFlow)'} - {address}, {island}
             </h3>
             <p className="text-sm text-gray-600">
-              {familyMembers.length} family members • {viewMode === 'tree' ? 'Visual' : 'Tabular'} view
+              {familyMembers.length} family members
             </p>
           </div>
           
@@ -169,19 +168,6 @@ const EmbeddedFamilyTree: React.FC<EmbeddedFamilyTreeProps> = ({
                 onViewChange={handleViewModeChange}
               />
             )}
-            
-            {/* Multi-row layout toggle */}
-            <button
-              onClick={() => setUseMultiRowLayout(!useMultiRowLayout)}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                useMultiRowLayout 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-              title={useMultiRowLayout ? 'Switch to single-row layout' : 'Switch to multi-row layout'}
-            >
-              {useMultiRowLayout ? '📐 Single Row' : '📐 Multi Row'}
-            </button>
           </div>
         </div>
       </div>
@@ -221,19 +207,24 @@ const EmbeddedFamilyTree: React.FC<EmbeddedFamilyTreeProps> = ({
           </div>
         ) : (
           <>
-            {/* Show either ClassicFamilyTree or FamilyTableView based on view mode */}
-            {viewMode === 'tree' ? (
-              <ClassicFamilyTree
-                familyMembers={familyMembers}
-                relationships={familyRelationships}
-                useMultiRowLayout={useMultiRowLayout}
-                svgRef={svgRef as React.RefObject<SVGSVGElement>}
-              />
-            ) : (
+            {/* Show family tree based on view mode */}
+            {viewMode === 'table' ? (
               <FamilyTableView
                 familyMembers={familyMembers}
                 address={address}
                 island={island}
+              />
+            ) : viewMode === 'svg-tree' ? (
+              <ClassicFamilyTree
+                familyMembers={familyMembers}
+                relationships={familyRelationships}
+                svgRef={svgRef as React.RefObject<SVGSVGElement>}
+              />
+            ) : (
+              <CleanReactFlowFamilyTree
+                familyMembers={familyMembers}
+                relationships={familyRelationships}
+                hasMultipleFamilies={false}
               />
             )}
           </>

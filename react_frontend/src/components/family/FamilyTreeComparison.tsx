@@ -1,11 +1,10 @@
-// 2025-01-31: Clean comparison component for SVG vs ReactFlow family tree implementations
-// Allows switching between ClassicFamilyTree (SVG) and SimpleReactFlowFamilyTree for evaluation
+// 2025-01-05: Clean comparison component for SVG vs ReactFlow family tree implementations  
+// Allows switching between ClassicFamilyTree (SVG) and CleanReactFlowFamilyTree for evaluation
 
 import React, { useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { FamilyMember, FamilyRelationship } from './hooks/useFamilyOrganization';
 import ClassicFamilyTree from './ClassicFamilyTree';
-import SimpleReactFlowFamilyTree from './SimpleReactFlowFamilyTree';
 import CleanReactFlowFamilyTree from './CleanReactFlowFamilyTree';
 
 interface FamilyTreeComparisonProps {
@@ -16,7 +15,7 @@ interface FamilyTreeComparisonProps {
   svgRef?: React.RefObject<SVGSVGElement>;
 }
 
-type TreeImplementation = 'svg' | 'reactflow' | 'clean-reactflow';
+type TreeImplementation = 'svg' | 'clean-reactflow';
 
 const FamilyTreeComparison: React.FC<FamilyTreeComparisonProps> = ({
   familyMembers,
@@ -33,15 +32,6 @@ const FamilyTreeComparison: React.FC<FamilyTreeComparisonProps> = ({
 
   const renderFamilyTree = () => {
     switch (implementation) {
-      case 'reactflow':
-        return (
-          <SimpleReactFlowFamilyTree
-            familyMembers={familyMembers}
-            relationships={relationships}
-            onRelationshipChange={onRelationshipChange}
-            hasMultipleFamilies={hasMultipleFamilies}
-          />
-        );
       case 'clean-reactflow':
         return (
           <CleanReactFlowFamilyTree
@@ -84,16 +74,6 @@ const FamilyTreeComparison: React.FC<FamilyTreeComparisonProps> = ({
                   SVG Tree
                 </button>
                 <button
-                  onClick={() => handleImplementationChange('reactflow')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    implementation === 'reactflow'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  ReactFlow Tree
-                </button>
-                <button
                   onClick={() => handleImplementationChange('clean-reactflow')}
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     implementation === 'clean-reactflow'
@@ -113,11 +93,6 @@ const FamilyTreeComparison: React.FC<FamilyTreeComparisonProps> = ({
               <div>
                 <strong>SVG Implementation:</strong> Custom SVG rendering with drag-and-drop, 
                 complex positioning logic, and manual relationship connections.
-              </div>
-            ) : implementation === 'reactflow' ? (
-              <div>
-                <strong>ReactFlow Implementation:</strong> Professional node-based UI with 
-                automatic layout, zoom/pan, and built-in interactions.
               </div>
             ) : (
               <div>

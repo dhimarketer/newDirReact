@@ -70,3 +70,20 @@ useFamilyGraphLayout.ts:98:109
 [2025-01-02 01:15] | USER INPUT: now the nodes are detached from the boxes
 [2025-01-02 01:30] | USER INPUT: now good. but still lets make the relationship line of parents same size so that they will be equidistant from the middle. now one parent's line is short, another one is long . see image
 [2025-01-02 01:45] | USER INPUT: good job. now lets increase the inner box  which contains the text because there is so much unused space betwen the outer box. see image.
+[2025-01-05 12:00] | USER INPUT: now lets clean up the family tree window dialog. we can remove the button "Reactflow tree" now that we have a better version in "clean reaactflow" button. also single row/ multi row toggle button and its code looks redundant. we shall keep svg layout, table layout, edit button, download image options etc. give a cleaner more organized laout for the window
+[2025-01-05 12:05] | USER INPUT: tree view button is also redundant. remove it. compare button already have two views.
+[2025-01-05 12:10] | USER INPUT: tree compare button itself can also be replaced with the svg tree and clean reactflow buttons on the same position so they are more directly accessible. i see no reason for the labels "view" and  "tree comparison format" which can be removed to make more space. also the download formats shall be added to dropdown  so it will look better
+[2025-01-05 12:20] | USER INPUT: still the download options dropdown is not correct. the download options shall be fully inside the dropdown
+[2025-01-05 12:25] | USER INPUT: clicking the download dropdown shall make the dropdown open and display the contents, but i see the drop down options are behind the graphic. send them forward . see image
+[2025-01-05 12:30] | USER INPUT: not good. now clicking the drop down expands the header. its not the way. just open the drop down. do not resize header. also i notice when clicked on the drop down options, its not actually saving the image in the format specified. basically its not working
+[2025-01-05 12:35] | USER INPUT: clicking download dropdown doesn't open the dropdown so nothing happens when user clicks it
+[2025-01-05 12:38] | USER INPUT: maybe its opening but if the dropdown is behind the graphic than cannot be seen by user
+[2025-01-05 12:40] | USER INPUT: clicking the dropdown shall open the dropdown like a normal dropdown to show its options. but currently clicking the dropdown reveals the button far away in the left which is not good
+[2025-01-05 12:42] | USER INPUT: still not good. the buttons appear far down, totally disconnected from the dropdown option.
+[2025-01-05 12:45] | USER INPUT: now position corrected. but getting this error Family tree not ready for download. Please wait for the tree to load."  🔽 Download initiated: 
+Object { format: "svg", familyName: "happy rest_gn. fuvahmulah", svgExists: false }
+FamilyTreeDownloadButton.tsx:44:13
+❌ SVG element not found for download FamilyTreeDownloadButton.tsx:47:15
+📋 Dropdown clicked
+[2025-01-05 12:47] | USER INPUT: check why user cannot download when user clicks the download options for family tree in family tree window.
+[2025-01-05 16:15] | USER INPUT: still same result. jpg renders black background, png and svg renders checkered background. we don't have many layers, is there a way to capture both the graphic and the lines?

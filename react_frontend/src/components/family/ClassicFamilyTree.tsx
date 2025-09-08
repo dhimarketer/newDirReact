@@ -23,11 +23,13 @@ interface FamilyRelationship {
 interface ClassicFamilyTreeProps {
   familyMembers: FamilyMember[];
   relationships?: FamilyRelationship[];
+  svgRef?: React.RefObject<SVGSVGElement>; // 2025-01-05: NEW - Reference to SVG element for download functionality
 }
 
 const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({ 
   familyMembers, 
-  relationships = [] 
+  relationships = [],
+  svgRef
 }) => {
   // 2025-01-31: SIMPLIFIED - Use the same family organization logic as the hook
   const organizedMembers = useFamilyOrganization(familyMembers, relationships);
@@ -69,8 +71,10 @@ const ClassicFamilyTree: React.FC<ClassicFamilyTreeProps> = ({
   return (
     <div className="classic-family-tree">
       <svg 
+        ref={svgRef}
         width={totalWidth} 
         height={totalHeight}
+        viewBox={`0 0 ${totalWidth} ${totalHeight}`}
         className="w-full h-auto"
         style={{ minWidth: '400px' }}
       >

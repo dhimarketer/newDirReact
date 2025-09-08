@@ -260,14 +260,40 @@ export const getOptimalImageDimensions = (svgElement: SVGSVGElement): { width: n
   const svgRect = svgElement.getBoundingClientRect();
   const viewBox = svgElement.viewBox.baseVal;
   
-  // Use viewBox if available, otherwise use bounding rect
-  const contentWidth = viewBox.width || svgRect.width;
-  const contentHeight = viewBox.height || svgRect.height;
+  // Use viewBox if available and valid, otherwise use bounding rect or SVG attributes
+  let contentWidth: number;
+  let contentHeight: number;
+  
+  if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+    // Use viewBox dimensions
+    contentWidth = viewBox.width;
+    contentHeight = viewBox.height;
+  } else {
+    // Fallback to SVG attributes or bounding rect
+    const svgWidth = svgElement.getAttribute('width');
+    const svgHeight = svgElement.getAttribute('height');
+    
+    if (svgWidth && svgHeight) {
+      // Parse SVG width/height attributes
+      contentWidth = parseFloat(svgWidth) || svgRect.width;
+      contentHeight = parseFloat(svgHeight) || svgRect.height;
+    } else {
+      // Use bounding rect as last resort
+      contentWidth = svgRect.width;
+      contentHeight = svgRect.height;
+    }
+  }
   
   // Calculate optimal dimensions with some padding
   const padding = 40;
   const optimalWidth = Math.max(contentWidth + padding, 800);
   const optimalHeight = Math.max(contentHeight + padding, 600);
+  
+  console.log('📐 Image dimension calculation:', {
+    viewBox: viewBox ? { width: viewBox.width, height: viewBox.height } : null,
+    svgRect: { width: svgRect.width, height: svgRect.height },
+    finalDimensions: { width: optimalWidth, height: optimalHeight }
+  });
   
   return {
     width: Math.round(optimalWidth),

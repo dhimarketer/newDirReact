@@ -62,7 +62,7 @@
 .family-tree-controls {
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
   flex-wrap: nowrap;
   justify-content: flex-end;
@@ -70,6 +70,32 @@
   padding: 4px 8px;
   overflow: visible;
   position: relative;
+}
+
+/* Control Groups */
+.controls-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.controls-group.view-controls {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.controls-group.edit-controls {
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.controls-group.action-controls {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.controls-group.window-controls {
+  background: rgba(239, 68, 68, 0.15);
 }
 
 .family-tree-controls button,
@@ -635,6 +661,15 @@
   visibility: visible !important;
   display: block !important;
   z-index: 9999 !important;
+}
+
+/* ========================================
+   DOWNLOAD DROPDOWN Z-INDEX FIX
+   ======================================== */
+
+.download-dropdown-menu {
+  z-index: 99999 !important;
+  position: relative;
 }
 
 /* ========================================

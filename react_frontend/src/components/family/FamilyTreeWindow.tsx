@@ -8,11 +8,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { familyService } from '../../services/familyService';
 import CleanReactFlowFamilyTree from './CleanReactFlowFamilyTree';
+import ClassicFamilyTree from './ClassicFamilyTree';
 import RelationshipManager from './RelationshipManager';
 import FamilyTreeDownloadButton from './FamilyTreeDownloadButton';
 import FamilyTableView from './FamilyTableView';
 import FamilyViewToggle, { ViewMode } from './FamilyViewToggle';
-import FamilyTreeComparison from './FamilyTreeComparison';
 import { PhoneBookEntry } from '../../types/directory';
 
 interface FamilyTreeWindowProps {
@@ -20,7 +20,7 @@ interface FamilyTreeWindowProps {
   onClose: () => void;
   address: string;
   island: string;
-  initialViewMode?: ViewMode; // 2025-01-29: NEW - Allow setting initial view mode
+  initialViewMode?: ViewMode; // 2025-01-05: Updated - Allow setting initial view mode (table or comparison)
 }
 
 // 2025-01-28: FIXED - Use proper types from types directory to resolve TypeScript conflicts
@@ -63,7 +63,7 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   onClose, 
   address, 
   island,
-  initialViewMode = 'tree'
+  initialViewMode = 'svg-tree'
 }) => {
   // const { user } = useAuthStore(); // Currently unused but kept for future use
   
@@ -96,8 +96,6 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   // 2025-01-28: ENHANCED: Added state for editing mode
   const [isEditingMode, setIsEditingMode] = useState(false);
   
-  // 2025-01-29: NEW - State for multi-row layout toggle
-  const [useMultiRowLayout, setUseMultiRowLayout] = useState(false);
   
   // 2025-01-29: NEW - State for tracking unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -724,92 +722,95 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
         >
           <div className="family-tree-title">
             <h2>
-              {viewMode === 'tree' ? 'Family Tree' : viewMode === 'comparison' ? 'Family Tree Comparison' : 'Family Table'} - {address}, {island}
+              {viewMode === 'table' ? 'Family Table' : viewMode === 'svg-tree' ? 'Family Tree (SVG)' : 'Family Tree (ReactFlow)'} - {address}, {island}
             </h2>
             <div className="family-tree-subtitle">
               {hasMultipleFamilies ? (
                 <>
-                  {families.length} families • {families.reduce((total, family) => total + family.members.length, 0)} total members • {viewMode === 'tree' ? 'Combined' : viewMode === 'comparison' ? 'Comparison' : 'Tabular'} view
+                  {families.length} families • {families.reduce((total, family) => total + family.members.length, 0)} total members
                 </>
               ) : (
                 <>
-                  {familyMembers.length} family members • {viewMode === 'tree' ? 'Visual' : viewMode === 'comparison' ? 'Comparison' : 'Tabular'} view
+                  {familyMembers.length} family members
                 </>
               )}
             </div>
           </div>
           
           <div className="family-tree-controls">
-            {/* 2025-01-29: NEW - View mode toggle between tree and table views */}
-            {!isEditingMode && familyMembers.length > 0 && (
-              <FamilyViewToggle
-                currentView={viewMode}
-                onViewChange={handleViewModeChange}
-                className="mr-2"
-              />
+            {/* View Mode Controls Group */}
+            <div className="controls-group view-controls">
+              {/* View mode toggle between tree and table views */}
+              {!isEditingMode && familyMembers.length > 0 && (
+                <FamilyViewToggle
+                  currentView={viewMode}
+                  onViewChange={handleViewModeChange}
+                  className="mr-2"
+                />
+              )}
+            </div>
+            
+            {/* Edit Mode Controls Group */}
+            {isEditingMode && (
+              <div className="controls-group edit-controls">
+                {/* Save Family button when in editing mode with unsaved changes */}
+                {hasUnsavedChanges && (
+                  <button
+                    onClick={handleSaveFamily}
+                    disabled={isSaving}
+                    className="save-family-btn"
+                    title="Save family changes"
+                  >
+                    {isSaving ? '💾 Saving...' : '💾 Save Family'}
+                  </button>
+                )}
+              </div>
             )}
             
-            {/* 2025-01-29: NEW - Save Family button when in editing mode with unsaved changes */}
-            {isEditingMode && hasUnsavedChanges && (
+            {/* Action Controls Group */}
+            <div className="controls-group action-controls">
+              {/* Download Family Tree button */}
+              {familyGroupExists && familyMembers.length > 0 && (
+                <FamilyTreeDownloadButton
+                  svgRef={svgRef as React.RefObject<SVGSVGElement>}
+                  familyName={`${address}_${island}`}
+                  variant="outline"
+                  size="sm"
+                  currentViewMode={viewMode}
+                />
+              )}
+              
+              {/* Edit Family Tree button */}
               <button
-                onClick={handleSaveFamily}
-                disabled={isSaving}
-                className="save-family-btn"
-                title="Save family changes"
+                onClick={toggleEditingMode}
+                className={`edit-family-btn ${isEditingMode ? 'active' : ''}`}
+                title={isEditingMode ? 'Exit Edit Mode' : 'Edit Family Tree'}
               >
-                {isSaving ? '💾 Saving...' : '💾 Save Family'}
+                {isEditingMode ? '✏️ Exit Edit' : '✏️ Edit Tree'}
               </button>
-            )}
+              
+              {/* Delete Family button */}
+              {familyGroupExists && familyGroupData?.id && (
+                <button
+                  onClick={handleDeleteFamily}
+                  className="delete-family-btn"
+                  title="Delete saved family relationships (keeps individual members)"
+                >
+                  🗑️ Delete Family
+                </button>
+              )}
+            </div>
             
-            {/* 2025-01-29: NEW - Added Delete Family button to clear saved relationships */}
-            {familyGroupExists && familyGroupData?.id && (
+            {/* Window Controls Group */}
+            <div className="controls-group window-controls">
               <button
-                onClick={handleDeleteFamily}
-                className="delete-family-btn"
-                title="Delete saved family relationships (keeps individual members)"
+                onClick={onClose}
+                className="close-btn"
+                title="Close window"
               >
-                🗑️ Delete Family
+                ✕
               </button>
-            )}
-            
-            {/* 2025-01-29: NEW - Multi-row layout toggle button - Always visible for better UX */}
-            <button
-              onClick={() => setUseMultiRowLayout(!useMultiRowLayout)}
-              className={`multi-row-toggle-btn ${useMultiRowLayout ? 'active' : ''}`}
-              title={useMultiRowLayout ? 'Switch to single-row layout' : 'Switch to multi-row layout (prevents horizontal clipping)'}
-              style={{ display: 'flex', visibility: 'visible', opacity: 1 }}
-            >
-              {useMultiRowLayout ? '📐 Single Row' : '📐 Multi Row'}
-            </button>
-            
-
-            
-            {/* 2025-01-29: NEW - Added Download Family Tree button */}
-            {familyGroupExists && familyMembers.length > 0 && (
-              <FamilyTreeDownloadButton
-                svgRef={svgRef as React.RefObject<SVGSVGElement>}
-                familyName={`${address}_${island}`}
-                variant="outline"
-                size="sm"
-              />
-            )}
-            
-            {/* 2025-01-28: ENHANCED: Added Edit Family Tree button */}
-            <button
-              onClick={toggleEditingMode}
-              className={`edit-family-btn ${isEditingMode ? 'active' : ''}`}
-              title={isEditingMode ? 'Exit Edit Mode' : 'Edit Family Tree'}
-            >
-              {isEditingMode ? '✏️ Exit Edit' : '✏️ Edit Tree'}
-            </button>
-            
-            <button
-              onClick={onClose}
-              className="close-btn"
-              title="Close window"
-            >
-              ✕
-            </button>
+            </div>
           </div>
         </div>
 
@@ -906,18 +907,36 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                 />
               ) : (
                 /* Show family tree visualization */
-                viewMode === 'tree' ? (
+                viewMode === 'table' ? (
+                  <FamilyTableView
+                    familyMembers={familyMembers}
+                    address={address}
+                    island={island}
+                  />
+                ) : viewMode === 'svg-tree' ? (
                   (() => {
-                    // 2025-01-05: UPDATED - Use CleanReactFlowFamilyTree with Dagre automatic layout
-                    console.log('🔍 FamilyTreeWindow: Rendering CleanReactFlowFamilyTree with combined data:', {
+                    console.log('🔍 FamilyTreeWindow: Rendering ClassicFamilyTree (SVG) with:', {
                       viewMode,
-                      hasMultipleFamilies,
-                      familiesCount: families.length,
                       familyMembersCount: familyMembers.length,
                       relationshipsCount: familyRelationships.length,
-                      relationships: familyRelationships
+                      hasMultipleFamilies
                     });
-                    
+                    return (
+                      <ClassicFamilyTree
+                        familyMembers={familyMembers}
+                        relationships={familyRelationships}
+                        svgRef={svgRef as React.RefObject<SVGSVGElement>}
+                      />
+                    );
+                  })()
+                ) : (
+                  (() => {
+                    console.log('🔍 FamilyTreeWindow: Rendering CleanReactFlowFamilyTree with:', {
+                      viewMode,
+                      familyMembersCount: familyMembers.length,
+                      relationshipsCount: familyRelationships.length,
+                      hasMultipleFamilies
+                    });
                     return (
                       <CleanReactFlowFamilyTree
                         familyMembers={familyMembers}
@@ -926,36 +945,6 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                       />
                     );
                   })()
-                ) : viewMode === 'comparison' ? (
-                  (() => {
-                    console.log('🔍 FamilyTreeWindow: Rendering FamilyTreeComparison with:', {
-                      viewMode,
-                      familyMembersCount: familyMembers.length,
-                      relationshipsCount: familyRelationships.length,
-                      hasMultipleFamilies
-                    });
-                    return (
-                      <FamilyTreeComparison
-                        familyMembers={familyMembers}
-                        relationships={familyRelationships}
-                        onRelationshipChange={(relationship) => {
-                          // Handle single relationship change by updating the relationships array
-                          const updatedRelationships = familyRelationships.map(rel => 
-                            rel.id === relationship.id ? relationship : rel
-                          );
-                          handleRelationshipChange(updatedRelationships);
-                        }}
-                        hasMultipleFamilies={hasMultipleFamilies}
-                        svgRef={svgRef as React.RefObject<SVGSVGElement>}
-                      />
-                    );
-                  })()
-                ) : (
-                  <FamilyTableView
-                    familyMembers={familyMembers}
-                    address={address}
-                    island={island}
-                  />
                 )
               )}
             </>

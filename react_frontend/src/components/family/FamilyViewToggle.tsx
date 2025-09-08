@@ -3,7 +3,7 @@
 
 import React from 'react';
 
-export type ViewMode = 'tree' | 'table' | 'comparison';
+export type ViewMode = 'table' | 'svg-tree' | 'clean-reactflow';
 
 interface FamilyViewToggleProps {
   currentView: ViewMode;
@@ -18,22 +18,6 @@ const FamilyViewToggle: React.FC<FamilyViewToggleProps> = ({
 }) => {
   return (
     <div className={`flex items-center space-x-2 ${className}`}>
-      <span className="text-sm font-medium text-gray-700">View:</span>
-      
-      {/* Tree View Button */}
-      <button
-        onClick={() => onViewChange('tree')}
-        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center space-x-2 ${
-          currentView === 'tree'
-            ? 'bg-blue-100 text-blue-700 border-2 border-blue-300 shadow-sm'
-            : 'bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200 hover:text-gray-700'
-        }`}
-        title="Show family tree visualization"
-      >
-        <span className="text-base">🌳</span>
-        <span>Tree View</span>
-      </button>
-
       {/* Table View Button */}
       <button
         onClick={() => onViewChange('table')}
@@ -45,27 +29,36 @@ const FamilyViewToggle: React.FC<FamilyViewToggleProps> = ({
         title="Show family data in table format"
       >
         <span className="text-base">📋</span>
-        <span>Table View</span>
+        <span>Table</span>
       </button>
 
-      {/* Comparison View Button */}
+      {/* SVG Tree Button */}
       <button
-        onClick={() => onViewChange('comparison')}
+        onClick={() => onViewChange('svg-tree')}
         className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center space-x-2 ${
-          currentView === 'comparison'
+          currentView === 'svg-tree'
+            ? 'bg-blue-100 text-blue-700 border-2 border-blue-300 shadow-sm'
+            : 'bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200 hover:text-gray-700'
+        }`}
+        title="Show SVG-based family tree with drag-and-drop"
+      >
+        <span className="text-base">🌳</span>
+        <span>SVG Tree</span>
+      </button>
+
+      {/* Clean ReactFlow Button */}
+      <button
+        onClick={() => onViewChange('clean-reactflow')}
+        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center space-x-2 ${
+          currentView === 'clean-reactflow'
             ? 'bg-purple-100 text-purple-700 border-2 border-purple-300 shadow-sm'
             : 'bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200 hover:text-gray-700'
         }`}
-        title="Compare SVG vs ReactFlow implementations"
+        title="Show ReactFlow-based family tree with organizational chart layout"
       >
-        <span className="text-base">⚖️</span>
-        <span>Compare</span>
+        <span className="text-base">⚛️</span>
+        <span>ReactFlow</span>
       </button>
-
-      {/* View Mode Indicator */}
-      <div className="ml-2 text-xs text-gray-500">
-        {currentView === 'tree' ? 'Visual' : currentView === 'table' ? 'Tabular' : 'Comparison'} format
-      </div>
     </div>
   );
 };
