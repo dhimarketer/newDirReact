@@ -47,7 +47,8 @@ export const useFamilyGraphLayout = ({ familyMembers, relationships }: FamilyGra
       rankdir: 'TB',        // Top-to-bottom layout
       nodesep: 80,          // Node separation
       ranksep: 120,         // Rank separation  
-      align: 'UL'           // Upper-left alignment
+      align: 'UL',          // Upper-left alignment
+      ranker: 'longest-path' // Use longest-path ranker for better family tree layout
     });
     g.setDefaultEdgeLabel(() => ({}));
 
@@ -55,70 +56,75 @@ export const useFamilyGraphLayout = ({ familyMembers, relationships }: FamilyGra
     const FAMILY_NODE_WIDTH = 200;
     const FAMILY_NODE_HEIGHT = 80;
 
-    // 2025-01-02: SIMPLIFIED - Create clean organizational chart structure
-    // Add parent nodes to Dagre graph (top level)
-    parents.forEach(parent => {
-      const nodeId = (parent.entry?.pid || parent.id).toString();
-      g.setNode(nodeId, { 
-        width: FAMILY_NODE_WIDTH, 
-        height: FAMILY_NODE_HEIGHT 
-      });
-    });
-
-    // Add child nodes to Dagre graph (bottom level)
-    children.forEach(child => {
-      const nodeId = (child.entry?.pid || child.id).toString();
-      g.setNode(nodeId, { 
-        width: FAMILY_NODE_WIDTH, 
-        height: FAMILY_NODE_HEIGHT 
-      });
-    });
-
-    // Create clean organizational chart edges
-    if (parents.length > 0 && children.length > 0) {
-      if (parents.length === 2) {
-        // TWO PARENTS: Create horizontal spouse line + vertical lines to children
-        const parent1Id = (parents[0].entry?.pid || parents[0].id).toString();
-        const parent2Id = (parents[1].entry?.pid || parents[1].id).toString();
-        
-        // Horizontal spouse connection between parents
-        g.setEdge(parent1Id, parent2Id);
-        
-        // Each parent connects to each child (simple direct connections)
-        children.forEach(child => {
-          const childId = (child.entry?.pid || child.id).toString();
-          g.setEdge(parent1Id, childId);
-          g.setEdge(parent2Id, childId);
-        });
-      } else {
-        // SINGLE PARENT OR MORE: Direct parent-child connections
-        parents.forEach(parent => {
-          const parentId = (parent.entry?.pid || parent.id).toString();
-          children.forEach(child => {
-            const childId = (child.entry?.pid || child.id).toString();
-            g.setEdge(parentId, childId);
-          });
-        });
-      }
+    // 2024-12-20: FIXED - Use manual positioning only, no Dagre for family tree layout
+    // Define union node IDs for manual edge creation
+    let centerUnionId = '';
+    let distributionUnionId = '';
+    
+    if (parents.length === 2 && children.length > 0) {
+      const parent1Id = (parents[0].entry?.pid || parents[0].id).toString();
+      const parent2Id = (parents[1].entry?.pid || parents[1].id).toString();
+      centerUnionId = `center-union-${parent1Id}-${parent2Id}`;
+      distributionUnionId = `dist-union-${parent1Id}-${parent2Id}`;
+    }
+    
+    // 2024-12-20: FIXED - Create spouse center node for proper T-junction connection
+    let spouseCenterNodeId = '';
+    if (parents.length === 2) {
+      const parent1Id = (parents[0].entry?.pid || parents[0].id).toString();
+      const parent2Id = (parents[1].entry?.pid || parents[1].id).toString();
+      spouseCenterNodeId = `spouse-center-${parent1Id}-${parent2Id}`;
     }
 
-    // Calculate layout
-    dagre.layout(g);
+    // No Dagre layout needed - all positioning is manual
 
     // Convert Dagre nodes to React Flow nodes
     const nodes: Node[] = [];
     
-    // Add parent nodes
-    parents.forEach(parent => {
+    // 2024-12-20: FIXED - Manually position parents side-by-side (like SVG layout)
+    const parentY = 50; // Fixed Y position for parents (top level)
+    const containerWidth = 800; // Assume reasonable container width
+    const parentSpacing = 250; // Horizontal spacing between parents
+    
+    if (parents.length === 1) {
+      // Single parent - center horizontally
+      const parent = parents[0];
       const nodeId = (parent.entry?.pid || parent.id).toString();
-      const nodeData = g.node(nodeId);
-      if (nodeData) {
+      nodes.push({
+        id: nodeId,
+        type: 'familyNode',
+        position: { 
+          x: (containerWidth - FAMILY_NODE_WIDTH) / 2, 
+          y: parentY 
+        },
+        data: { 
+          member: parent,
+          name: parent.entry?.name || `User ${parent.user}`,
+          age: parent.entry?.age,
+          gender: parent.entry?.gender,
+          role: 'parent'
+        },
+        style: {
+          width: FAMILY_NODE_WIDTH,
+          height: FAMILY_NODE_HEIGHT,
+          backgroundColor: '#fef3c7',
+          border: '2px solid #8B4513',
+          borderRadius: '8px',
+        },
+      });
+    } else if (parents.length === 2) {
+      // Two parents - position side-by-side horizontally
+      const totalWidth = FAMILY_NODE_WIDTH + parentSpacing;
+      const startX = (containerWidth - totalWidth) / 2;
+      
+      parents.forEach((parent, index) => {
+        const nodeId = (parent.entry?.pid || parent.id).toString();
         nodes.push({
           id: nodeId,
           type: 'familyNode',
           position: { 
-            x: nodeData.x - FAMILY_NODE_WIDTH / 2, 
-            y: nodeData.y - FAMILY_NODE_HEIGHT / 2 
+            x: startX + index * (FAMILY_NODE_WIDTH + parentSpacing), 
+            y: parentY 
           },
           data: { 
             member: parent,
@@ -130,25 +136,57 @@ export const useFamilyGraphLayout = ({ familyMembers, relationships }: FamilyGra
           style: {
             width: FAMILY_NODE_WIDTH,
             height: FAMILY_NODE_HEIGHT,
-            backgroundColor: '#fef3c7', // Light yellow for parents
+            backgroundColor: '#fef3c7',
             border: '2px solid #8B4513',
             borderRadius: '8px',
           },
         });
-      }
-    });
+      });
+    }
 
-    // Add child nodes  
-    children.forEach(child => {
+    // 2024-12-20: FIXED - Manually position children horizontally (like SVG) for proper T-junction
+    const childY = parentY + FAMILY_NODE_HEIGHT + 160; // Position children below union nodes
+    const childSpacing = 220; // Horizontal spacing between children
+    
+    if (children.length === 1) {
+      // Single child - center horizontally
+      const child = children[0];
       const nodeId = (child.entry?.pid || child.id).toString();
-      const nodeData = g.node(nodeId);
-      if (nodeData) {
+      nodes.push({
+        id: nodeId,
+        type: 'familyNode',
+        position: { 
+          x: (containerWidth - FAMILY_NODE_WIDTH) / 2, 
+          y: childY 
+        },
+        data: { 
+          member: child,
+          name: child.entry?.name || `User ${child.user}`,
+          age: child.entry?.age,
+          gender: child.entry?.gender,
+          role: 'child'
+        },
+        style: {
+          width: FAMILY_NODE_WIDTH,
+          height: FAMILY_NODE_HEIGHT,
+          backgroundColor: '#dbeafe',
+          border: '2px solid #8B4513',
+          borderRadius: '8px',
+        },
+      });
+    } else if (children.length > 1) {
+      // Multiple children - position horizontally in a line
+      const totalChildWidth = (children.length - 1) * childSpacing + FAMILY_NODE_WIDTH;
+      const childStartX = (containerWidth - totalChildWidth) / 2;
+      
+      children.forEach((child, index) => {
+        const nodeId = (child.entry?.pid || child.id).toString();
         nodes.push({
           id: nodeId,
           type: 'familyNode',
           position: { 
-            x: nodeData.x - FAMILY_NODE_WIDTH / 2, 
-            y: nodeData.y - FAMILY_NODE_HEIGHT / 2 
+            x: childStartX + index * childSpacing, 
+            y: childY 
           },
           data: { 
             member: child,
@@ -160,61 +198,181 @@ export const useFamilyGraphLayout = ({ familyMembers, relationships }: FamilyGra
           style: {
             width: FAMILY_NODE_WIDTH,
             height: FAMILY_NODE_HEIGHT,
-            backgroundColor: '#dbeafe', // Light blue for children
+            backgroundColor: '#dbeafe',
             border: '2px solid #8B4513',
             borderRadius: '8px',
           },
         });
+      });
+    }
+
+    // 2024-12-20: FIXED - Add spouse center node and union nodes for proper T-junction structure
+    if (parents.length === 2) {
+      const totalWidth = FAMILY_NODE_WIDTH + parentSpacing;
+      const startX = (containerWidth - totalWidth) / 2;
+      const centerX = startX + FAMILY_NODE_WIDTH / 2 + parentSpacing / 2; // Center between the two parents
+      
+      const spouseCenterY = parentY + FAMILY_NODE_HEIGHT / 2; // Middle of spouse line (same Y as parents)
+      const centerUnionY = parentY + FAMILY_NODE_HEIGHT + 40; // Below parents
+      const distributionUnionY = centerUnionY + 40; // Below center union
+      
+      // Add spouse center node (invisible node at center of spouse line)
+      nodes.push({
+        id: spouseCenterNodeId,
+        type: 'unionNode',
+        position: { 
+          x: centerX - 0.5, 
+          y: spouseCenterY - 0.5 
+        },
+        data: { 
+          label: null 
+        },
+        style: {
+          width: 1,
+          height: 1,
+          backgroundColor: 'transparent',
+          border: 'none',
+          opacity: 0,
+          pointerEvents: 'none'
+        },
+      });
+      
+      if (children.length > 0) {
+        // Add center union node (vertical drop from spouse line center)
+        nodes.push({
+          id: centerUnionId,
+          type: 'unionNode',
+          position: { 
+            x: centerX - 0.5, 
+            y: centerUnionY - 0.5 
+          },
+          data: { 
+            label: null 
+          },
+          style: {
+            width: 1,
+            height: 1,
+            backgroundColor: 'transparent',
+            border: 'none',
+            opacity: 0,
+            pointerEvents: 'none'
+          },
+        });
+        
+        // Add distribution union node (horizontal distribution to children)
+        nodes.push({
+          id: distributionUnionId,
+          type: 'unionNode',
+          position: { 
+            x: centerX - 0.5, 
+            y: distributionUnionY - 0.5 
+          },
+          data: { 
+            label: null 
+          },
+          style: {
+            width: 1,
+            height: 1,
+            backgroundColor: 'transparent',
+            border: 'none',
+            opacity: 0,
+            pointerEvents: 'none'
+          },
+        });
       }
-    });
+    }
 
     // Convert Dagre edges to React Flow edges
     const edges: Edge[] = [];
     
-    console.log(`🔗 Converting ${g.edges().length} Dagre edges to React Flow:`, g.edges().map(e => `${e.v} → ${e.w}`));
-    
-    g.edges().forEach(edge => {
-      // Determine edge type based on source and target
-      const sourceIsParent = parents.some(p => (p.entry?.pid || p.id).toString() === edge.v);
-      const targetIsParent = parents.some(p => (p.entry?.pid || p.id).toString() === edge.w);
-      const sourceIsChild = children.some(c => (c.entry?.pid || c.id).toString() === edge.v);
-      const targetIsChild = children.some(c => (c.entry?.pid || c.id).toString() === edge.w);
+    // 2024-12-20: FIXED - Add manual edges for spouse connection and parent-to-union
+    if (parents.length === 2) {
+      const parent1Id = (parents[0].entry?.pid || parents[0].id).toString();
+      const parent2Id = (parents[1].entry?.pid || parents[1].id).toString();
       
-      // Determine if this is a spouse edge (parent to parent) or parent-child edge
-      const isSpouseEdge = sourceIsParent && targetIsParent;
-      const isParentChildEdge = (sourceIsParent && targetIsChild) || (sourceIsChild && targetIsParent);
-
-      // Set proper handles and styling
-      let sourceHandle = 'bottom';
-      let targetHandle = 'top';
-      let edgeStyle = { stroke: '#8B4513', strokeWidth: 3 };
-      let edgeType = 'straight';
-      
-      if (isSpouseEdge) {
-        // Horizontal spouse connection
-        sourceHandle = 'right';
-        targetHandle = 'left';
-        edgeStyle = { stroke: '#ec4899', strokeWidth: 4, strokeDasharray: '8,4' };
-        edgeType = 'smoothstep';
-      }
-
+      // 1. Horizontal spouse line between parents
       edges.push({
-        id: `${edge.v}-${edge.w}`,
-        source: edge.v,
-        target: edge.w,
-        sourceHandle: sourceHandle,
-        targetHandle: targetHandle,
-        type: edgeType,
-        style: edgeStyle,
-        markerEnd: isParentChildEdge ? {
-          type: MarkerType.ArrowClosed,
-          color: '#8B4513',
-          width: 10,
-          height: 7,
-        } : undefined,
+        id: `spouse-${parent1Id}-${parent2Id}`,
+        source: parent1Id,
+        target: parent2Id,
+        sourceHandle: 'right',
+        targetHandle: 'left',
+        type: 'straight',
+        style: { stroke: '#ec4899', strokeWidth: 4, strokeDasharray: '8,4' },
         animated: false,
       });
-    });
+      
+      // 2. Vertical line from spouse center to center union (if children exist)
+      if (children.length > 0) {
+        edges.push({
+          id: `spouse-center-to-center-union`,
+          source: spouseCenterNodeId,
+          target: centerUnionId,
+          sourceHandle: 'bottom',
+          targetHandle: 'top',
+          type: 'straight',
+          style: { stroke: '#8B4513', strokeWidth: 3 },
+          animated: false,
+        });
+        
+        // 3. Vertical line from center union to distribution union
+        edges.push({
+          id: `center-to-distribution-union`,
+          source: centerUnionId,
+          target: distributionUnionId,
+          sourceHandle: 'bottom',
+          targetHandle: 'top',
+          type: 'straight',
+          style: { stroke: '#8B4513', strokeWidth: 3 },
+          animated: false,
+        });
+        
+        // 4. Vertical lines from distribution union to each child
+        children.forEach((child, index) => {
+          const childId = (child.entry?.pid || child.id).toString();
+          edges.push({
+            id: `distribution-to-child-${childId}`,
+            source: distributionUnionId,
+            target: childId,
+            sourceHandle: 'bottom',
+            targetHandle: 'top',
+            type: 'straight',
+            style: { stroke: '#8B4513', strokeWidth: 3 },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#8B4513',
+              width: 10,
+              height: 7,
+            },
+            animated: false,
+          });
+        });
+      }
+    } else if (parents.length === 1 && children.length > 0) {
+      // Single parent case - direct vertical connections to children
+      const parentId = (parents[0].entry?.pid || parents[0].id).toString();
+      children.forEach((child, index) => {
+        const childId = (child.entry?.pid || child.id).toString();
+        edges.push({
+          id: `parent-to-child-${childId}`,
+          source: parentId,
+          target: childId,
+          sourceHandle: 'bottom',
+          targetHandle: 'top',
+          type: 'straight',
+          style: { stroke: '#8B4513', strokeWidth: 3 },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: '#8B4513',
+            width: 10,
+            height: 7,
+          },
+          animated: false,
+        });
+      });
+    }
+    
+    console.log(`🔗 Created ${edges.length} manual edges for T-junction family tree structure`);
 
     return { nodes, edges };
   }, [parents, children, familyMembers, relationships]);
