@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useEffect } from 'react';
-import { ReactFlow, Node, Edge, MarkerType, ReactFlowProvider, useNodesState, useEdgesState, Controls, Background, Handle, Position } from '@xyflow/react';
+import { ReactFlow, Node, Edge, MarkerType, ReactFlowProvider, useNodesState, useEdgesState, Controls, Background, Handle, Position, BaseEdge, EdgeLabelRenderer, getBezierPath, getStraightPath } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useFamilyGraphLayout } from './hooks/useFamilyGraphLayout';
 import { FamilyMember as OfficialFamilyMember, FamilyRelationship as OfficialFamilyRelationship } from '../../types/family';
@@ -30,7 +30,7 @@ interface FamilyRelationship {
 // Custom node component with handles
 const FamilyNode = ({ data, isConnectable }: { data: any; isConnectable: boolean }) => {
   return (
-    <div className="clean-family-node" style={{ position: 'relative', width: '200px', height: '80px', border: '2px solid #333' }}>
+    <div className="clean-family-node" style={{ position: 'relative', width: '200px', height: '80px', border: '2px solid #333', backgroundColor: 'transparent' }}>
       {/* Right handle for spouse connections */}
       <Handle
         type="source"
@@ -100,27 +100,45 @@ const FamilyNode = ({ data, isConnectable }: { data: any; isConnectable: boolean
   );
 };
 
-// Custom union node component
+// Custom union node component for junction points - acts as T-junction on spouse line
 const UnionNode = ({ data, isConnectable }: { data: any; isConnectable: boolean }) => {
   return (
-    <div className="clean-family-union-node" style={{ position: 'relative', width: '20px', height: '20px', border: '2px solid #333' }}>
-      {/* Top handle for parent connections */}
+    <div className="clean-family-union-node" style={{ position: 'relative', width: '10px', height: '10px', backgroundColor: 'transparent' }}>
+      {/* Left handle - receives spouse line from left parent */}
       <Handle
         type="target"
-        position={Position.Top}
-        id="top"
+        position={Position.Left}
+        id="left"
         isConnectable={isConnectable}
         style={{ 
-          background: '#8B4513', 
-          width: '8px', 
-          height: '8px',
-          border: '2px solid #fff',
-          top: '-4px',
-          left: '50%',
-          transform: 'translateX(-50%)'
+          background: '#ec4899', 
+          width: '4px', 
+          height: '4px',
+          border: 'none',
+          left: '-2px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          opacity: 0
         }}
       />
-      {/* Bottom handle for child connections */}
+      {/* Right handle - sends spouse line to right parent */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right"
+        isConnectable={isConnectable}
+        style={{ 
+          background: '#ec4899', 
+          width: '4px', 
+          height: '4px',
+          border: 'none',
+          right: '-2px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          opacity: 0
+        }}
+      />
+      {/* Bottom handle - sends lines to children */}
       <Handle
         type="source"
         position={Position.Bottom}
@@ -128,16 +146,109 @@ const UnionNode = ({ data, isConnectable }: { data: any; isConnectable: boolean 
         isConnectable={isConnectable}
         style={{ 
           background: '#8B4513', 
-          width: '8px', 
-          height: '8px',
-          border: '2px solid #fff',
-          bottom: '-4px',
+          width: '4px', 
+          height: '4px',
+          border: 'none',
+          bottom: '-2px',
           left: '50%',
-          transform: 'translateX(-50%)'
+          transform: 'translateX(-50%)',
+          opacity: 0
         }}
       />
-      {data.label}
+      {/* Optional: Small visible dot to show junction point during development */}
+      <div style={{
+        width: '2px',
+        height: '2px',
+        backgroundColor: '#8B4513',
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        opacity: 0.3
+      }} />
     </div>
+  );
+};
+
+// Custom org chart edge that draws complete parent-to-child connection pattern
+const OrgChartEdge = ({ id, sourceX, sourceY, targetX, targetY, style = {}, markerEnd, data }: any) => {
+  // For true org chart layout, we need to draw:
+  // 1. Vertical line down from junction (spouse line center)
+  // 2. Horizontal line to all children positions
+  // 3. Vertical lines down to each child
+  
+  const childrenPositions = data?.childrenPositions || [];
+  const junctionY = sourceY + 60; // Vertical drop distance
+  
+  if (childrenPositions.length === 0) {
+    // Fallback: simple line to target
+    const path = `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
+    return <BaseEdge path={path} style={style} markerEnd={markerEnd} />;
+  }
+  
+  // Build the complete org chart path
+  let path = `M ${sourceX},${sourceY}`; // Start at junction
+  
+  // 1. Vertical drop from junction
+  path += ` L ${sourceX},${junctionY}`;
+  
+  // 2. Horizontal line to leftmost child
+  const leftmostX = Math.min(...childrenPositions.map((c: any) => c.x));
+  const rightmostX = Math.max(...childrenPositions.map((c: any) => c.x));
+  
+  path += ` L ${leftmostX},${junctionY}`;
+  path += ` L ${rightmostX},${junctionY}`;
+  
+  // 3. Vertical lines to each child
+  childrenPositions.forEach((child: any) => {
+    path += ` M ${child.x},${junctionY} L ${child.x},${child.y}`;
+  });
+  
+  return (
+    <>
+      <BaseEdge path={path} style={style} />
+      {/* Add arrows to each child */}
+      {childrenPositions.map((child: any, index: number) => (
+        <BaseEdge 
+          key={`arrow-${index}`}
+          path={`M ${child.x},${child.y - 10} L ${child.x},${child.y}`} 
+          style={style} 
+          markerEnd={markerEnd} 
+        />
+      ))}
+    </>
+  );
+};
+
+// Custom T-junction edge for parent-to-child connections in org chart style
+const TJunctionEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, markerEnd, data }: any) => {
+  // For org chart T-junction: 
+  // 1. Start from source (parent) bottom
+  // 2. Go down to a junction point
+  // 3. Move horizontally to align with target (child)
+  // 4. Go down to target top
+  
+  const isOrgChart = data?.isOrgChart;
+  const centerX = data?.centerX;
+  
+  let path;
+  
+  if (isOrgChart && centerX) {
+    // Create proper T-junction path through the center point
+    const junctionY = sourceY + 40; // Distance below the source
+    
+    // Path: source -> down -> center -> horizontal to target column -> down to target
+    path = `M ${sourceX},${sourceY} L ${sourceX},${junctionY} L ${centerX},${junctionY} L ${targetX},${junctionY} L ${targetX},${targetY}`;
+  } else {
+    // Default T-junction behavior
+    const midY = sourceY + Math.abs(targetY - sourceY) / 2;
+    path = `M ${sourceX},${sourceY} L ${sourceX},${midY} L ${targetX},${midY} L ${targetX},${targetY}`;
+  }
+  
+  return (
+    <>
+      <BaseEdge path={path} style={style} markerEnd={markerEnd} />
+    </>
   );
 };
 
@@ -213,9 +324,34 @@ const CleanReactFlowFamilyTree: React.FC<CleanReactFlowFamilyTreeProps> = ({
           data: {
             ...node.data,
             label: (
-              <div className={`clean-family-node--${(node.data as any).member?.role_in_family?.includes('parent') ? 'parent' : 'child'}`}>
-                <div className="clean-family-node__name">{(node.data as any).name}</div>
-                <div className="clean-family-node__age">
+              <div className={`clean-family-node--${(node.data as any).member?.role_in_family?.includes('parent') ? 'parent' : 'child'}`} style={{
+                width: '190px',
+                height: '70px',
+                backgroundColor: (node.data as any).member?.role_in_family?.includes('parent') ? '#fef3c7' : '#dbeafe',
+                border: '1px solid #8B4513',
+                borderRadius: '4px',
+                padding: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                margin: '4px',
+                boxSizing: 'border-box'
+              }}>
+                <div className="clean-family-node__name" style={{
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: '#333',
+                  textAlign: 'center',
+                  marginBottom: '4px',
+                  lineHeight: '1.2'
+                }}>{(node.data as any).name}</div>
+                <div className="clean-family-node__age" style={{
+                  fontSize: '12px',
+                  color: '#666',
+                  textAlign: 'center',
+                  lineHeight: '1.1'
+                }}>
                   {(node.data as any).age ? `${(node.data as any).age} years` : 'Age unknown'}
                 </div>
               </div>
@@ -300,6 +436,10 @@ const CleanReactFlowFamilyTree: React.FC<CleanReactFlowFamilyTreeProps> = ({
         nodeTypes={{
           familyNode: FamilyNode,
           unionNode: UnionNode
+        }}
+        edgeTypes={{
+          tjunction: TJunctionEdge,
+          orgchart: OrgChartEdge
         }}
         fitView
         nodesConnectable={false}

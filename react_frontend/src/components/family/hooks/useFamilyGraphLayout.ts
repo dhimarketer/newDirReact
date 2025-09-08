@@ -56,24 +56,14 @@ export const useFamilyGraphLayout = ({ familyMembers, relationships }: FamilyGra
     const FAMILY_NODE_WIDTH = 200;
     const FAMILY_NODE_HEIGHT = 80;
 
-    // 2024-12-20: FIXED - Use manual positioning only, no Dagre for family tree layout
-    // Define union node IDs for manual edge creation
-    let centerUnionId = '';
-    let distributionUnionId = '';
+    // 2025-01-02: FIXED - Simplified union node structure for classic org chart layout
+    // Single union node for T-junction from spouse line to children
+    let unionNodeId = '';
     
     if (parents.length === 2 && children.length > 0) {
       const parent1Id = (parents[0].entry?.pid || parents[0].id).toString();
       const parent2Id = (parents[1].entry?.pid || parents[1].id).toString();
-      centerUnionId = `center-union-${parent1Id}-${parent2Id}`;
-      distributionUnionId = `dist-union-${parent1Id}-${parent2Id}`;
-    }
-    
-    // 2024-12-20: FIXED - Create spouse center node for proper T-junction connection
-    let spouseCenterNodeId = '';
-    if (parents.length === 2) {
-      const parent1Id = (parents[0].entry?.pid || parents[0].id).toString();
-      const parent2Id = (parents[1].entry?.pid || parents[1].id).toString();
-      spouseCenterNodeId = `spouse-center-${parent1Id}-${parent2Id}`;
+      unionNodeId = `union-${parent1Id}-${parent2Id}`;
     }
 
     // No Dagre layout needed - all positioning is manual
@@ -107,7 +97,7 @@ export const useFamilyGraphLayout = ({ familyMembers, relationships }: FamilyGra
         style: {
           width: FAMILY_NODE_WIDTH,
           height: FAMILY_NODE_HEIGHT,
-          backgroundColor: '#fef3c7',
+          backgroundColor: 'transparent',
           border: '2px solid #8B4513',
           borderRadius: '8px',
         },
@@ -169,7 +159,7 @@ export const useFamilyGraphLayout = ({ familyMembers, relationships }: FamilyGra
         style: {
           width: FAMILY_NODE_WIDTH,
           height: FAMILY_NODE_HEIGHT,
-          backgroundColor: '#dbeafe',
+          backgroundColor: 'transparent',
           border: '2px solid #8B4513',
           borderRadius: '8px',
         },
@@ -198,7 +188,7 @@ export const useFamilyGraphLayout = ({ familyMembers, relationships }: FamilyGra
           style: {
             width: FAMILY_NODE_WIDTH,
             height: FAMILY_NODE_HEIGHT,
-            backgroundColor: '#dbeafe',
+            backgroundColor: 'transparent',
             border: '2px solid #8B4513',
             borderRadius: '8px',
           },
@@ -206,30 +196,33 @@ export const useFamilyGraphLayout = ({ familyMembers, relationships }: FamilyGra
       });
     }
 
-    // 2024-12-20: FIXED - Add spouse center node and union nodes for proper T-junction structure
-    if (parents.length === 2) {
+    // 2025-01-02: FIXED - Add junction node + distribution system for right-angled org chart layout
+    if (parents.length === 2 && children.length > 0) {
       const totalWidth = FAMILY_NODE_WIDTH + parentSpacing;
       const startX = (containerWidth - totalWidth) / 2;
       const centerX = startX + FAMILY_NODE_WIDTH / 2 + parentSpacing / 2; // Center between the two parents
       
-      const spouseCenterY = parentY + FAMILY_NODE_HEIGHT / 2; // Middle of spouse line (same Y as parents)
-      const centerUnionY = parentY + FAMILY_NODE_HEIGHT + 40; // Below parents
-      const distributionUnionY = centerUnionY + 40; // Below center union
+      // Add invisible junction node at exact midpoint between the two parent nodes
+      const junctionNodeId = `junction-${(parents[0].entry?.pid || parents[0].id)}-${(parents[1].entry?.pid || parents[1].id)}`;
       
-      // Add spouse center node (invisible node at center of spouse line)
+      // Calculate exact midpoint between parent connection handles for equal line segments
+      const parent1RightHandleX = startX + FAMILY_NODE_WIDTH; // Left parent's right handle
+      const parent2LeftHandleX = startX + FAMILY_NODE_WIDTH + parentSpacing; // Right parent's left handle
+      const exactMidpointX = (parent1RightHandleX + parent2LeftHandleX) / 2; // Exact midpoint between handles
+      
       nodes.push({
-        id: spouseCenterNodeId,
+        id: junctionNodeId,
         type: 'unionNode',
         position: { 
-          x: centerX - 0.5, 
-          y: spouseCenterY - 0.5 
+          x: exactMidpointX - 5, // Exact midpoint for equal line segments
+          y: parentY + FAMILY_NODE_HEIGHT / 2 - 5 // Same level as parent right/left handles
         },
         data: { 
           label: null 
         },
         style: {
-          width: 1,
-          height: 1,
+          width: 10,
+          height: 10,
           backgroundColor: 'transparent',
           border: 'none',
           opacity: 0,
@@ -237,63 +230,35 @@ export const useFamilyGraphLayout = ({ familyMembers, relationships }: FamilyGra
         },
       });
       
-      if (children.length > 0) {
-        // Add center union node (vertical drop from spouse line center)
-        nodes.push({
-          id: centerUnionId,
-          type: 'unionNode',
-          position: { 
-            x: centerX - 0.5, 
-            y: centerUnionY - 0.5 
-          },
-          data: { 
-            label: null 
-          },
-          style: {
-            width: 1,
-            height: 1,
-            backgroundColor: 'transparent',
-            border: 'none',
-            opacity: 0,
-            pointerEvents: 'none'
-          },
-        });
-        
-        // Add distribution union node (horizontal distribution to children)
-        nodes.push({
-          id: distributionUnionId,
-          type: 'unionNode',
-          position: { 
-            x: centerX - 0.5, 
-            y: distributionUnionY - 0.5 
-          },
-          data: { 
-            label: null 
-          },
-          style: {
-            width: 1,
-            height: 1,
-            backgroundColor: 'transparent',
-            border: 'none',
-            opacity: 0,
-            pointerEvents: 'none'
-          },
-        });
-      }
+      // No distribution nodes needed - using single custom edge for all child connections
     }
 
     // Convert Dagre edges to React Flow edges
     const edges: Edge[] = [];
     
-    // 2024-12-20: FIXED - Add manual edges for spouse connection and parent-to-union
+    // 2025-01-02: FIXED - True T-junction by making spouse line pass THROUGH junction node
     if (parents.length === 2) {
       const parent1Id = (parents[0].entry?.pid || parents[0].id).toString();
       const parent2Id = (parents[1].entry?.pid || parents[1].id).toString();
+      const junctionNodeId = `junction-${parent1Id}-${parent2Id}`;
       
-      // 1. Horizontal spouse line between parents
+      // 1. Split spouse line into two segments that connect through junction node
+      // 1a. Left segment: Parent1 -> Junction
       edges.push({
-        id: `spouse-${parent1Id}-${parent2Id}`,
+        id: `spouse-left-${parent1Id}`,
         source: parent1Id,
+        target: junctionNodeId,
+        sourceHandle: 'right',
+        targetHandle: 'left',
+        type: 'straight',
+        style: { stroke: '#ec4899', strokeWidth: 4, strokeDasharray: '8,4' },
+        animated: false,
+      });
+      
+      // 1b. Right segment: Junction -> Parent2
+      edges.push({
+        id: `spouse-right-${parent2Id}`,
+        source: junctionNodeId,
         target: parent2Id,
         sourceHandle: 'right',
         targetHandle: 'left',
@@ -302,42 +267,28 @@ export const useFamilyGraphLayout = ({ familyMembers, relationships }: FamilyGra
         animated: false,
       });
       
-      // 2. Vertical line from spouse center to center union (if children exist)
+      // 2. Create smoothstep edges for org chart appearance - they maintain proper connections
       if (children.length > 0) {
-        edges.push({
-          id: `spouse-center-to-center-union`,
-          source: spouseCenterNodeId,
-          target: centerUnionId,
-          sourceHandle: 'bottom',
-          targetHandle: 'top',
-          type: 'straight',
-          style: { stroke: '#8B4513', strokeWidth: 3 },
-          animated: false,
-        });
-        
-        // 3. Vertical line from center union to distribution union
-        edges.push({
-          id: `center-to-distribution-union`,
-          source: centerUnionId,
-          target: distributionUnionId,
-          sourceHandle: 'bottom',
-          targetHandle: 'top',
-          type: 'straight',
-          style: { stroke: '#8B4513', strokeWidth: 3 },
-          animated: false,
-        });
-        
-        // 4. Vertical lines from distribution union to each child
         children.forEach((child, index) => {
           const childId = (child.entry?.pid || child.id).toString();
+          
+          // Use smoothstep edge optimized for org chart right angles
           edges.push({
-            id: `distribution-to-child-${childId}`,
-            source: distributionUnionId,
+            id: `junction-to-child-${childId}`,
+            source: junctionNodeId,
             target: childId,
             sourceHandle: 'bottom',
             targetHandle: 'top',
-            type: 'straight',
-            style: { stroke: '#8B4513', strokeWidth: 3 },
+            type: 'smoothstep',
+            pathOptions: {
+              offset: 0, // No offset for clean lines
+              borderRadius: 2, // Minimal radius for sharp corners
+              curvature: 0.1, // Low curvature for more right-angled appearance
+            },
+            style: { 
+              stroke: '#8B4513', 
+              strokeWidth: 3,
+            },
             markerEnd: {
               type: MarkerType.ArrowClosed,
               color: '#8B4513',
@@ -373,6 +324,8 @@ export const useFamilyGraphLayout = ({ familyMembers, relationships }: FamilyGra
     }
     
     console.log(`🔗 Created ${edges.length} manual edges for T-junction family tree structure`);
+    console.log(`🔗 Edge Details:`, edges.map(e => ({ id: e.id, source: e.source, target: e.target, type: e.type })));
+    console.log(`🔗 Node Details:`, nodes.map(n => ({ id: n.id, type: n.type, position: n.position })));
 
     return { nodes, edges };
   }, [parents, children, familyMembers, relationships]);
