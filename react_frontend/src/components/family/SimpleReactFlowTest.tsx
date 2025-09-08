@@ -60,6 +60,32 @@ const SimpleReactFlowTest: React.FC<SimpleReactFlowTestProps> = ({ familyMembers
         position: { x: parentX, y: startY },
       });
     });
+
+    // Add center node positioned ON the horizontal spouse line
+    if (organizedMembers.parents.length === 2) {
+      // Calculate center position between parents
+      const parent1X = startX - ((organizedMembers.parents.length - 1) * horizontalSpacing) / 2;
+      const parent2X = startX + ((organizedMembers.parents.length - 1) * horizontalSpacing) / 2;
+      const centerX = (parent1X + parent2X) / 2;
+      
+      // Add center node positioned ON the horizontal spouse line
+      nodes.push({
+        id: 'parent-center',
+        type: 'default',
+        draggable: false,
+        position: { x: centerX, y: startY }, // ON the horizontal spouse line
+        data: {
+          label: null // Invisible node
+        },
+        style: {
+          background: 'transparent',
+          border: 'none',
+          width: 0,
+          height: 0,
+          zIndex: 10
+        }
+      });
+    }
     
     // Position children below parents
     const childrenY = startY + verticalSpacing;
@@ -96,23 +122,90 @@ const SimpleReactFlowTest: React.FC<SimpleReactFlowTestProps> = ({ familyMembers
     return nodes;
   }, [familyMembers, organizedMembers]);
 
-  // Create clean family relationship edges
+  // Create clean family relationship edges - ONE LINE PER CHILD
   const edges: Edge[] = useMemo(() => {
     if (nodes.length < 2) return [];
     
     const edges: Edge[] = [];
     
-    // Create parent-to-child edges using organized members
-    organizedMembers.parents.forEach((parent) => {
-      organizedMembers.children.forEach((child) => {
+    // ORGANIZATIONAL CHART: Lines from center of parent relationship to each child
+    if (organizedMembers.parents.length > 0 && organizedMembers.children.length > 0) {
+      if (organizedMembers.parents.length === 2) {
+        // Two parents: Connect children to center of horizontal spouse line
+        const centerNodeId = 'parent-center';
+        
+        // Connect each child to the center
+        organizedMembers.children.forEach((child: any) => {
+          edges.push({
+            id: `center-to-child-${child.entry.pid}`,
+            source: centerNodeId,
+            target: String(child.entry.pid),
+            type: 'straight',
+            style: { 
+              stroke: '#8B4513', 
+              strokeWidth: 3
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#8B4513',
+              width: 12,
+              height: 12,
+            }
+          });
+        });
+      } else {
+        // Single parent: Connect directly to children
+        const parent = organizedMembers.parents[0];
+        organizedMembers.children.forEach((child: any) => {
+          edges.push({
+            id: `parent-to-child-${child.entry.pid}`,
+            source: String(parent.entry.pid),
+            target: String(child.entry.pid),
+            type: 'straight',
+            style: { 
+              stroke: '#8B4513', 
+              strokeWidth: 3
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#8B4513',
+              width: 12,
+              height: 12,
+            }
+          });
+        });
+      }
+    }
+    
+    // Create organizational chart structure for two parents
+    if (organizedMembers.parents.length === 2) {
+      const parent1 = organizedMembers.parents[0];
+      const parent2 = organizedMembers.parents[1];
+      const centerNodeId = 'parent-center';
+      
+      // 1. Create horizontal spouse line between parents
+      edges.push({
+        id: `spouse-${parent1.entry.pid}-${parent2.entry.pid}`,
+        source: String(parent1.entry.pid),
+        target: String(parent2.entry.pid),
+        type: 'straight',
+        style: { 
+          stroke: '#ec4899', 
+          strokeWidth: 3,
+          strokeDasharray: '8,4'
+        }
+      });
+      
+      // 2. Connect each child to the center node (positioned on the horizontal spouse line)
+      organizedMembers.children.forEach((child: any) => {
         edges.push({
-          id: `parent-child-${parent.entry.pid}-${child.entry.pid}`,
-          source: String(parent.entry.pid),
+          id: `center-to-child-${child.entry.pid}`,
+          source: centerNodeId,
           target: String(child.entry.pid),
           type: 'straight',
           style: { 
             stroke: '#8B4513', 
-            strokeWidth: 2
+            strokeWidth: 3
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -121,23 +214,6 @@ const SimpleReactFlowTest: React.FC<SimpleReactFlowTestProps> = ({ familyMembers
             height: 12,
           }
         });
-      });
-    });
-    
-    // Create spouse connection between parents (if there are 2 parents)
-    if (organizedMembers.parents.length === 2) {
-      const parent1 = organizedMembers.parents[0];
-      const parent2 = organizedMembers.parents[1];
-      edges.push({
-        id: `spouse-${parent1.entry.pid}-${parent2.entry.pid}`,
-        source: String(parent1.entry.pid),
-        target: String(parent2.entry.pid),
-        type: 'straight',
-        style: { 
-          stroke: '#ec4899', 
-          strokeWidth: 2,
-          strokeDasharray: '8,4'
-        }
       });
     }
     

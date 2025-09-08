@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { ReactFlow, Node, Edge, MarkerType, ReactFlowProvider, useNodesState, useEdgesState } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useFamilyOrganization } from './hooks/useFamilyOrganization';
@@ -31,14 +31,9 @@ interface SimpleReactFlowFamilyTreeProps {
 
 const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
   familyMembers,
-  relationships = [],
-  hasMultipleFamilies = false
+  relationships = []
 }) => {
-  console.log('🔍 SimpleReactFlowFamilyTree - Component called with:', {
-    familyMembersCount: familyMembers.length,
-    relationshipsCount: relationships.length,
-    hasMultipleFamilies
-  });
+  // 2025-01-31: Removed console.log to prevent infinite loop - was causing excessive re-renders
 
   // Use proper family organization logic
   const organizedMembers = useFamilyOrganization(familyMembers, relationships);
@@ -53,15 +48,10 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
     const startX = 300;
     const startY = 50;
     
-    console.log('🔍 SimpleReactFlowFamilyTree - Organized members:', {
-      parents: organizedMembers.parents.length,
-      children: organizedMembers.children.length,
-      grandparents: organizedMembers.grandparents.length,
-      grandchildren: organizedMembers.grandchildren.length
-    });
+    // 2025-01-31: Removed console.log to prevent infinite loop
     
     // Position parents at top center
-    organizedMembers.parents.forEach((parent, index) => {
+    organizedMembers.parents.forEach((parent: any, index: number) => {
       const parentX = startX - ((organizedMembers.parents.length - 1) * horizontalSpacing) / 2 + (index * horizontalSpacing);
       nodes.push({
         id: String(parent.entry.pid),
@@ -91,10 +81,12 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
         position: { x: parentX, y: startY },
       });
     });
+
+    // 2025-01-31: Removed center node - children will connect directly to spouse line
     
     // Position children below parents
     const childrenY = startY + verticalSpacing;
-    organizedMembers.children.forEach((child, index) => {
+    organizedMembers.children.forEach((child: any, index: number) => {
       const childX = startX - ((organizedMembers.children.length - 1) * horizontalSpacing) / 2 + (index * horizontalSpacing);
       nodes.push({
         id: String(child.entry.pid),
@@ -125,23 +117,66 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
       });
     });
     
+    // 2025-01-31: Removed console.log to prevent infinite loop
     return nodes;
-  }, [familyMembers, organizedMembers]);
+  }, [familyMembers.length, organizedMembers.parents.length, organizedMembers.children.length, organizedMembers.parents, organizedMembers.children]);
 
-  // Create organizational chart style edges - MATCHING SVG STRUCTURE
+  // Create organizational chart style edges with center connection
   const edges: Edge[] = useMemo(() => {
-    if (organizedMembers.parents.length + organizedMembers.children.length < 2) return [];
+    // 2025-01-31: Removed console.log to prevent infinite loop
+    
+    if (organizedMembers.parents.length + organizedMembers.children.length < 2) {
+      return [];
+    }
     
     const edges: Edge[] = [];
+    const edgeIds = new Set<string>(); // 2025-01-31: Track edge IDs to prevent duplicates
     
-    // ORGANIZATIONAL CHART STRUCTURE: Individual parent-child connections
+    // 2025-01-31: Define layout constants for edge calculations
+    const horizontalSpacing = 200;
+    const verticalSpacing = 150;
+    const startX = 300;
+    const startY = 50;
+    const childrenY = startY + verticalSpacing;
+    
+    // 2025-01-31: Helper function to safely add edges and prevent duplicates
+    const addEdge = (edge: Edge) => {
+      if (!edgeIds.has(edge.id)) {
+        edgeIds.add(edge.id);
+        edges.push(edge);
+      }
+    };
+    
+    // COMPREHENSIVE SOLUTION: Create proper organizational chart structure
     if (organizedMembers.parents.length > 0 && organizedMembers.children.length > 0) {
-      // Individual parent-to-child connections (organizational chart style)
-      organizedMembers.parents.forEach((parent) => {
-        organizedMembers.children.forEach((child) => {
-          edges.push({
-            id: `parent-child-${parent.entry.pid}-${child.entry.pid}`,
-            source: String(parent.entry.pid),
+      if (organizedMembers.parents.length === 2) {
+        // TWO PARENTS: Create horizontal spouse line + direct connection to children
+        const parent1 = organizedMembers.parents[0];
+        const parent2 = organizedMembers.parents[1];
+        
+        // 2025-01-31: Removed console.log to prevent infinite loop
+        
+        // 1. Create horizontal spouse line between parents
+        addEdge({
+          id: `spouse-${parent1.entry.pid}-${parent2.entry.pid}`,
+          source: String(parent1.entry.pid),
+          target: String(parent2.entry.pid),
+          type: 'straight',
+          style: { 
+            stroke: '#ec4899', 
+            strokeWidth: 3,
+            strokeDasharray: '8,4'
+          }
+        });
+        
+        // 2. Connect each child to both parents (creating a V-shape that meets at the center)
+        organizedMembers.children.forEach((child: any, childIndex: number) => {
+          const childX = startX - ((organizedMembers.children.length - 1) * horizontalSpacing) / 2 + (childIndex * horizontalSpacing);
+          
+          // Connect from parent1 to child
+          addEdge({
+            id: `parent1-to-child-${child.entry.pid}`,
+            source: String(parent1.entry.pid),
             target: String(child.entry.pid),
             type: 'straight',
             style: { 
@@ -151,29 +186,53 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
             markerEnd: {
               type: MarkerType.ArrowClosed,
               color: '#8B4513',
+              width: 10,
+              height: 10,
+            }
+          });
+          
+          // Connect from parent2 to child (this will create the V-shape meeting at center)
+          addEdge({
+            id: `parent2-to-child-${child.entry.pid}`,
+            source: String(parent2.entry.pid),
+            target: String(child.entry.pid),
+            type: 'straight',
+            style: { 
+              stroke: '#8B4513', 
+              strokeWidth: 2
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#8B4513',
+              width: 10,
+              height: 10,
+            }
+          });
+        });
+        
+        // 2025-01-31: Removed console.log to prevent infinite loop
+      } else {
+        // SINGLE PARENT: Connect directly to children
+        const parent = organizedMembers.parents[0];
+        organizedMembers.children.forEach((child: any) => {
+          addEdge({
+            id: `parent-to-child-${child.entry.pid}`,
+            source: String(parent.entry.pid),
+            target: String(child.entry.pid),
+            type: 'straight',
+            style: { 
+              stroke: '#8B4513', 
+              strokeWidth: 3
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#8B4513',
               width: 12,
               height: 12,
             }
           });
         });
-      });
-    }
-    
-    // Spouse connections between parents (horizontal dashed lines)
-    if (organizedMembers.parents.length >= 2) {
-      const parent1 = organizedMembers.parents[0];
-      const parent2 = organizedMembers.parents[1];
-      edges.push({
-        id: `spouse-${parent1.entry.pid}-${parent2.entry.pid}`,
-        source: String(parent1.entry.pid),
-        target: String(parent2.entry.pid),
-        type: 'straight',
-        style: { 
-          stroke: '#ec4899', 
-          strokeWidth: 2,
-          strokeDasharray: '8,4'
-        }
-      });
+      }
     }
     
     // Fallback: If no parents detected, create sibling connections
@@ -182,7 +241,7 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
         for (let j = i + 1; j < organizedMembers.children.length; j++) {
           const child1 = organizedMembers.children[i];
           const child2 = organizedMembers.children[j];
-          edges.push({
+          addEdge({
             id: `sibling-${child1.entry.pid}-${child2.entry.pid}`,
             source: String(child1.entry.pid),
             target: String(child2.entry.pid),
@@ -197,20 +256,22 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
       }
     }
     
+    // 2025-01-31: Removed console.log to prevent infinite loop
     return edges;
-  }, [organizedMembers]);
+  }, [organizedMembers.parents.length, organizedMembers.children.length, organizedMembers.parents, organizedMembers.children]);
 
-  console.log('🔍 SimpleReactFlowFamilyTree - Created:', { nodes: nodes.length, edges: edges.length });
+  // 2025-01-31: Removed console.log to prevent infinite loop
 
   // Use ReactFlow hooks for proper state management
-  const [reactFlowNodes, setNodes, onNodesChange] = useNodesState(nodes);
-  const [reactFlowEdges, setEdges, onEdgesChange] = useEdgesState(edges);
+  const [reactFlowNodes, , onNodesChange] = useNodesState(nodes);
+  const [reactFlowEdges, , onEdgesChange] = useEdgesState(edges);
 
-  // Update nodes and edges when data changes
-  React.useEffect(() => {
-    setNodes(nodes);
-    setEdges(edges);
-  }, [nodes, edges, setNodes, setEdges]);
+  // 2025-01-31: Added useCallback to prevent unnecessary re-renders
+  const handleNodesChange = useCallback(onNodesChange, [onNodesChange]);
+  const handleEdgesChange = useCallback(onEdgesChange, [onEdgesChange]);
+
+  // 2025-01-31: FIXED - Removed useEffect that was causing infinite loop
+  // ReactFlow hooks already handle state updates automatically
 
   if (familyMembers.length === 0) {
     return (
@@ -269,8 +330,8 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
       <ReactFlow
         nodes={reactFlowNodes}
         edges={reactFlowEdges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
         fitView
         nodesConnectable={false}
         nodesDraggable={true}
@@ -290,7 +351,7 @@ const SimpleReactFlowFamilyTree: React.FC<SimpleReactFlowFamilyTreeProps> = ({
           }
         }}
         onInit={() => {
-          console.log('🔍 SimpleReactFlowFamilyTree - ReactFlow initialized with:', { nodes: reactFlowNodes.length, edges: reactFlowEdges.length });
+          // 2025-01-31: Removed console.log to prevent infinite loop
         }}
       />
     </div>
