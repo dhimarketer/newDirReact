@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { familyService } from '../../services/familyService';
-import ClassicFamilyTree from './ClassicFamilyTree';
+import CleanReactFlowFamilyTree from './CleanReactFlowFamilyTree';
 import RelationshipManager from './RelationshipManager';
 import FamilyTreeDownloadButton from './FamilyTreeDownloadButton';
 import FamilyTableView from './FamilyTableView';
@@ -246,11 +246,15 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     setIsLoading(true);
     setError(null);
     
-
+    // 2025-01-31: DEBUG - Log the parameters being passed
+    console.log('🔍 FamilyTreeWindow: fetchFamilyMembers called with:', { address, island, isOpen });
     
     try {
       // 2025-01-31: ENHANCED - Try to get all families at the address first
       const allFamiliesResponse = await familyService.getAllFamiliesByAddress(address, island);
+      
+      // 2025-01-31: DEBUG - Log the API response
+      console.log('🔍 FamilyTreeWindow: getAllFamiliesByAddress response:', allFamiliesResponse);
       
       if (allFamiliesResponse.success && allFamiliesResponse.data && allFamiliesResponse.data.length > 0) {
         
@@ -542,6 +546,8 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
         setFamilyGroupData(null);
       }
     } catch (err) {
+      // 2025-01-31: DEBUG - Log the actual error
+      console.error('🔍 FamilyTreeWindow: Error in fetchFamilyMembers:', err);
       setError('Error loading family data');
       setFamilyGroupExists(false);
       setFamilyGroupData(null);
@@ -902,8 +908,8 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                 /* Show family tree visualization */
                 viewMode === 'tree' ? (
                   (() => {
-                    // 2025-01-31: FIXED - Always use ClassicFamilyTree for both single and multiple families
-                    console.log('🔍 FamilyTreeWindow: Rendering ClassicFamilyTree with combined data:', {
+                    // 2025-01-05: UPDATED - Use CleanReactFlowFamilyTree with Dagre automatic layout
+                    console.log('🔍 FamilyTreeWindow: Rendering CleanReactFlowFamilyTree with combined data:', {
                       viewMode,
                       hasMultipleFamilies,
                       familiesCount: families.length,
@@ -913,11 +919,10 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                     });
                     
                     return (
-                      <ClassicFamilyTree
+                      <CleanReactFlowFamilyTree
                         familyMembers={familyMembers}
                         relationships={familyRelationships}
-                        useMultiRowLayout={useMultiRowLayout}
-                        svgRef={svgRef as React.RefObject<SVGSVGElement>}
+                        hasMultipleFamilies={hasMultipleFamilies}
                       />
                     );
                   })()

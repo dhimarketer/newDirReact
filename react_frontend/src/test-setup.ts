@@ -52,7 +52,7 @@ localStorageMock.getItem.mockImplementation((key: string) => {
 });
 
 // Mock fetch globally to prevent real API calls
-global.fetch = vi.fn();
+(global as any).fetch = vi.fn();
 
 // Mock axios to prevent real HTTP requests
 vi.mock('axios', () => ({
@@ -72,15 +72,25 @@ vi.mock('axios', () => ({
 }));
 
 // Mock all service modules
-vi.mock('../services/familyService', () => ({
-  default: {
+vi.mock('../services/familyService', () => {
+  const mockFamilyService = {
     getFamilies: vi.fn(),
     getFamilyById: vi.fn(),
     createFamily: vi.fn(),
     updateFamily: vi.fn(),
     deleteFamily: vi.fn(),
-  },
-}));
+    getAllFamiliesByAddress: vi.fn().mockResolvedValue({
+      success: true,
+      data: [],
+      message: 'No families found'
+    }),
+  };
+  
+  return {
+    familyService: mockFamilyService,
+    default: mockFamilyService,
+  };
+});
 
 vi.mock('../services/directoryService', () => ({
   default: {

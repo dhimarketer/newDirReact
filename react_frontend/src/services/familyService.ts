@@ -489,7 +489,18 @@ class FamilyService {
   }> {
     try {
       console.log('DEBUG: Getting all families for:', { address, island });
+      console.log('DEBUG: Island type:', typeof island, 'Island value:', JSON.stringify(island));
       
+      // 2025-01-31: DEBUG - Check if island is undefined or empty
+      if (!island || island.trim() === '') {
+        console.error('DEBUG: Island parameter is missing or empty:', { address, island });
+        return {
+          success: false,
+          error: 'Island parameter is required but was not provided'
+        };
+      }
+      
+      console.log('DEBUG: Making API call to /family/groups/by_address/ with params:', { address, island });
       const response = await apiService.get('/family/groups/by_address/', {
         params: { address, island }
       });

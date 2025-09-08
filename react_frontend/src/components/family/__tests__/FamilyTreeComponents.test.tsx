@@ -158,6 +158,20 @@ describe('Family Tree Components Integration', () => {
         relationships: mockRelationships
       }
     });
+    
+    // Mock getAllFamiliesByAddress method
+    (familyService.getAllFamiliesByAddress as any).mockResolvedValue({
+      success: true,
+      data: [{
+        id: 1,
+        name: 'Test Family',
+        description: 'Test family description',
+        address: '123 Main St',
+        island: 'Male',
+        members: mockFamilyMembers,
+        relationships: mockRelationships
+      }]
+    });
   });
 
   describe('FamilyTreeWindow', () => {
@@ -192,6 +206,7 @@ describe('Family Tree Components Integration', () => {
 
     it('handles errors gracefully', async () => {
       (familyService.getFamilyByAddress as any).mockRejectedValue(new Error('API Error'));
+      (familyService.getAllFamiliesByAddress as any).mockRejectedValue(new Error('API Error'));
 
       render(
         <FamilyTreeWindow
@@ -214,6 +229,10 @@ describe('Family Tree Components Integration', () => {
           members: [],
           relationships: []
         }
+      });
+      (familyService.getAllFamiliesByAddress as any).mockResolvedValue({
+        success: true,
+        data: []
       });
 
       render(
@@ -858,6 +877,10 @@ describe('Family Tree Components Integration', () => {
           relationships: []
         }
       });
+      (familyService.getAllFamiliesByAddress as any).mockResolvedValue({
+        success: true,
+        data: []
+      });
 
       render(
         <FamilyTreeWindow
@@ -912,6 +935,10 @@ describe('Family Tree Components Integration', () => {
           members: singlePerson,
           relationships: []
         }
+      });
+      (familyService.getAllFamiliesByAddress as any).mockResolvedValue({
+        success: true,
+        data: []
       });
 
       render(
@@ -1002,6 +1029,10 @@ describe('Family Tree Components Integration', () => {
           relationships: []
         }
       });
+      (familyService.getAllFamiliesByAddress as any).mockResolvedValue({
+        success: true,
+        data: []
+      });
 
       render(
         <FamilyTreeWindow
@@ -1024,6 +1055,7 @@ describe('Family Tree Components Integration', () => {
 
     it('shows appropriate message when family inference fails', async () => {
       (familyService.getFamilyByAddress as any).mockRejectedValue(new Error('Family inference failed'));
+      (familyService.getAllFamiliesByAddress as any).mockRejectedValue(new Error('Family inference failed'));
 
       render(
         <FamilyTreeWindow

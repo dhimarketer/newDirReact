@@ -24,4 +24,5 @@ export { default as FamilyTableView } from './FamilyTableView';  // 2025-01-29: 
 export { default as FamilyViewToggle } from './FamilyViewToggle';  // 2025-01-29: NEW - Toggle component for switching between tree and table views
 export { default as BulkFamilyDeleteModal } from './BulkFamilyDeleteModal';  // 2025-01-31: NEW - Bulk family delete modal for admin operations
 export { default as SimpleReactFlowFamilyTree } from './SimpleReactFlowFamilyTree';  // 2025-01-31: NEW - Simple ReactFlow-based family tree with clean layout
+export { default as CleanReactFlowFamilyTree } from './CleanReactFlowFamilyTree';  // 2025-01-31: NEW - Clean ReactFlow family tree from scratch
 export { default as FamilyTreeComparison } from './FamilyTreeComparison';  // 2025-01-31: NEW - A/B testing component for comparing SVG vs ReactFlow implementations
