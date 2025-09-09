@@ -97,3 +97,6 @@ FamilyTreeDownloadButton.tsx:44:13
 [2025-01-05 18:05] | USER INPUT: still jpg/png failed. but svg manged to download image ok.
 [2025-01-05 18:15] | USER INPUT: still failed. png/jpg showing blank canvas.
 [2025-01-05 18:25] | USER INPUT: now i found an interesting issue. when rendered there is one parent. but when downloaded as react flow jpg there are 2 parents. so that means there is separate multiple parent detection logics going on. there shall be one logic flow. download shall just download not do other works
+[2025-01-05 18:35] | USER INPUT: now families with 2 parents show the lines, but families with one parent have no lines.
+[2025-01-05 18:45] | USER INPUT: not successful yet. here is some logs [LOGS SHOWING ALL NODES DETECTED AS CHILDREN WITH 0 PARENTS]
+[2025-01-05 18:55] | USER INPUT: now almost perfect. we just need to make sure that the the text in the boxes need to get wrapped if its too long. see image.
