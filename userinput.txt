@@ -1,103 +1,12 @@
-[2025-01-05 10:00] | USER INPUT: check @DAGRE_IMPLEMENTATION_PLAN.md proceed with first step. after first step complete then i will tell you what to do.
-[2025-01-05 10:10] | USER INPUT: proceed with next step
-[2025-01-05 10:20] | USER INPUT: proceed to next step
-[2025-01-05 10:30] | USER INPUT: good job. proceed to next step
-[2025-01-05 10:35] | USER INPUT: what should i do?
-[2025-01-05 10:40] | USER INPUT: XHRGET
-http://localhost:3000/api/family/groups/by_address/?address=andhaleebuge&island=hdh.+makunudhoo
-[HTTP/1.1 404 Not Found 6ms]
-
-Not Found api.ts:192:19
-Error getting families by address: 
-Object { message: "Request failed with status code 404", name: "AxiosError", code: "ERR_BAD_REQUEST", config: {…}, request: XMLHttpRequest, response: {…}, status: 404, stack: "", … }
-familyService.ts:328:15
-XHRGET
-http://localhost:3000/api/family/groups/by_address/?address=annaarumaage&island=r.+rasmaadhoo
-[HTTP/1.1 404 Not Found 5ms]
-
-Not Found api.ts:192:19
-Error getting families by address: 
-Object { message: "Request failed with status code 404", name: "AxiosError", code: "ERR_BAD_REQUEST", config: {…}, request: XMLHttpRequest, response: {…}, status: 404, stack: "", … }
-familyService.ts:328:15
-XHRGET
-http://localhost:3000/api/family/groups/by_address/?address=aston+villa&island=ha.+filladhoo
-[HTTP/1.1 404 Not Found 5ms]
-
-Not Found api.ts:192:19
-Error getting families by address: 
-Object { message: "Request failed with status code 404", name: "AxiosError", code: "ERR_BAD_REQUEST", config: {…}, request: XMLHttpRequest, response: {…}, status: 404, stack: "", … }
-familyService.ts:328:15
-Uncaught Error: Maximum update depth exceeded. This can happen when a component repeatedly calls setState inside componentWillUpdate or componentDidUpdate. React limits the number of nested updates to prevent infinite loops.
-    React 4
-    setState vanilla.mjs:9
-    setState vanilla.mjs:9
-    setNodes index.js:3242
-    StoreUpdater index.js:294
-    react_stack_bottom_frame React
-react-dom_client.js:3001:128
-[2025-01-05 10:45] | USER INPUT: check . here is one family depicted in 4 layouts. i want clean org chart type layout. now that we have dagre + react flow, you shall be able to fix the layout.
-[2025-01-05 10:50] | USER INPUT: svg layout is working correctly. do not touch it yet.
-[2025-01-05 10:55] | USER INPUT: proceed
-[2025-01-05 11:00] | USER INPUT: Not Found api.ts:192:19
-Error getting families by address: 
-Object { message: "Request failed with status code 404", name: "AxiosError", code: "ERR_BAD_REQUEST", config: {…}, request: XMLHttpRequest, response: {…}, status: 404, stack: "", … }
-familyService.ts:328:15
-Uncaught TypeError: member.role.toLowerCase is not a function
-    useFamilyGraphLayout useFamilyGraphLayout.ts:152
-    useFamilyGraphLayout useFamilyGraphLayout.ts:146
-    React 3
-    useFamilyGraphLayout useFamilyGraphLayout.ts:24
-    CleanReactFlowFamilyTree CleanReactFlowFamilyTree.tsx:196
-    React 13
-useFamilyGraphLayout.ts:98:109
-[2025-01-05 11:10] | USER INPUT: start the frontend server. use existing terminal
-[2025-01-05 11:12] | USER INPUT: use the terminal i opened
-[2025-01-05 11:15] | USER INPUT: check why we can display svg layout correctly but not dagrr+react flow layout. there are no aarrows and lines as you can see. check the images
-[2025-01-02 02:26] | USER INPUT: in the layout of react flow  the parent detection logic is wrong. see the svg layout which is better. identify the problems and lets make a proper org chart style family tree.
-[2025-01-02 02:35] | USER INPUT: Unauthorized api.ts:186:19 / Not Found api.ts:192:19 / Error getting families by address / Hook errors: Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks / useMemo changed size between renders / React has detected a change in the order of Hooks called by CleanReactFlowFamilyTree / Uncaught Error: Should have a queue. You are likely calling Hooks conditionally
-[2024-12-20 14:30] | USER INPUT: now spouse relation line is visible. but it needs to be straight, and children's line shall be joined at the center. see image. see also svg line for comparison
-[2024-12-20 14:35] | USER INPUT: this is current layout. is this good?
-[2024-12-20 14:40] | USER INPUT: make it traditional t junction style
-[2024-12-20 14:45] | USER INPUT: this is the layout i see now. is this good?
-[2024-12-20 14:50] | USER INPUT: no its not. here is the correct description. The image you've shared is a family tree diagram, but it's structured in a way that resembles a hierarchical organizational chart (org chart) rather than a traditional family tree layout. However, the current arrangement has some visual and structural issues that make it less effective for clarity and readability. [DETAILED ANALYSIS OF ISSUES: Unbalanced Hierarchy, Poor Visual Flow, Misplaced Relationships, Missing Spouse Connection] [REQUESTED IMPROVEMENTS: Place Parents Side-by-Side, Align Children Horizontally, Use Consistent Styling, Label Clearly]
-[2024-12-20 14:55] | USER INPUT: now spouse line is straight, which is good. however lines from parent to children are also flattened so the layout is not as good as a traditional org chart. see image
-[2024-12-20 15:00] | USER INPUT: good job. but still i see the union is connecte to 1 parent. not to spouse line where both parents are joined. this will apply to families with 2 parents.. see image
-[2025-01-02 00:00] | USER INPUT: we were last working on reactflow layout for family and now its almost perfect. see the image. but there is something to improve. there are  is the union node between the parent and children's connections. and  the line from parent to union is not connected. nor is uinion to child nodes connected. lets either remove this node and connect the childrens lines to  parent  relationship line or a better arrangement. i want the layout to look exactly like a classic org chart layout
-[2025-01-02 00:15] | USER INPUT: still its not connected. if user drags a parent node away the layout shall not break. see image
-[2025-01-02 00:30] | USER INPUT: the parent's relationship line an children's relationship line are still not connected. if parent node is moved, the layout breaks. we want a  hard join between the parent relationship and childrent's relationship lines as in a classic org chart
-[2025-01-02 00:45] | USER INPUT: good job. now all we need is to bend the children's relationship lines at right angles to make it a true org chart layout.
-[2025-01-02 01:00] | USER INPUT: now there is no line that connects children to family. see the actual layout vs  a proper org chart style layout . see both images and give your best solution
-[2025-01-02 01:15] | USER INPUT: now the nodes are detached from the boxes
-[2025-01-02 01:30] | USER INPUT: now good. but still lets make the relationship line of parents same size so that they will be equidistant from the middle. now one parent's line is short, another one is long . see image
-[2025-01-02 01:45] | USER INPUT: good job. now lets increase the inner box  which contains the text because there is so much unused space betwen the outer box. see image.
-[2025-01-05 12:00] | USER INPUT: now lets clean up the family tree window dialog. we can remove the button "Reactflow tree" now that we have a better version in "clean reaactflow" button. also single row/ multi row toggle button and its code looks redundant. we shall keep svg layout, table layout, edit button, download image options etc. give a cleaner more organized laout for the window
-[2025-01-05 12:05] | USER INPUT: tree view button is also redundant. remove it. compare button already have two views.
-[2025-01-05 12:10] | USER INPUT: tree compare button itself can also be replaced with the svg tree and clean reactflow buttons on the same position so they are more directly accessible. i see no reason for the labels "view" and  "tree comparison format" which can be removed to make more space. also the download formats shall be added to dropdown  so it will look better
-[2025-01-05 12:20] | USER INPUT: still the download options dropdown is not correct. the download options shall be fully inside the dropdown
-[2025-01-05 12:25] | USER INPUT: clicking the download dropdown shall make the dropdown open and display the contents, but i see the drop down options are behind the graphic. send them forward . see image
-[2025-01-05 12:30] | USER INPUT: not good. now clicking the drop down expands the header. its not the way. just open the drop down. do not resize header. also i notice when clicked on the drop down options, its not actually saving the image in the format specified. basically its not working
-[2025-01-05 12:35] | USER INPUT: clicking download dropdown doesn't open the dropdown so nothing happens when user clicks it
-[2025-01-05 12:38] | USER INPUT: maybe its opening but if the dropdown is behind the graphic than cannot be seen by user
-[2025-01-05 12:40] | USER INPUT: clicking the dropdown shall open the dropdown like a normal dropdown to show its options. but currently clicking the dropdown reveals the button far away in the left which is not good
-[2025-01-05 12:42] | USER INPUT: still not good. the buttons appear far down, totally disconnected from the dropdown option.
-[2025-01-05 12:45] | USER INPUT: now position corrected. but getting this error Family tree not ready for download. Please wait for the tree to load."  🔽 Download initiated: 
-Object { format: "svg", familyName: "happy rest_gn. fuvahmulah", svgExists: false }
-FamilyTreeDownloadButton.tsx:44:13
-❌ SVG element not found for download FamilyTreeDownloadButton.tsx:47:15
-📋 Dropdown clicked
-[2025-01-05 12:47] | USER INPUT: check why user cannot download when user clicks the download options for family tree in family tree window.
-[2025-01-05 16:15] | USER INPUT: still same result. jpg renders black background, png and svg renders checkered background. we don't have many layers, is there a way to capture both the graphic and the lines?
-[2025-01-05 16:50] | USER INPUT: still no success
-[2025-01-05 17:05] | USER INPUT: still i see no lines. why can't you capture the lines but everything else? visible content
-[2025-01-05 17:15] | USER INPUT: now good. but i noticed the in the downloaded image, the lines are not in the correct position as was rendered. see both images
-[2025-01-05 17:25] | USER INPUT: still not resovled. see images
-[2025-01-05 17:35] | USER INPUT: we are still fixing family tree layout download issues. now i noticed that the downloaded layout is different from what is shown. downloaded jpg version of the react flow family layout image has square type child connectors while what is actually shown has straight slanted connnectors. also this is when there is one parent. if there are 2 parents, then relationship lines are not even shown at all. is it possible to get download the same layout that is visible to user?
-[2025-01-05 17:45] | USER INPUT: we have tried this method earlier but the results were a failure. it only shows blank canvas either in black or white. no actual family tree graphic or its relationship lines. find a better conclusive solution
-[2025-01-05 17:55] | USER INPUT: still failed. is there a better approach? why not flatten before rendering as graphic
-[2025-01-05 18:05] | USER INPUT: still jpg/png failed. but svg manged to download image ok.
-[2025-01-05 18:15] | USER INPUT: still failed. png/jpg showing blank canvas.
-[2025-01-05 18:25] | USER INPUT: now i found an interesting issue. when rendered there is one parent. but when downloaded as react flow jpg there are 2 parents. so that means there is separate multiple parent detection logics going on. there shall be one logic flow. download shall just download not do other works
-[2025-01-05 18:35] | USER INPUT: now families with 2 parents show the lines, but families with one parent have no lines.
-[2025-01-05 18:45] | USER INPUT: not successful yet. here is some logs [LOGS SHOWING ALL NODES DETECTED AS CHILDREN WITH 0 PARENTS]
-[2025-01-05 18:55] | USER INPUT: now almost perfect. we just need to make sure that the the text in the boxes need to get wrapped if its too long. see image.
-[2025-01-05 19:05] | USER INPUT: very good. still there are minor problems. see imge. i see the text in last row is intersecting with the box boundary. text shall fit within the box
+[2024-12-28 14:20] | USER INPUT: now lets work on family tree edit function.  we already have a family edit capability but its not very intuitive and not working very well even. user shall be able to assign family members to different  positions such as father, mother, son , daughter, grand mother, grand father, son in law, daughter in law, etc. first study current setup and lets design a better more user friendly way to do family edit from scratch if need be. first make a plan and then we will implement the plan
+[2024-12-28 15:15] | USER INPUT: still the smart family edit window is too big and  a left side menu is obscuring part of the window. the window itself is too big. so are the buttons.  lets resize it, make controls smaller and move it away from the left side  menu. see the image
+[2024-12-28 16:25] | USER INPUT: when user clicks on an address, the faily tree of only that address shall be rembmered. i see when family tree is opened for smart edit, some previous  family member names are there. also the layout shall show son, daughter, son in law, daughter in law also.  currently its showing father, mother, grand father, grand mother.
+[2024-12-28 17:30] | USER INPUT: we were earlier working on family tree smart edit family member auto assigining. we have some success. but need more. see image. daughter, son correctly detected. but mother, father, not detected. also if there are multiple sons or daughters they shall be under daugher/son column as daughter 1, daughter 2  etc.
+[2024-12-28 17:50] | USER INPUT: i see parents are misidentified as grand parents. this must be from age calculation. but do not do this. check how this is already implemented correctly in svg family tree. system can detect only as parents by age detection method. user will identify grandparents and grand kinds
+[2024-12-28 18:10] | USER INPUT: lets add table structure to the form so that its easier to follow visually.
+[2024-12-28 18:25] | USER INPUT: good job. user has to be able to drag members to any role
+[2024-12-28 18:35] | USER INPUT: now the form is too tall, so user has to scroll. lets  restyle the form to make more use of space economically. let there be a box for son where all sons will be added by name with numeral. but same time user shall be able to drag members by name to other roles
+[2024-12-28 18:50] | USER INPUT: now i see previous family members. this is wrong. always clear data when opening smart edit. also keep the table structure
+[2024-12-28 19:05] | USER INPUT: still the form is too tall. user has to scroll. lets make the layout more compact
+[2024-12-28 19:40] | USER INPUT: still the role table is too wide compared to members table. see image. this is making the form too tall and visually difficult for user.
+[2024-12-28 19:45] | USER INPUT: here is the form. can you see a way to conserve space. i see the table on the right is taking too much space because of the cancel button on each row.

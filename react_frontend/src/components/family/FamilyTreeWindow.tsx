@@ -13,6 +13,7 @@ import RelationshipManager from './RelationshipManager';
 import FamilyTreeDownloadButton from './FamilyTreeDownloadButton';
 import FamilyTableView from './FamilyTableView';
 import FamilyViewToggle, { ViewMode } from './FamilyViewToggle';
+import EnhancedFamilyEditor from './EnhancedFamilyEditor';  // 2024-12-28: NEW - Enhanced family editor
 import { PhoneBookEntry } from '../../types/directory';
 
 interface FamilyTreeWindowProps {
@@ -95,6 +96,9 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   
   // 2025-01-28: ENHANCED: Added state for editing mode
   const [isEditingMode, setIsEditingMode] = useState(false);
+  
+  // 2024-12-28: NEW - State for enhanced family editor
+  const [showEnhancedEditor, setShowEnhancedEditor] = useState(false);
   
   
   // 2025-01-29: NEW - State for tracking unsaved changes
@@ -789,6 +793,15 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                 {isEditingMode ? '✏️ Exit Edit' : '✏️ Edit Tree'}
               </button>
               
+              {/* 2024-12-28: NEW - Enhanced Family Editor button */}
+              <button
+                onClick={() => setShowEnhancedEditor(true)}
+                className="enhanced-edit-family-btn"
+                title="Open Enhanced Family Role Editor"
+              >
+                🎯 Smart Editor
+              </button>
+              
               {/* Delete Family button */}
               {familyGroupExists && familyGroupData?.id && (
                 <button
@@ -957,6 +970,53 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
           className="resize-handle"
           onMouseDown={startResize}
         />
+        
+        {/* 2024-12-28: NEW - Enhanced Family Editor Modal */}
+        {showEnhancedEditor && (
+          <EnhancedFamilyEditor
+            key={`${address}-${island}`} // Force re-render when address changes
+            isOpen={showEnhancedEditor}
+            onClose={() => setShowEnhancedEditor(false)}
+            address={address}
+            island={island}
+            members={familyMembers.map(m => m.entry)}
+            relationships={familyRelationships}
+            onSave={async (familyData) => {
+              // Save the enhanced family data
+              console.log('Saving enhanced family data:', familyData);
+              
+              try {
+                const response = await familyService.saveFamilyChanges(
+                  address, 
+                  island, 
+                  familyData.members.map((member: any) => ({
+                    entry: { pid: member.entry_id },
+                    role: member.role
+                  })),
+                  familyData.relationships
+                );
+                
+                if (response.success) {
+                  // Refresh family data
+                  await fetchFamilyMembers();
+                  setHasUnsavedChanges(false);
+                  setShowEnhancedEditor(false);
+                } else {
+                  throw new Error(response.error || 'Failed to save');
+                }
+              } catch (error) {
+                console.error('Error saving enhanced family data:', error);
+                throw error;
+              }
+            }}
+            initialFamilyData={{
+              members: familyMembers.map(member => ({
+                person: member.entry,
+                role: member.role as any // This will be mapped to specific role in EnhancedFamilyEditor
+              }))
+            }}
+          />
+        )}
       </div>
     </div>,
     document.body

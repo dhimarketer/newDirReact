@@ -26,3 +26,8 @@ export { default as BulkFamilyDeleteModal } from './BulkFamilyDeleteModal';  // 
 export { default as SimpleReactFlowFamilyTree } from './SimpleReactFlowFamilyTree';  // 2025-01-31: NEW - Simple ReactFlow-based family tree with clean layout
 export { default as CleanReactFlowFamilyTree } from './CleanReactFlowFamilyTree';  // 2025-01-31: NEW - Clean ReactFlow family tree from scratch
 export { default as FamilyTreeComparison } from './FamilyTreeComparison';  // 2025-01-31: NEW - A/B testing component for comparing SVG vs ReactFlow implementations
+
+// 2024-12-28: Enhanced family editing components for intuitive role assignment
+export { default as EnhancedFamilyEditor } from './EnhancedFamilyEditor';  // NEW - Enhanced family editor with specific role assignment
+export { default as FamilyRoleSelector } from './FamilyRoleSelector';  // NEW - Smart role selector with age/gender suggestions
+export { default as FamilyPositionGrid } from './FamilyPositionGrid';  // NEW - Visual family position grid for role assignment
