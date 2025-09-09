@@ -6,6 +6,264 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Download, Image, FileText, ChevronDown } from 'lucide-react';
 import { downloadFamilyTree, getOptimalImageDimensions } from '../../utils/imageDownloadUtils';
 
+// Pure SVG generator function that reuses the same layout logic as ClassicFamilyTree
+const generateFamilyTreeSVG = (familyMembers: any[], relationships: any[] = [], parentCount?: number, childCount?: number): SVGSVGElement => {
+  // Use exact parent/child split from displayed layout, or fallback to role-based detection
+  let parents: any[] = [];
+  let children: any[] = [];
+  
+  if (parentCount !== undefined && childCount !== undefined) {
+    // Use exact counts from displayed layout
+    parents = familyMembers.filter(m => m.role === 'parent');
+    children = familyMembers.filter(m => m.role === 'child');
+    console.log(`🎯 Using exact layout: ${parents.length} parents, ${children.length} children`);
+  } else {
+    // Fallback to age-based detection (should not happen in download context)
+    const sortedByAge = [...familyMembers].sort((a, b) => (b.entry.age || 0) - (a.entry.age || 0));
+    const totalMembers = familyMembers.length;
+    const detectedParentCount = Math.min(2, Math.ceil(totalMembers / 2));
+    parents = sortedByAge.slice(0, detectedParentCount);
+    children = sortedByAge.slice(detectedParentCount);
+    console.log(`⚠️ Fallback age detection: ${parents.length} parents, ${children.length} children`);
+  }
+  
+  console.log(`🎨 SVG Generator: ${parents.length} parents, ${children.length} children`);
+  
+  // Calculate dimensions (same as ClassicFamilyTree)
+  const nodeWidth = 120;
+  const nodeHeight = 60;
+  const horizontalSpacing = 20;
+  const verticalSpacing = 80;
+  
+  const parentWidth = parents.length * nodeWidth + (parents.length - 1) * horizontalSpacing;
+  const childWidth = children.length * nodeWidth + (children.length - 1) * horizontalSpacing;
+  const totalWidth = Math.max(parentWidth, childWidth, 400);
+  const totalHeight = 200 + (children.length > 0 ? verticalSpacing : 0);
+  
+  // Calculate positions
+  const parentY = 20;
+  const childY = parentY + nodeHeight + verticalSpacing;
+  const parentStartX = (totalWidth - parentWidth) / 2;
+  const childStartX = (totalWidth - childWidth) / 2;
+  
+  // Create SVG element
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', totalWidth.toString());
+  svg.setAttribute('height', totalHeight.toString());
+  svg.setAttribute('viewBox', `0 0 ${totalWidth} ${totalHeight}`);
+  svg.style.backgroundColor = '#ffffff';
+  
+  // Create parent nodes
+  parents.forEach((parent, index) => {
+    const x = parentStartX + index * (nodeWidth + horizontalSpacing);
+    const y = parentY;
+    
+    // Create parent group
+    const parentGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    
+    // Parent rectangle
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', x.toString());
+    rect.setAttribute('y', y.toString());
+    rect.setAttribute('width', nodeWidth.toString());
+    rect.setAttribute('height', nodeHeight.toString());
+    rect.setAttribute('fill', '#fef3c7');
+    rect.setAttribute('stroke', '#8B4513');
+    rect.setAttribute('stroke-width', '2');
+    rect.setAttribute('rx', '8');
+    parentGroup.appendChild(rect);
+    
+    // Parent name
+    const nameText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    nameText.setAttribute('x', (x + nodeWidth / 2).toString());
+    nameText.setAttribute('y', (y + nodeHeight / 2 - 8).toString());
+    nameText.setAttribute('text-anchor', 'middle');
+    nameText.setAttribute('font-family', 'Arial, sans-serif');
+    nameText.setAttribute('font-size', '12');
+    nameText.setAttribute('font-weight', 'bold');
+    nameText.setAttribute('fill', '#333');
+    nameText.textContent = parent.entry.name || 'Unknown';
+    parentGroup.appendChild(nameText);
+    
+    // Parent age
+    if (parent.entry.age) {
+      const ageText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      ageText.setAttribute('x', (x + nodeWidth / 2).toString());
+      ageText.setAttribute('y', (y + nodeHeight / 2 + 10).toString());
+      ageText.setAttribute('text-anchor', 'middle');
+      ageText.setAttribute('font-family', 'Arial, sans-serif');
+      ageText.setAttribute('font-size', '10');
+      ageText.setAttribute('fill', '#666');
+      ageText.textContent = `${parent.entry.age} years`;
+      parentGroup.appendChild(ageText);
+    }
+    
+    svg.appendChild(parentGroup);
+  });
+  
+  // Create child nodes
+  children.forEach((child, index) => {
+    const x = childStartX + index * (nodeWidth + horizontalSpacing);
+    const y = childY;
+    
+    // Create child group
+    const childGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    
+    // Child rectangle
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', x.toString());
+    rect.setAttribute('y', y.toString());
+    rect.setAttribute('width', nodeWidth.toString());
+    rect.setAttribute('height', nodeHeight.toString());
+    rect.setAttribute('fill', '#dbeafe');
+    rect.setAttribute('stroke', '#8B4513');
+    rect.setAttribute('stroke-width', '2');
+    rect.setAttribute('rx', '8');
+    childGroup.appendChild(rect);
+    
+    // Child name
+    const nameText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    nameText.setAttribute('x', (x + nodeWidth / 2).toString());
+    nameText.setAttribute('y', (y + nodeHeight / 2 - 8).toString());
+    nameText.setAttribute('text-anchor', 'middle');
+    nameText.setAttribute('font-family', 'Arial, sans-serif');
+    nameText.setAttribute('font-size', '12');
+    nameText.setAttribute('font-weight', 'bold');
+    nameText.setAttribute('fill', '#333');
+    nameText.textContent = child.entry.name || 'Unknown';
+    childGroup.appendChild(nameText);
+    
+    // Child age
+    if (child.entry.age) {
+      const ageText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      ageText.setAttribute('x', (x + nodeWidth / 2).toString());
+      ageText.setAttribute('y', (y + nodeHeight / 2 + 10).toString());
+      ageText.setAttribute('text-anchor', 'middle');
+      ageText.setAttribute('font-family', 'Arial, sans-serif');
+      ageText.setAttribute('font-size', '10');
+      ageText.setAttribute('fill', '#666');
+      ageText.textContent = `${child.entry.age} years`;
+      childGroup.appendChild(ageText);
+    }
+    
+    svg.appendChild(childGroup);
+  });
+  
+  // Draw connections (same logic as ClassicFamilyTree)
+  if (parents.length > 0 && children.length > 0) {
+    const connectionGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    
+    // If multiple parents, draw spouse line
+    if (parents.length === 2) {
+      const parent1X = parentStartX + nodeWidth / 2;
+      const parent2X = parentStartX + nodeWidth + horizontalSpacing + nodeWidth / 2;
+      const spouseY = parentY + nodeHeight;
+      
+      const spouseLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      spouseLine.setAttribute('x1', parent1X.toString());
+      spouseLine.setAttribute('y1', spouseY.toString());
+      spouseLine.setAttribute('x2', parent2X.toString());
+      spouseLine.setAttribute('y2', spouseY.toString());
+      spouseLine.setAttribute('stroke', '#8B4513');
+      spouseLine.setAttribute('stroke-width', '3');
+      spouseLine.setAttribute('stroke-dasharray', '8,4');
+      connectionGroup.appendChild(spouseLine);
+      
+      // Center point for children connection
+      const centerX = (parent1X + parent2X) / 2;
+      const centerY = spouseY;
+      
+      // Vertical line down from center
+      const verticalLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      verticalLine.setAttribute('x1', centerX.toString());
+      verticalLine.setAttribute('y1', centerY.toString());
+      verticalLine.setAttribute('x2', centerX.toString());
+      verticalLine.setAttribute('y2', (centerY + verticalSpacing / 2).toString());
+      verticalLine.setAttribute('stroke', '#8B4513');
+      verticalLine.setAttribute('stroke-width', '3');
+      connectionGroup.appendChild(verticalLine);
+      
+      // Horizontal distribution line to children
+      if (children.length > 0) {
+        const firstChildX = childStartX + nodeWidth / 2;
+        const lastChildX = childStartX + (children.length - 1) * (nodeWidth + horizontalSpacing) + nodeWidth / 2;
+        const distributionY = centerY + verticalSpacing / 2;
+        
+        const distributionLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        distributionLine.setAttribute('x1', firstChildX.toString());
+        distributionLine.setAttribute('y1', distributionY.toString());
+        distributionLine.setAttribute('x2', lastChildX.toString());
+        distributionLine.setAttribute('y2', distributionY.toString());
+        distributionLine.setAttribute('stroke', '#8B4513');
+        distributionLine.setAttribute('stroke-width', '3');
+        connectionGroup.appendChild(distributionLine);
+        
+        // Vertical lines to each child
+        children.forEach((child, index) => {
+          const childX = childStartX + index * (nodeWidth + horizontalSpacing) + nodeWidth / 2;
+          
+          const childLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          childLine.setAttribute('x1', childX.toString());
+          childLine.setAttribute('y1', distributionY.toString());
+          childLine.setAttribute('x2', childX.toString());
+          childLine.setAttribute('y2', childY.toString());
+          childLine.setAttribute('stroke', '#8B4513');
+          childLine.setAttribute('stroke-width', '3');
+          connectionGroup.appendChild(childLine);
+        });
+      }
+    } else if (parents.length === 1) {
+      // Single parent - direct connection to children
+      const parentX = parentStartX + nodeWidth / 2;
+      const parentBottomY = parentY + nodeHeight;
+      
+      if (children.length > 0) {
+        // Vertical line down from parent
+        const verticalLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        verticalLine.setAttribute('x1', parentX.toString());
+        verticalLine.setAttribute('y1', parentBottomY.toString());
+        verticalLine.setAttribute('x2', parentX.toString());
+        verticalLine.setAttribute('y2', (parentBottomY + verticalSpacing / 2).toString());
+        verticalLine.setAttribute('stroke', '#8B4513');
+        verticalLine.setAttribute('stroke-width', '3');
+        connectionGroup.appendChild(verticalLine);
+        
+        // Horizontal distribution line to children
+        const firstChildX = childStartX + nodeWidth / 2;
+        const lastChildX = childStartX + (children.length - 1) * (nodeWidth + horizontalSpacing) + nodeWidth / 2;
+        const distributionY = parentBottomY + verticalSpacing / 2;
+        
+        const distributionLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        distributionLine.setAttribute('x1', firstChildX.toString());
+        distributionLine.setAttribute('y1', distributionY.toString());
+        distributionLine.setAttribute('x2', lastChildX.toString());
+        distributionLine.setAttribute('y2', distributionY.toString());
+        distributionLine.setAttribute('stroke', '#8B4513');
+        distributionLine.setAttribute('stroke-width', '3');
+        connectionGroup.appendChild(distributionLine);
+        
+        // Vertical lines to each child
+        children.forEach((child, index) => {
+          const childX = childStartX + index * (nodeWidth + horizontalSpacing) + nodeWidth / 2;
+          
+          const childLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          childLine.setAttribute('x1', childX.toString());
+          childLine.setAttribute('y1', distributionY.toString());
+          childLine.setAttribute('x2', childX.toString());
+          childLine.setAttribute('y2', childY.toString());
+          childLine.setAttribute('stroke', '#8B4513');
+          childLine.setAttribute('stroke-width', '3');
+          connectionGroup.appendChild(childLine);
+        });
+      }
+    }
+    
+    svg.appendChild(connectionGroup);
+  }
+  
+  return svg;
+};
+
 interface FamilyTreeDownloadButtonProps {
   svgRef: React.RefObject<SVGSVGElement>;
   familyName: string;
@@ -276,8 +534,8 @@ const FamilyTreeDownloadButton: React.FC<FamilyTreeDownloadButtonProps> = ({
           gCount: reactFlowSvg.querySelectorAll('g').length
         });
         
-        // For ReactFlow, try a simple screenshot approach
-        console.log('🔄 Using simple screenshot approach for ReactFlow download');
+        // For ReactFlow, generate a pure SVG directly from the family data using the same layout logic
+        console.log('🔄 Using pure SVG generation from family data');
         
         try {
           setIsDownloading(true);
@@ -288,98 +546,312 @@ const FamilyTreeDownloadButton: React.FC<FamilyTreeDownloadButtonProps> = ({
             setIsDownloading(false);
           }, 10000);
           
-          const { default: html2canvas } = await import('html2canvas');
+          // Get the family data from the ReactFlow component
+          // We need to extract the family members and relationships that are being displayed
+          console.log('🔍 Extracting family data from ReactFlow display...');
           
-          // Find the family tree content area - this should contain everything visible
-          let targetElement = document.querySelector('.family-tree-content') as HTMLElement;
-          
-          if (!targetElement) {
-            targetElement = document.querySelector('.clean-family-tree-container') as HTMLElement;
+          // Find the ReactFlow component and extract the underlying data
+          const cleanFamilyTreeContainer = document.querySelector('.clean-family-tree-container');
+          if (!cleanFamilyTreeContainer) {
+            throw new Error('No clean family tree container found');
           }
           
-          if (!targetElement) {
-            targetElement = document.querySelector('.react-flow') as HTMLElement;
-          }
+          // Extract the EXACT layout from the displayed ReactFlow nodes (don't re-detect parents!)
+          const reactFlowNodes = document.querySelectorAll('.react-flow__node');
+          const displayedNodes: any[] = [];
           
-          if (!targetElement) {
-            throw new Error('No family tree content found');
-          }
-          
-          console.log('🎯 Capturing visible family tree content:', {
-            className: targetElement.className,
-            tagName: targetElement.tagName,
-            dimensions: {
-              width: targetElement.offsetWidth,
-              height: targetElement.offsetHeight,
-              scrollWidth: targetElement.scrollWidth,
-              scrollHeight: targetElement.scrollHeight
-            }
-          });
-          
-          // Simple html2canvas configuration - no complex settings
-          const canvas = await html2canvas(targetElement, {
-            backgroundColor: '#ffffff',
-            scale: 1, // Use 1x scale to avoid issues
-            useCORS: true,
-            allowTaint: true,
-            logging: false,
-            removeContainer: false,
-            width: targetElement.offsetWidth,
-            height: targetElement.offsetHeight
-          });
-          
-          console.log('📊 Canvas created with dimensions:', {
-            width: canvas.width,
-            height: canvas.height,
-            ratio: canvas.width / canvas.height
-          });
-          
-          // Convert canvas to blob and download
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = `family_tree_${familyName.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '_')}.${format}`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              URL.revokeObjectURL(url);
-              
-              console.log('✅ ReactFlow simple download completed successfully');
-              setIsOpen(false);
-              setIsDownloading(false);
-              
-              // Clear timeout since download completed
-              if (downloadTimeoutRef.current) {
-                clearTimeout(downloadTimeoutRef.current);
-                downloadTimeoutRef.current = null;
-              }
-            } else {
-              throw new Error('Failed to create image from family tree content');
-            }
-          }, format === 'jpg' ? 'image/jpeg' : 'image/png');
-          
-          return;
-        } catch (error) {
-          console.error('❌ ReactFlow simple download failed:', error);
-          
-          // Try even simpler approach - capture the entire window
-          try {
-            console.log('🔄 Trying window capture approach');
-            const { default: html2canvas } = await import('html2canvas');
+          // Get node positions and data from the actual displayed layout
+          reactFlowNodes.forEach((node) => {
+            const nameElement = node.querySelector('.clean-family-node__name');
+            const ageElement = node.querySelector('.clean-family-node__age');
+            const nodeElement = node as HTMLElement;
+            const nodeRect = nodeElement.getBoundingClientRect();
             
-            // Capture the entire body and crop to family tree area
-            const body = document.body;
-            const canvas = await html2canvas(body, {
-              backgroundColor: '#ffffff',
-              scale: 0.5, // Lower scale for performance
-              useCORS: true,
-              allowTaint: true,
-              logging: false,
-              removeContainer: false
+            if (nameElement) {
+              const name = nameElement.textContent || '';
+              const ageText = ageElement?.textContent || '';
+              const age = ageText.includes('years') ? parseInt(ageText.replace(' years', '')) : undefined;
+              
+              // Determine if this is a parent or child based on the node's styling/class
+              const nodeContent = nodeElement.querySelector('[class*="parent"], [class*="child"]');
+              const isParent = nodeContent?.className.includes('parent') || 
+                              nodeElement.style.backgroundColor === 'rgb(254, 243, 199)' || // #fef3c7
+                              getComputedStyle(nodeElement).backgroundColor === 'rgb(254, 243, 199)';
+              
+              displayedNodes.push({
+                entry: {
+                  pid: displayedNodes.length + 1,
+                  name: name,
+                  age: age
+                },
+                role: isParent ? 'parent' : 'child',
+                x: nodeRect.left,
+                y: nodeRect.top,
+                width: nodeRect.width,
+                height: nodeRect.height
+              });
+            }
+          });
+          
+          // Sort by Y position to maintain the layout structure (parents at top)
+          displayedNodes.sort((a, b) => a.y - b.y);
+          
+          // Separate parents and children based on the ACTUAL displayed layout
+          const parents = displayedNodes.filter(node => node.role === 'parent');
+          const children = displayedNodes.filter(node => node.role === 'child');
+          
+          // If role detection failed, use Y position as fallback (same generation = similar Y)
+          if (parents.length === 0 && children.length === 0) {
+            const sortedByY = displayedNodes.sort((a, b) => a.y - b.y);
+            const generations = [];
+            let currentGeneration = [sortedByY[0]];
+            
+            for (let i = 1; i < sortedByY.length; i++) {
+              if (Math.abs(sortedByY[i].y - currentGeneration[0].y) <= 50) {
+                currentGeneration.push(sortedByY[i]);
+              } else {
+                generations.push(currentGeneration);
+                currentGeneration = [sortedByY[i]];
+              }
+            }
+            generations.push(currentGeneration);
+            
+            // First generation = parents, rest = children
+            const parentsFromLayout = generations[0] || [];
+            const childrenFromLayout = generations.slice(1).flat() || [];
+            
+            parents.push(...parentsFromLayout.map(n => ({ ...n, role: 'parent' })));
+            children.push(...childrenFromLayout.map(n => ({ ...n, role: 'child' })));
+          }
+          
+          console.log(`📊 Extracted EXACT layout: ${parents.length} parents, ${children.length} children`);
+          console.log(`👨‍👩‍👧‍👦 Parents:`, parents.map(p => p.entry.name));
+          console.log(`👶 Children:`, children.map(c => c.entry.name));
+          
+          // Generate SVG using the EXACT extracted layout
+          const familyMembers = [...parents, ...children];
+          const generatedSvg = generateFamilyTreeSVG(familyMembers, [], parents.length, children.length);
+          
+          console.log('✅ Generated pure SVG from family data');
+          
+          // Convert SVG to image
+          if (format === 'svg') {
+            // For SVG format, download the SVG directly
+            const svgData = new XMLSerializer().serializeToString(generatedSvg);
+            const svgBlob = new Blob([svgData], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(svgBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `family_tree_${familyName.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '_')}.svg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            console.log('✅ Pure SVG download completed successfully');
+            setIsOpen(false);
+            setIsDownloading(false);
+            
+            if (downloadTimeoutRef.current) {
+              clearTimeout(downloadTimeoutRef.current);
+              downloadTimeoutRef.current = null;
+            }
+          } else {
+            // For PNG/JPG, draw directly on canvas instead of SVG conversion
+            console.log(`🖼️ Drawing family tree directly on canvas for ${format.toUpperCase()}`);
+            
+            // Use the EXACT same parent/child split from the extracted layout
+            const parents = familyMembers.filter(m => m.role === 'parent');
+            const children = familyMembers.filter(m => m.role === 'child');
+            
+            // Calculate dimensions (same as SVG)
+            const nodeWidth = 120;
+            const nodeHeight = 60;
+            const horizontalSpacing = 20;
+            const verticalSpacing = 80;
+            
+            const parentWidth = parents.length * nodeWidth + (parents.length - 1) * horizontalSpacing;
+            const childWidth = children.length * nodeWidth + (children.length - 1) * horizontalSpacing;
+            const totalWidth = Math.max(parentWidth, childWidth, 400);
+            const totalHeight = 200 + (children.length > 0 ? verticalSpacing : 0);
+            
+            // Calculate positions
+            const parentY = 20;
+            const childY = parentY + nodeHeight + verticalSpacing;
+            const parentStartX = (totalWidth - parentWidth) / 2;
+            const childStartX = (totalWidth - childWidth) / 2;
+            
+            // Create canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = totalWidth * 2; // Higher resolution
+            canvas.height = totalHeight * 2;
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              throw new Error('Could not get canvas context');
+            }
+            
+            // Scale for higher resolution
+            ctx.scale(2, 2);
+            
+            // Fill white background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, totalWidth, totalHeight);
+            
+            // Set default font
+            ctx.font = '12px Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            console.log(`🎨 Drawing ${parents.length} parents and ${children.length} children`);
+            
+            // Draw parent nodes
+            parents.forEach((parent, index) => {
+              const x = parentStartX + index * (nodeWidth + horizontalSpacing);
+              const y = parentY;
+              
+              // Draw parent rectangle
+              ctx.fillStyle = '#fef3c7';
+              ctx.strokeStyle = '#8B4513';
+              ctx.lineWidth = 2;
+              
+              // Draw rounded rectangle
+              ctx.beginPath();
+              ctx.roundRect(x, y, nodeWidth, nodeHeight, 8);
+              ctx.fill();
+              ctx.stroke();
+              
+              // Draw parent name
+              ctx.fillStyle = '#333';
+              ctx.font = 'bold 12px Arial, sans-serif';
+              ctx.fillText(parent.entry.name || 'Unknown', x + nodeWidth / 2, y + nodeHeight / 2 - 8);
+              
+              // Draw parent age
+              if (parent.entry.age) {
+                ctx.fillStyle = '#666';
+                ctx.font = '10px Arial, sans-serif';
+                ctx.fillText(`${parent.entry.age} years`, x + nodeWidth / 2, y + nodeHeight / 2 + 10);
+              }
             });
             
+            // Draw child nodes
+            children.forEach((child, index) => {
+              const x = childStartX + index * (nodeWidth + horizontalSpacing);
+              const y = childY;
+              
+              // Draw child rectangle
+              ctx.fillStyle = '#dbeafe';
+              ctx.strokeStyle = '#8B4513';
+              ctx.lineWidth = 2;
+              
+              // Draw rounded rectangle
+              ctx.beginPath();
+              ctx.roundRect(x, y, nodeWidth, nodeHeight, 8);
+              ctx.fill();
+              ctx.stroke();
+              
+              // Draw child name
+              ctx.fillStyle = '#333';
+              ctx.font = 'bold 12px Arial, sans-serif';
+              ctx.fillText(child.entry.name || 'Unknown', x + nodeWidth / 2, y + nodeHeight / 2 - 8);
+              
+              // Draw child age
+              if (child.entry.age) {
+                ctx.fillStyle = '#666';
+                ctx.font = '10px Arial, sans-serif';
+                ctx.fillText(`${child.entry.age} years`, x + nodeWidth / 2, y + nodeHeight / 2 + 10);
+              }
+            });
+            
+            // Draw connections
+            if (parents.length > 0 && children.length > 0) {
+              ctx.strokeStyle = '#8B4513';
+              ctx.lineWidth = 3;
+              
+              if (parents.length === 2) {
+                // Two parents - draw spouse line and connections
+                const parent1X = parentStartX + nodeWidth / 2;
+                const parent2X = parentStartX + nodeWidth + horizontalSpacing + nodeWidth / 2;
+                const spouseY = parentY + nodeHeight;
+                
+                // Draw spouse line (dashed)
+                ctx.setLineDash([8, 4]);
+                ctx.beginPath();
+                ctx.moveTo(parent1X, spouseY);
+                ctx.lineTo(parent2X, spouseY);
+                ctx.stroke();
+                
+                // Reset line dash
+                ctx.setLineDash([]);
+                
+                // Center point for children connection
+                const centerX = (parent1X + parent2X) / 2;
+                const centerY = spouseY;
+                
+                // Vertical line down from center
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(centerX, centerY + verticalSpacing / 2);
+                ctx.stroke();
+                
+                // Horizontal distribution line to children
+                if (children.length > 0) {
+                  const firstChildX = childStartX + nodeWidth / 2;
+                  const lastChildX = childStartX + (children.length - 1) * (nodeWidth + horizontalSpacing) + nodeWidth / 2;
+                  const distributionY = centerY + verticalSpacing / 2;
+                  
+                  ctx.beginPath();
+                  ctx.moveTo(firstChildX, distributionY);
+                  ctx.lineTo(lastChildX, distributionY);
+                  ctx.stroke();
+                  
+                  // Vertical lines to each child
+                  children.forEach((child, index) => {
+                    const childX = childStartX + index * (nodeWidth + horizontalSpacing) + nodeWidth / 2;
+                    ctx.beginPath();
+                    ctx.moveTo(childX, distributionY);
+                    ctx.lineTo(childX, childY);
+                    ctx.stroke();
+                  });
+                }
+              } else if (parents.length === 1) {
+                // Single parent - direct connection to children
+                const parentX = parentStartX + nodeWidth / 2;
+                const parentBottomY = parentY + nodeHeight;
+                
+                if (children.length > 0) {
+                  // Vertical line down from parent
+                  ctx.beginPath();
+                  ctx.moveTo(parentX, parentBottomY);
+                  ctx.lineTo(parentX, parentBottomY + verticalSpacing / 2);
+                  ctx.stroke();
+                  
+                  // Horizontal distribution line to children
+                  const firstChildX = childStartX + nodeWidth / 2;
+                  const lastChildX = childStartX + (children.length - 1) * (nodeWidth + horizontalSpacing) + nodeWidth / 2;
+                  const distributionY = parentBottomY + verticalSpacing / 2;
+                  
+                  ctx.beginPath();
+                  ctx.moveTo(firstChildX, distributionY);
+                  ctx.lineTo(lastChildX, distributionY);
+                  ctx.stroke();
+                  
+                  // Vertical lines to each child
+                  children.forEach((child, index) => {
+                    const childX = childStartX + index * (nodeWidth + horizontalSpacing) + nodeWidth / 2;
+                    ctx.beginPath();
+                    ctx.moveTo(childX, distributionY);
+                    ctx.lineTo(childX, childY);
+                    ctx.stroke();
+                  });
+                }
+              }
+            }
+            
+            console.log('✅ Family tree drawn directly on canvas');
+            
+            // Convert to blob and download
             canvas.toBlob((blob) => {
               if (blob) {
                 const url = URL.createObjectURL(blob);
@@ -391,7 +863,7 @@ const FamilyTreeDownloadButton: React.FC<FamilyTreeDownloadButtonProps> = ({
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
                 
-                console.log('✅ Window capture download completed successfully');
+                console.log(`✅ Direct canvas ${format.toUpperCase()} download completed successfully`);
                 setIsOpen(false);
                 setIsDownloading(false);
                 
@@ -399,15 +871,17 @@ const FamilyTreeDownloadButton: React.FC<FamilyTreeDownloadButtonProps> = ({
                   clearTimeout(downloadTimeoutRef.current);
                   downloadTimeoutRef.current = null;
                 }
+              } else {
+                throw new Error(`Failed to create ${format} blob from direct canvas`);
               }
-            }, format === 'jpg' ? 'image/jpeg' : 'image/png');
-            
-            return;
-          } catch (windowError) {
-            console.error('❌ Window capture also failed:', windowError);
+            }, format === 'jpg' ? 'image/jpeg' : 'image/png', format === 'jpg' ? 0.95 : undefined);
           }
           
-          // Fall through to try SVG approach
+          return;
+        } catch (error) {
+          console.error('❌ Pure SVG generation failed:', error);
+          
+          // Fall through to try direct SVG approach
         }
         
         try {
