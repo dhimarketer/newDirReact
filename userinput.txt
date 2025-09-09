@@ -10,3 +10,6 @@
 [2024-12-28 19:05] | USER INPUT: still the form is too tall. user has to scroll. lets make the layout more compact
 [2024-12-28 19:40] | USER INPUT: still the role table is too wide compared to members table. see image. this is making the form too tall and visually difficult for user.
 [2024-12-28 19:45] | USER INPUT: here is the form. can you see a way to conserve space. i see the table on the right is taking too much space because of the cancel button on each row.
+[2024-12-28 19:50] | USER INPUT: now after removing the button there is noway to remove a member from role table. how to fix this. lets drag out to remove
+[2024-12-28 19:55] | USER INPUT: still i see mixup. here i clicked the family of happy night, sh. goidhoo, but the form is populated with the family of happy night, k. Male'. so its two different families. as mentioned earlier, when user clicks on an address, the form shall open with data of that particular address, previous data shall not be there on the form
+[2024-12-28 20:00] | USER INPUT: the issue is not resolved. this must be in search result issue. because as user i am clicking on search result addresses. when i click on a search result address i shall see the family tree of that particular address. not the one before searched

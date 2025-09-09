@@ -560,6 +560,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
 
                     {/* Family Tree Window */}
       <FamilyTreeWindow
+        key={`${selectedAddress}-${selectedIsland}`} // 2024-12-28: CRITICAL FIX - Force re-render when address changes
         isOpen={familyTreeWindowOpen}
         onClose={() => setFamilyTreeWindowOpen(false)}
         address={selectedAddress}

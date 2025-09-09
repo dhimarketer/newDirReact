@@ -248,6 +248,13 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     setIsLoading(true);
     setError(null);
     
+    // 2024-12-28: CRITICAL FIX - Clear all family data when switching addresses
+    console.log('🔍 FamilyTreeWindow: Clearing previous family data for new address:', { address, island, isOpen });
+    setFamilyMembers([]);
+    setFamilyRelationships([]);
+    setFamilies([]);
+    setHasMultipleFamilies(false);
+    
     // 2025-01-31: DEBUG - Log the parameters being passed
     console.log('🔍 FamilyTreeWindow: fetchFamilyMembers called with:', { address, island, isOpen });
     
@@ -1009,12 +1016,12 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                 throw error;
               }
             }}
-            initialFamilyData={{
+            initialFamilyData={familyMembers.length > 0 ? {
               members: familyMembers.map(member => ({
                 person: member.entry,
                 role: member.role as any // This will be mapped to specific role in EnhancedFamilyEditor
               }))
-            }}
+            } : undefined}
           />
         )}
       </div>

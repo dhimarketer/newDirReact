@@ -76,3 +76,15 @@
 [2024-12-28 19:45] | react_frontend/src/components/family/FamilyPositionGrid.tsx | Optimized column widths - Role (1/3), Person (1/2), Age (1/6) for better space usage | ok
 [2024-12-28 19:45] | react_frontend/src/components/family/FamilyPositionGrid.tsx | Made layout perfectly balanced - both tables now w-1/2 (50% each) | ok
 [2024-12-28 19:45] | react_frontend/src/components/family/FamilyPositionGrid.tsx | Reduced table heights from h-40 to h-36 for more compact form | ok
+[2024-12-28 19:50] | react_frontend/src/components/family/FamilyPositionGrid.tsx | ADDED drag-out-to-remove functionality - users can now drag members from roles to remove them | ok
+[2024-12-28 19:50] | react_frontend/src/components/family/FamilyPositionGrid.tsx | Created visual remove zone below roles table with red dashed border and trash icon | ok
+[2024-12-28 19:50] | react_frontend/src/components/family/FamilyPositionGrid.tsx | Made person names in roles table draggable with visual feedback (opacity and red background) | ok
+[2024-12-28 19:50] | react_frontend/src/components/family/FamilyPositionGrid.tsx | Added drag state tracking to distinguish between dragging from members vs roles | ok
+[2024-12-28 19:50] | react_frontend/src/components/family/FamilyPositionGrid.tsx | Reduced roles table height to h-32 to make room for remove zone | ok
+[2024-12-28 19:55] | react_frontend/src/components/family/FamilyTreeWindow.tsx | CRITICAL FIX - Clear all family data when switching addresses to prevent data mixup | ok
+[2024-12-28 19:55] | react_frontend/src/components/family/FamilyTreeWindow.tsx | Added explicit state clearing in fetchFamilyMembers: setFamilyMembers([]), setFamilyRelationships([]), setFamilies([]) | ok
+[2024-12-28 19:55] | react_frontend/src/components/family/FamilyTreeWindow.tsx | Fixed initialFamilyData passing - only pass data when familyMembers.length > 0 | ok
+[2024-12-28 19:55] | react_frontend/src/components/family/FamilyTreeWindow.tsx | Enhanced logging to track address changes and data clearing | ok
+[2024-12-28 20:00] | react_frontend/src/components/directory/SearchResults.tsx | CRITICAL FIX - Added key prop to FamilyTreeWindow to force re-render when address changes | ok
+[2024-12-28 20:00] | react_frontend/src/components/family/FamilyDetailsModal.tsx | CRITICAL FIX - Added key prop to FamilyTreeWindow to force re-render when family changes | ok
+[2024-12-28 20:00] | react_frontend/src/components/directory/SearchResults.tsx | Fixed search result address click data persistence issue - each click now opens fresh data | ok

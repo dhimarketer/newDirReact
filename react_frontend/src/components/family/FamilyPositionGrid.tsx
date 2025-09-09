@@ -36,6 +36,7 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
   const [selectedPosition, setSelectedPosition] = useState<PositionSlot | null>(null);
   const [showRoleSelector, setShowRoleSelector] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<PhoneBookEntry | null>(null);
+  const [draggedFromRole, setDraggedFromRole] = useState<boolean>(false);
 
   // 2024-12-28: Removed familyStructure - now using compact role boxes instead
 
@@ -186,11 +187,37 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
                       onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', JSON.stringify(person));
                         e.dataTransfer.effectAllowed = 'move';
+                        setDraggedFromRole(false);
                         console.log(`Starting drag of ${person.name}`);
                         e.currentTarget.classList.add('opacity-50', 'bg-blue-100');
                       }}
                       onDragEnd={(e) => {
                         e.currentTarget.classList.remove('opacity-50', 'bg-blue-100');
+                        setDraggedFromRole(false);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const personData = e.dataTransfer.getData('text/plain');
+                        if (personData) {
+                          try {
+                            const draggedPerson = JSON.parse(personData);
+                            console.log(`Dropping ${draggedPerson.name} onto ${person.name} - reassigning`);
+                            
+                            // If dragging from a role assignment, remove from current role first
+                            if (draggedFromRole) {
+                              const existingMember = members.find(m => m.person.pid === draggedPerson.pid);
+                              if (existingMember) {
+                                onMemberRemove(existingMember.person.pid);
+                              }
+                            }
+                          } catch (error) {
+                            console.error('Error parsing dropped person data:', error);
+                          }
+                        }
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
                       }}
                       className={`cursor-move hover:bg-gray-50 transition-all duration-200 ${
                         isAssigned ? 'bg-gray-100' : 'bg-white'
@@ -242,7 +269,7 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
               )}
             </div>
           </div>
-          <div className="overflow-x-auto h-36 overflow-y-auto">
+          <div className="overflow-x-auto h-32 overflow-y-auto">
           <table className="w-full border-collapse border border-gray-300">
             <thead>
               <tr className="bg-gray-100">
@@ -351,11 +378,23 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
                     >
                       <div 
                         className="font-medium text-black p-0.5 bg-green-50 border border-green-200 rounded text-xs truncate cursor-pointer hover:bg-red-50 hover:border-red-300 transition-all duration-200"
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('text/plain', JSON.stringify(member.person));
+                          e.dataTransfer.effectAllowed = 'move';
+                          setDraggedFromRole(true);
+                          console.log(`Starting drag of ${member.person.name} from role: ${role}`);
+                          e.currentTarget.classList.add('opacity-50', 'bg-red-100');
+                        }}
+                        onDragEnd={(e) => {
+                          e.currentTarget.classList.remove('opacity-50', 'bg-red-100');
+                          setDraggedFromRole(false);
+                        }}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRemoveMember(member);
                         }}
-                        title="Click to remove assignment"
+                        title="Click to remove or drag to reassign/remove"
                       >
                         {member.person.name}
                       </div>
@@ -371,6 +410,43 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
               })}
             </tbody>
           </table>
+          </div>
+          
+          {/* Remove Zone - Drag members here to remove from roles */}
+          <div 
+            className="mt-2 p-2 border-2 border-dashed border-red-300 bg-red-50 rounded text-center text-xs text-red-600 hover:bg-red-100 hover:border-red-400 transition-all duration-200"
+            onDrop={(e) => {
+              e.preventDefault();
+              const personData = e.dataTransfer.getData('text/plain');
+              if (personData) {
+                try {
+                  const person = JSON.parse(personData);
+                  console.log(`Removing ${person.name} from all roles`);
+                  
+                  // Find the member and remove them
+                  const memberToRemove = members.find(m => m.person.pid === person.pid);
+                  if (memberToRemove) {
+                    onMemberRemove(memberToRemove.person.pid);
+                  }
+                } catch (error) {
+                  console.error('Error parsing dropped person data for removal:', error);
+                }
+              }
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+            }}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              e.currentTarget.classList.add('bg-red-200', 'border-red-500');
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.currentTarget.classList.remove('bg-red-200', 'border-red-500');
+            }}
+          >
+            🗑️ Drag here to remove from role
           </div>
         </div>
       </div>

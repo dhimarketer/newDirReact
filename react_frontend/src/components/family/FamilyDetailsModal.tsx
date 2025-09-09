@@ -21,6 +21,7 @@ const FamilyDetailsModal: React.FC<FamilyDetailsModalProps> = ({
   // Simply render the existing FamilyTreeWindow with the family's address and island
   return (
     <FamilyTreeWindow
+      key={`${family.address}-${family.island}`} // 2024-12-28: CRITICAL FIX - Force re-render when family changes
       isOpen={true}
       onClose={onClose}
       address={family.address || ''}
