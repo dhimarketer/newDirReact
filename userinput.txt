@@ -100,3 +100,4 @@ FamilyTreeDownloadButton.tsx:44:13
 [2025-01-05 18:35] | USER INPUT: now families with 2 parents show the lines, but families with one parent have no lines.
 [2025-01-05 18:45] | USER INPUT: not successful yet. here is some logs [LOGS SHOWING ALL NODES DETECTED AS CHILDREN WITH 0 PARENTS]
 [2025-01-05 18:55] | USER INPUT: now almost perfect. we just need to make sure that the the text in the boxes need to get wrapped if its too long. see image.
+[2025-01-05 19:05] | USER INPUT: very good. still there are minor problems. see imge. i see the text in last row is intersecting with the box boundary. text shall fit within the box

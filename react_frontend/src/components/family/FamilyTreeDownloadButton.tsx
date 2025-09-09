@@ -136,10 +136,16 @@ const generateFamilyTreeSVG = (familyMembers: any[], relationships: any[] = [], 
     rect.setAttribute('rx', '8');
     parentGroup.appendChild(rect);
     
-    // Parent name with text wrapping
-    const nameLines = wrapText(parent.entry.name || 'Unknown', nodeWidth - 10, 12);
-    const totalNameHeight = nameLines.length * 14; // 14px per line
-    const nameStartY = y + (nodeHeight - totalNameHeight) / 2 + 6; // Center vertically
+    // Parent name with text wrapping - ensure text fits within node
+    const nameLines = wrapText(parent.entry.name || 'Unknown', nodeWidth - 16, 12); // More padding
+    const ageHeight = parent.entry.age ? 12 : 0; // Age text height
+    const totalTextHeight = nameLines.length * 14 + ageHeight + (ageHeight > 0 ? 4 : 0); // Include age + spacing
+    const availableHeight = nodeHeight - 16; // 8px padding top and bottom
+    
+    // If text is too tall, start from top with padding
+    const nameStartY = totalTextHeight > availableHeight 
+      ? y + 18 // Start near top with padding
+      : y + (nodeHeight - totalTextHeight) / 2 + 14; // Center if it fits
     
     nameLines.forEach((line, index) => {
       const nameText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -154,11 +160,14 @@ const generateFamilyTreeSVG = (familyMembers: any[], relationships: any[] = [], 
       parentGroup.appendChild(nameText);
     });
     
-    // Parent age (positioned below the wrapped name)
+    // Parent age (positioned below the wrapped name with boundary check)
     if (parent.entry.age) {
+      const ageY = nameStartY + nameLines.length * 14 + 4;
+      const maxY = y + nodeHeight - 8; // 8px from bottom
+      
       const ageText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       ageText.setAttribute('x', (x + nodeWidth / 2).toString());
-      ageText.setAttribute('y', (nameStartY + nameLines.length * 14 + 8).toString());
+      ageText.setAttribute('y', Math.min(ageY, maxY).toString());
       ageText.setAttribute('text-anchor', 'middle');
       ageText.setAttribute('font-family', 'Arial, sans-serif');
       ageText.setAttribute('font-size', '10');
@@ -190,10 +199,16 @@ const generateFamilyTreeSVG = (familyMembers: any[], relationships: any[] = [], 
     rect.setAttribute('rx', '8');
     childGroup.appendChild(rect);
     
-    // Child name with text wrapping
-    const nameLines = wrapText(child.entry.name || 'Unknown', nodeWidth - 10, 12);
-    const totalNameHeight = nameLines.length * 14; // 14px per line
-    const nameStartY = y + (nodeHeight - totalNameHeight) / 2 + 6; // Center vertically
+    // Child name with text wrapping - ensure text fits within node
+    const nameLines = wrapText(child.entry.name || 'Unknown', nodeWidth - 16, 12); // More padding
+    const ageHeight = child.entry.age ? 12 : 0; // Age text height
+    const totalTextHeight = nameLines.length * 14 + ageHeight + (ageHeight > 0 ? 4 : 0); // Include age + spacing
+    const availableHeight = nodeHeight - 16; // 8px padding top and bottom
+    
+    // If text is too tall, start from top with padding
+    const nameStartY = totalTextHeight > availableHeight 
+      ? y + 18 // Start near top with padding
+      : y + (nodeHeight - totalTextHeight) / 2 + 14; // Center if it fits
     
     nameLines.forEach((line, index) => {
       const nameText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -208,11 +223,14 @@ const generateFamilyTreeSVG = (familyMembers: any[], relationships: any[] = [], 
       childGroup.appendChild(nameText);
     });
     
-    // Child age (positioned below the wrapped name)
+    // Child age (positioned below the wrapped name with boundary check)
     if (child.entry.age) {
+      const ageY = nameStartY + nameLines.length * 14 + 4;
+      const maxY = y + nodeHeight - 8; // 8px from bottom
+      
       const ageText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       ageText.setAttribute('x', (x + nodeWidth / 2).toString());
-      ageText.setAttribute('y', (nameStartY + nameLines.length * 14 + 8).toString());
+      ageText.setAttribute('y', Math.min(ageY, maxY).toString());
       ageText.setAttribute('text-anchor', 'middle');
       ageText.setAttribute('font-family', 'Arial, sans-serif');
       ageText.setAttribute('font-size', '10');
@@ -807,20 +825,20 @@ const FamilyTreeDownloadButton: React.FC<FamilyTreeDownloadButtonProps> = ({
             const childStartX = (totalWidth - childWidth) / 2;
             
             // Create canvas
-            const canvas = document.createElement('canvas');
+          const canvas = document.createElement('canvas');
             canvas.width = totalWidth * 2; // Higher resolution
             canvas.height = totalHeight * 2;
-            
+          
             const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              throw new Error('Could not get canvas context');
-            }
-            
+          if (!ctx) {
+            throw new Error('Could not get canvas context');
+          }
+          
             // Scale for higher resolution
             ctx.scale(2, 2);
             
             // Fill white background
-            ctx.fillStyle = '#ffffff';
+          ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, totalWidth, totalHeight);
             
             // Set default font
@@ -846,22 +864,30 @@ const FamilyTreeDownloadButton: React.FC<FamilyTreeDownloadButtonProps> = ({
               ctx.fill();
               ctx.stroke();
               
-              // Draw parent name with wrapping
+              // Draw parent name with wrapping - ensure text fits within node
               ctx.fillStyle = '#333';
               ctx.font = 'bold 12px Arial, sans-serif';
-              const parentNameLines = wrapTextCanvas(ctx, parent.entry.name || 'Unknown', nodeWidth - 10);
-              const parentNameHeight = parentNameLines.length * 14;
-              const parentNameStartY = y + (nodeHeight - parentNameHeight) / 2 + 6;
+              const parentNameLines = wrapTextCanvas(ctx, parent.entry.name || 'Unknown', nodeWidth - 16);
+              const parentAgeHeight = parent.entry.age ? 12 : 0;
+              const parentTotalTextHeight = parentNameLines.length * 14 + parentAgeHeight + (parentAgeHeight > 0 ? 4 : 0);
+              const parentAvailableHeight = nodeHeight - 16;
+              
+              // If text is too tall, start from top with padding
+              const parentNameStartY = parentTotalTextHeight > parentAvailableHeight 
+                ? y + 18 // Start near top with padding
+                : y + (nodeHeight - parentTotalTextHeight) / 2 + 14; // Center if it fits
               
               parentNameLines.forEach((line, index) => {
                 ctx.fillText(line, x + nodeWidth / 2, parentNameStartY + index * 14);
               });
               
-              // Draw parent age (positioned below wrapped name)
+              // Draw parent age (positioned below wrapped name with boundary check)
               if (parent.entry.age) {
                 ctx.fillStyle = '#666';
                 ctx.font = '10px Arial, sans-serif';
-                ctx.fillText(`${parent.entry.age} years`, x + nodeWidth / 2, parentNameStartY + parentNameLines.length * 14 + 8);
+                const parentAgeY = parentNameStartY + parentNameLines.length * 14 + 4;
+                const parentMaxY = y + nodeHeight - 8; // 8px from bottom
+                ctx.fillText(`${parent.entry.age} years`, x + nodeWidth / 2, Math.min(parentAgeY, parentMaxY));
               }
             });
             
@@ -881,22 +907,30 @@ const FamilyTreeDownloadButton: React.FC<FamilyTreeDownloadButtonProps> = ({
               ctx.fill();
               ctx.stroke();
               
-              // Draw child name with wrapping
+              // Draw child name with wrapping - ensure text fits within node
               ctx.fillStyle = '#333';
               ctx.font = 'bold 12px Arial, sans-serif';
-              const childNameLines = wrapTextCanvas(ctx, child.entry.name || 'Unknown', nodeWidth - 10);
-              const childNameHeight = childNameLines.length * 14;
-              const childNameStartY = y + (nodeHeight - childNameHeight) / 2 + 6;
+              const childNameLines = wrapTextCanvas(ctx, child.entry.name || 'Unknown', nodeWidth - 16);
+              const childAgeHeight = child.entry.age ? 12 : 0;
+              const childTotalTextHeight = childNameLines.length * 14 + childAgeHeight + (childAgeHeight > 0 ? 4 : 0);
+              const childAvailableHeight = nodeHeight - 16;
+              
+              // If text is too tall, start from top with padding
+              const childNameStartY = childTotalTextHeight > childAvailableHeight 
+                ? y + 18 // Start near top with padding
+                : y + (nodeHeight - childTotalTextHeight) / 2 + 14; // Center if it fits
               
               childNameLines.forEach((line, index) => {
                 ctx.fillText(line, x + nodeWidth / 2, childNameStartY + index * 14);
               });
               
-              // Draw child age (positioned below wrapped name)
+              // Draw child age (positioned below wrapped name with boundary check)
               if (child.entry.age) {
                 ctx.fillStyle = '#666';
                 ctx.font = '10px Arial, sans-serif';
-                ctx.fillText(`${child.entry.age} years`, x + nodeWidth / 2, childNameStartY + childNameLines.length * 14 + 8);
+                const childAgeY = childNameStartY + childNameLines.length * 14 + 4;
+                const childMaxY = y + nodeHeight - 8; // 8px from bottom
+                ctx.fillText(`${child.entry.age} years`, x + nodeWidth / 2, Math.min(childAgeY, childMaxY));
               }
             });
             
@@ -904,7 +938,7 @@ const FamilyTreeDownloadButton: React.FC<FamilyTreeDownloadButtonProps> = ({
             console.log(`🔗 Canvas - Drawing connections: ${parents.length} parents, ${children.length} children`);
             if (parents.length > 0 && children.length > 0) {
               ctx.strokeStyle = '#8B4513';
-              ctx.lineWidth = 3;
+                  ctx.lineWidth = 3;
               
               if (parents.length === 2) {
                 // Two parents - draw spouse line and connections
@@ -914,11 +948,11 @@ const FamilyTreeDownloadButton: React.FC<FamilyTreeDownloadButtonProps> = ({
                 
                 // Draw spouse line (dashed)
                 ctx.setLineDash([8, 4]);
-                ctx.beginPath();
+                  ctx.beginPath();
                 ctx.moveTo(parent1X, spouseY);
                 ctx.lineTo(parent2X, spouseY);
-                ctx.stroke();
-                
+                  ctx.stroke();
+                  
                 // Reset line dash
                 ctx.setLineDash([]);
                 
@@ -933,7 +967,7 @@ const FamilyTreeDownloadButton: React.FC<FamilyTreeDownloadButtonProps> = ({
                 ctx.stroke();
                 
                 // Horizontal distribution line to children
-                if (children.length > 0) {
+                  if (children.length > 0) {
                   const firstChildX = childStartX + nodeWidth / 2;
                   const lastChildX = childStartX + (children.length - 1) * (nodeWidth + horizontalSpacing) + nodeWidth / 2;
                   const distributionY = centerY + verticalSpacing / 2;
@@ -969,20 +1003,20 @@ const FamilyTreeDownloadButton: React.FC<FamilyTreeDownloadButtonProps> = ({
                   const firstChildX = childStartX + nodeWidth / 2;
                   const lastChildX = childStartX + (children.length - 1) * (nodeWidth + horizontalSpacing) + nodeWidth / 2;
                   const distributionY = parentBottomY + verticalSpacing / 2;
-                  
-                  ctx.beginPath();
+                    
+                    ctx.beginPath();
                   ctx.moveTo(firstChildX, distributionY);
                   ctx.lineTo(lastChildX, distributionY);
-                  ctx.stroke();
-                  
+                    ctx.stroke();
+                    
                   // Vertical lines to each child
                   children.forEach((child, index) => {
                     const childX = childStartX + index * (nodeWidth + horizontalSpacing) + nodeWidth / 2;
-                    ctx.beginPath();
+                      ctx.beginPath();
                     ctx.moveTo(childX, distributionY);
                     ctx.lineTo(childX, childY);
-                    ctx.stroke();
-                  });
+                      ctx.stroke();
+                    });
                 }
               }
             }
