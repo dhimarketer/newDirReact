@@ -88,3 +88,24 @@
 [2024-12-28 20:00] | react_frontend/src/components/directory/SearchResults.tsx | CRITICAL FIX - Added key prop to FamilyTreeWindow to force re-render when address changes | ok
 [2024-12-28 20:00] | react_frontend/src/components/family/FamilyDetailsModal.tsx | CRITICAL FIX - Added key prop to FamilyTreeWindow to force re-render when family changes | ok
 [2024-12-28 20:00] | react_frontend/src/components/directory/SearchResults.tsx | Fixed search result address click data persistence issue - each click now opens fresh data | ok
+[2024-12-28 20:05] | react_frontend/src/components/family/FamilyPositionGrid.tsx | ADDED grandparent and grandchild roles to roles table - grandfather, grandmother, grandson, granddaughter | ok
+[2024-12-28 20:05] | react_frontend/src/components/family/FamilyPositionGrid.tsx | Updated role label mapping and numbering logic for grandparent/grandchild roles | ok
+[2024-12-28 20:05] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | ADDED grandparent detection logic - identifies people 20+ years older than parents | ok
+[2024-12-28 20:05] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | ADDED grandchild detection logic - identifies people 20+ years younger than children | ok
+[2024-12-28 20:05] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | Set proper generation levels - grandparents (0), parents (1), children (2), grandchildren (3) | ok
+[2024-12-28 20:10] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | ADDED multi-generational family detection logic - identifies families spanning multiple generations | ok
+[2024-12-28 20:10] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | ADDED family splitting modal - suggests creating separate nuclear families for each generation | ok
+[2024-12-28 20:10] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | ADDED address suggestion based on father name for new families (e.g., "Abdulla Haneef's Family, Habaruge") | ok
+[2024-12-28 20:10] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | ADDED three save options: Create Separate Families, Save as Single Family, or Cancel | ok
+[2024-12-28 20:10] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | IMPLEMENTED complete multi-generational family workflow - maintains nuclear family concept while supporting extended families | ok
+[2024-12-28 20:15] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | ADDED sidebar hiding functionality - automatically hides left menu when family tree form opens and restores when closed | ok
+[2024-12-28 20:15] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | REMOVED ml-32 positioning class - modal now centers properly when sidebar is hidden | ok
+[2024-12-28 20:20] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | ENHANCED family splitting logic - added parent-child relationship mapping between nuclear families | ok
+[2024-12-28 20:20] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | ADDED parent selection UI for grandchild families - asks user which parent from main family should be parent of grandchild | ok
+[2024-12-28 20:20] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | IMPLEMENTED proper family hierarchy creation - establishes parent-child relationships between families | ok
+[2024-12-28 20:20] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | ADDED validation to ensure all grandchild families have parent selected before creation | ok
+[2024-12-28 20:20] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | COMPLETED improved family splitting workflow - creates proper nuclear family hierarchy with relationships | ok
+[2024-12-28 20:25] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | FIXED family splitting logic - now creates only ONE additional family for grandchildren, keeps main family intact | ok
+[2024-12-28 20:25] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | UPDATED modal UI to show main family (kept) and additional family (created) separately | ok
+[2024-12-28 20:25] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | FIXED parent selection to show parents from main family, not from suggested families | ok
+[2024-12-28 20:25] | react_frontend/src/components/family/EnhancedFamilyEditor.tsx | IMPLEMENTED correct workflow: save main family (remove grandchildren) + create grandchild family with parent relationship | ok

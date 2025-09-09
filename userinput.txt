@@ -13,3 +13,25 @@
 [2024-12-28 19:50] | USER INPUT: now after removing the button there is noway to remove a member from role table. how to fix this. lets drag out to remove
 [2024-12-28 19:55] | USER INPUT: still i see mixup. here i clicked the family of happy night, sh. goidhoo, but the form is populated with the family of happy night, k. Male'. so its two different families. as mentioned earlier, when user clicks on an address, the form shall open with data of that particular address, previous data shall not be there on the form
 [2024-12-28 20:00] | USER INPUT: the issue is not resolved. this must be in search result issue. because as user i am clicking on search result addresses. when i click on a search result address i shall see the family tree of that particular address. not the one before searched
+[2024-12-28 20:05] | USER INPUT: now lets add grand children and grand parents also to the roles table in family tree smart edit form. this shall correctly identify the family member position and shall update multi generation family
+[2024-12-28 20:10] | USER INPUT: advice needed.  now what happens when a family becomes multi generation. our initial idea was to create a nuclear family for any address. now after user edits the family and make it extended, lets make user specify to create another nuclear family.  case in point. when fathmath nava haneef of habaruge becomes a daughter of Abdulla Haneef, thats another separate nuclear family. with nuha being the daughter and abdulla haneef being the father. lets create this as new family with suggested address with father's name. what do you think?
+[2024-12-28 20:15] | USER INPUT: lets hide the left menu which is covering the form . see image
+[2024-12-28 20:20] | USER INPUT: the family splitting logic is not yet good. if a grand parent or grand child is created then we shall ask who is the parent of the child is from this existing family. when user  updates this, the 2nd nuclear family is created from 1st nuclear family
+[2024-12-28 20:25] | USER INPUT: now this seems to create 3 families. while in fact 1 additional family need to be created. that is nava haneef family. but her father is Abdulla Haneef.  He is still a member of Habaruge family as a son of Mariyam Dhie. how to solve this? here is your given suggestion " Multi-Generational Family Detected
+
+This family spans multiple generations. We suggest creating separate nuclear families for better organization:
+fathimath saeeda's Family
+Generation 2
+Address:
+Members (5):
+fathimath saeeda (daughter)ibrahim nafiz (son)aishath wafa (daughter)abdulla haneef (son)hussain zaneef (son)
+fathmath nava haneef's Family
+Generation 3
+Address:
+Members (1):
+fathmath nava haneef (granddaughter)
+mariyam dhie's Family
+Generation 1
+Address:
+Members (1):
+mariyam dhie (mother)"

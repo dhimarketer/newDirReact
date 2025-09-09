@@ -5,6 +5,7 @@ import { PhoneBookEntry } from '../../types/directory';
 import { SpecificFamilyRole, EnhancedFamilyMember, FamilyValidationError } from '../../types/enhancedFamily';
 import { FAMILY_ROLE_DEFINITIONS, getRoleSuggestions } from '../../data/familyRoleDefinitions';
 import FamilyPositionGrid from './FamilyPositionGrid';
+import { useUI } from '../../store/uiStore';
 
 interface FamilyRelationship {
   id: number;
@@ -41,12 +42,22 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
   initialFamilyData,
   relationships = []
 }) => {
+  const { setSidebarOpen } = useUI();
   const [familyMembers, setFamilyMembers] = useState<EnhancedFamilyMember[]>([]);
   const [validationErrors, setValidationErrors] = useState<FamilyValidationError[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showAutoSuggest, setShowAutoSuggest] = useState(false);
+  const [showMultiGenModal, setShowMultiGenModal] = useState(false);
+  const [suggestedFamilies, setSuggestedFamilies] = useState<Array<{
+    name: string;
+    address: string;
+    members: EnhancedFamilyMember[];
+    generation: number;
+    parentFamilyId?: number; // ID of the parent family
+    parentMemberId?: number; // ID of the parent member who connects to this family
+  }>>([]);
 
   // Map generic roles to specific roles
   const mapGenericRoleToSpecific = (genericRole: string, person: PhoneBookEntry): SpecificFamilyRole => {
@@ -344,13 +355,89 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
       });
     });
 
-    // 2024-12-28: REMOVED automatic grandparent detection
-    // Users will manually identify grandparents and grandchildren
-    // System should only auto-detect parents by age analysis
+    // 2024-12-28: ADDED grandparent detection based on age analysis
+    // Detect grandparents as people significantly older than identified parents
+    const identifiedParents = enhancedMembers.filter(member => 
+      member.specific_role === 'father' || member.specific_role === 'mother'
+    );
+    
+    if (identifiedParents.length > 0) {
+      const remainingMembers = membersWithAge.filter(({ person }) => !usedPeople.has(person.pid));
+      
+      // Find potential grandparents (20+ years older than parents)
+      remainingMembers.forEach(({ person, age }) => {
+        if (usedPeople.has(person.pid)) return;
+        
+        const isGrandparent = identifiedParents.some(parent => {
+          const parentAge = parent.person.DOB ? new Date().getFullYear() - new Date(parent.person.DOB).getFullYear() : undefined;
+          return parentAge && age && (age - parentAge) >= 20;
+        });
+        
+        if (isGrandparent) {
+          let role: SpecificFamilyRole = 'other';
+          if (person.gender === 'M') {
+            role = 'grandfather';
+          } else if (person.gender === 'F') {
+            role = 'grandmother';
+          }
+          
+          if (role !== 'other') {
+            console.log('Assigned grandparent role by age analysis:', role, 'to', person.name);
+            enhancedMembers.push({
+              id: Date.now() + Math.random(),
+              person,
+              specific_role: role,
+              generation_level: 0, // Grandparents are generation 0
+              is_primary: true
+            });
+            usedPeople.add(person.pid);
+          }
+        }
+      });
+    }
 
-    // 2024-12-28: REMOVED hardcoded age thresholds for remaining members
-    // Only assign children based on relationship data or age gap analysis
-    // Users will manually assign grandparents and other roles
+    // 2024-12-28: ADDED grandchild detection based on age analysis
+    // Detect grandchildren as people significantly younger than identified children
+    const identifiedChildren = enhancedMembers.filter(member => 
+      member.specific_role === 'son' || member.specific_role === 'daughter'
+    );
+    
+    if (identifiedChildren.length > 0) {
+      const remainingMembers = membersWithAge.filter(({ person }) => !usedPeople.has(person.pid));
+      
+      // Find potential grandchildren (20+ years younger than children)
+      remainingMembers.forEach(({ person, age }) => {
+        if (usedPeople.has(person.pid)) return;
+        
+        const isGrandchild = identifiedChildren.some(child => {
+          const childAge = child.person.DOB ? new Date().getFullYear() - new Date(child.person.DOB).getFullYear() : undefined;
+          return childAge && age && (childAge - age) >= 20;
+        });
+        
+        if (isGrandchild) {
+          let role: SpecificFamilyRole = 'other';
+          if (person.gender === 'M') {
+            role = 'grandson';
+          } else if (person.gender === 'F') {
+            role = 'granddaughter';
+          }
+          
+          if (role !== 'other') {
+            console.log('Assigned grandchild role by age analysis:', role, 'to', person.name);
+            enhancedMembers.push({
+              id: Date.now() + Math.random(),
+              person,
+              specific_role: role,
+              generation_level: 3, // Grandchildren are generation 3
+              is_primary: true
+            });
+            usedPeople.add(person.pid);
+          }
+        }
+      });
+    }
+
+    // 2024-12-28: Continue with remaining members for children detection
     const remainingMembers = membersWithAge.filter(({ person }) => !usedPeople.has(person.pid));
     
     // Only assign as children if they have parents or are significantly younger than identified parents
@@ -391,6 +478,53 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
     
     return enhancedMembers;
   };
+
+  // 2024-12-28: Fixed multi-generational family detection - only create ONE additional family for grandchildren
+  const detectMultiGenerationalFamily = (members: EnhancedFamilyMember[]) => {
+    const generations = new Set<number>();
+    members.forEach(member => {
+      generations.add(member.generation_level);
+    });
+    
+    // Check if we have grandchildren (generation 3) - only split if grandchildren exist
+    const hasGrandchildren = generations.has(3);
+    
+    if (!hasGrandchildren) return null;
+    
+    // Find grandchildren (generation 3)
+    const grandchildren = members.filter(member => member.generation_level === 3);
+    
+    if (grandchildren.length === 0) return null;
+    
+    // Create only ONE additional family for grandchildren
+    const grandchildFamily = {
+      name: `${grandchildren[0].person.name}'s Family`,
+      address: `${grandchildren[0].person.name}'s Family, ${grandchildren[0].person.address || 'Habaruge'}`,
+      members: grandchildren,
+      generation: 3,
+      parentFamilyId: 0, // Main family
+      parentMemberId: undefined // Will be set by user
+    };
+    
+    return { 
+      suggestedFamilies: [grandchildFamily], 
+      familyRelationships: [] 
+    };
+  };
+
+  // 2024-12-28: Hide sidebar when modal opens, restore when closed
+  useEffect(() => {
+    if (isOpen) {
+      setSidebarOpen(false);
+    } else {
+      setSidebarOpen(true);
+    }
+    
+    // Cleanup: restore sidebar when component unmounts
+    return () => {
+      setSidebarOpen(true);
+    };
+  }, [isOpen, setSidebarOpen]);
 
   // Initialize family data
   useEffect(() => {
@@ -677,6 +811,17 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
     setError(null);
 
     try {
+      // 2024-12-28: Check for multi-generational family before saving
+      const multiGenResult = detectMultiGenerationalFamily(familyMembers);
+      
+      if (multiGenResult && multiGenResult.suggestedFamilies.length > 1) {
+        // Show multi-generational family splitting modal
+        setSuggestedFamilies(multiGenResult.suggestedFamilies);
+        setShowMultiGenModal(true);
+        setIsLoading(false);
+        return;
+      }
+
       // Convert enhanced family data to backend format
       const familyData = {
         address,
@@ -768,7 +913,7 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
-      <div className="bg-white rounded-lg shadow-xl w-[800px] h-[320px] overflow-hidden flex flex-col ml-32">
+      <div className="bg-white rounded-lg shadow-xl w-[800px] h-[320px] overflow-hidden flex flex-col">
         {/* Ultra Compact Header */}
         <div className="flex items-center justify-between px-2 py-1 border-b border-gray-300 bg-white">
           <div className="flex-1 min-w-0">
@@ -876,6 +1021,247 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Multi-Generational Family Splitting Modal */}
+      {showMultiGenModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">
+                Grandchild Family Detected
+              </h3>
+              <p className="text-gray-600 mb-6">
+                This family has grandchildren. We suggest creating one additional nuclear family for the grandchild while keeping the main family intact:
+              </p>
+              
+              {/* Main Family - Will be kept */}
+              <div className="mb-6 p-4 bg-green-50 border border-green-300 rounded-lg">
+                <h4 className="font-semibold text-lg text-green-900 mb-2">
+                  Main Family (Will be kept)
+                </h4>
+                <p className="text-green-700 mb-2">
+                  All original members will remain in the main family at: <strong>{address}</strong>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {familyMembers
+                    .filter(member => member.generation_level !== 3) // Exclude grandchildren
+                    .map((member, memberIndex) => (
+                      <span
+                        key={memberIndex}
+                        className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-sm"
+                      >
+                        {member.person.name} ({member.specific_role})
+                      </span>
+                    ))}
+                </div>
+              </div>
+
+              {/* Additional Family - Will be created */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-lg text-gray-900 mb-2">
+                  Additional Family to Create:
+                </h4>
+                {suggestedFamilies.map((family, index) => (
+                  <div key={index} className="border border-gray-300 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-lg text-gray-900">{family.name}</h4>
+                      <span className="text-sm text-gray-500">Generation {family.generation}</span>
+                    </div>
+                    <div className="mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Address:
+                      </label>
+                      <input
+                        type="text"
+                        value={family.address}
+                        onChange={(e) => {
+                          const updated = [...suggestedFamilies];
+                          updated[index].address = e.target.value;
+                          setSuggestedFamilies(updated);
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    {/* Parent Selection for Grandchildren */}
+                    {family.generation === 3 && family.parentFamilyId !== undefined && (
+                      <div className="mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Who is the parent of this grandchild family?
+                        </label>
+                        <select
+                          value={family.parentMemberId || ''}
+                          onChange={(e) => {
+                            const updated = [...suggestedFamilies];
+                            updated[index].parentMemberId = parseInt(e.target.value);
+                            setSuggestedFamilies(updated);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select parent from main family...</option>
+                          {familyMembers
+                            .filter(member => 
+                              member.generation_level !== 3 && // Exclude grandchildren
+                              (member.specific_role === 'father' || 
+                               member.specific_role === 'mother' ||
+                               member.specific_role === 'son' ||
+                               member.specific_role === 'daughter')
+                            )
+                            .map((member, memberIndex) => (
+                              <option key={memberIndex} value={member.person.pid}>
+                                {member.person.name} ({member.specific_role})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    )}
+                    
+                    <div className="mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Members ({family.members.length}):
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {family.members.map((member, memberIndex) => (
+                          <span
+                            key={memberIndex}
+                            className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                          >
+                            {member.person.name} ({member.specific_role})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowMultiGenModal(false);
+                    setSuggestedFamilies([]);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      setIsLoading(true);
+                      
+                      // Validate that all grandchild families have parent selected
+                      const grandchildFamilies = suggestedFamilies.filter(f => f.generation === 3);
+                      const missingParents = grandchildFamilies.filter(f => !f.parentMemberId);
+                      
+                      if (missingParents.length > 0) {
+                        setError('Please select a parent for all grandchild families before creating families.');
+                        setIsLoading(false);
+                        return;
+                      }
+                      
+                      // First, save the main family (remove grandchildren from it)
+                      const mainFamilyMembers = familyMembers.filter(member => member.generation_level !== 3);
+                      const mainFamilyData = {
+                        address,
+                        island,
+                        members: mainFamilyMembers.map(member => ({
+                          entry_id: member.person.pid,
+                          role: member.specific_role
+                        })),
+                        relationships: generateRelationshipsFromRoles(mainFamilyMembers)
+                      };
+                      await onSave(mainFamilyData);
+                      
+                      // Then create the additional grandchild family
+                      const grandchildFamily = suggestedFamilies[0];
+                      
+                      // Generate relationships for the grandchild family
+                      let grandchildRelationships = generateRelationshipsFromRoles(grandchildFamily.members);
+                      
+                      // Add parent-child relationship between the selected parent and grandchild
+                      if (grandchildFamily.parentMemberId) {
+                        // Find the parent member in the main family
+                        const parentMember = familyMembers.find(m => m.person.pid === grandchildFamily.parentMemberId);
+                        if (parentMember) {
+                          // Add parent-child relationship between the parent and the grandchild
+                          const grandchild = grandchildFamily.members[0];
+                          
+                          grandchildRelationships.push({
+                            person1_id: parentMember.person.pid,
+                            person2_id: grandchild.person.pid,
+                            relationship_type: 'parent',
+                            notes: `${parentMember.person.name} (${parentMember.specific_role}) → ${grandchild.person.name} (${grandchild.specific_role}) - Family Relationship`
+                          });
+                        }
+                      }
+                      
+                      const grandchildFamilyData = {
+                        address: grandchildFamily.address,
+                        island: island,
+                        members: grandchildFamily.members.map(member => ({
+                          entry_id: member.person.pid,
+                          role: member.specific_role
+                        })),
+                        relationships: grandchildRelationships
+                      };
+                      
+                      await onSave(grandchildFamilyData);
+                      
+                      setSuccessMessage(`Updated main family and created 1 additional grandchild family with proper relationships!`);
+                      setTimeout(() => {
+                        onClose();
+                      }, 1500);
+                    } catch (error) {
+                      setError(`Failed to create families: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                    } finally {
+                      setIsLoading(false);
+                      setShowMultiGenModal(false);
+                      setSuggestedFamilies([]);
+                    }
+                  }}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Creating Grandchild Family...' : 'Create Grandchild Family'}
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      setIsLoading(true);
+                      // Save as single family (original behavior)
+                      const familyData = {
+                        address,
+                        island,
+                        members: familyMembers.map(member => ({
+                          entry_id: member.person.pid,
+                          role: member.specific_role
+                        })),
+                        relationships: generateRelationshipsFromRoles(familyMembers)
+                      };
+                      await onSave(familyData);
+                      setSuccessMessage('Family structure saved as single family!');
+                      setTimeout(() => {
+                        onClose();
+                      }, 1500);
+                    } catch (error) {
+                      setError(`Failed to save family structure: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                    } finally {
+                      setIsLoading(false);
+                      setShowMultiGenModal(false);
+                      setSuggestedFamilies([]);
+                    }
+                  }}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Saving...' : 'Save as Single Family'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

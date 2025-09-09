@@ -280,10 +280,14 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
             </thead>
             <tbody>
               {/* Create rows for each role type with multiple members */}
-              {['father', 'mother', 'son', 'daughter', 'son_in_law', 'daughter_in_law'].map(role => {
+              {['grandfather', 'grandmother', 'father', 'mother', 'son', 'daughter', 'grandson', 'granddaughter', 'son_in_law', 'daughter_in_law'].map(role => {
                 const roleMembers = members.filter(m => m.specific_role === role);
                 const roleLabel = role === 'son_in_law' ? 'Son-in-law' : 
                                  role === 'daughter_in_law' ? 'Daughter-in-law' :
+                                 role === 'grandfather' ? 'Grandfather' :
+                                 role === 'grandmother' ? 'Grandmother' :
+                                 role === 'grandson' ? 'Grandson' :
+                                 role === 'granddaughter' ? 'Granddaughter' :
                                  role.charAt(0).toUpperCase() + role.slice(1);
                 
                 // Show empty row if no members assigned
@@ -340,7 +344,7 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
                 return roleMembers.map((member, index) => (
                   <tr key={`${role}-${member.id}`} className="hover:bg-gray-50">
                     <td className="border border-gray-300 px-1 py-0.5 text-xs font-medium text-gray-700 truncate">
-                      {role === 'son' || role === 'daughter' ? `${roleLabel} ${index + 1}` : roleLabel}
+                      {role === 'son' || role === 'daughter' || role === 'grandson' || role === 'granddaughter' ? `${roleLabel} ${index + 1}` : roleLabel}
                     </td>
                     <td 
                       className="border border-gray-300 px-1 py-0.5 text-xs transition-colors duration-200 hover:bg-green-50"
