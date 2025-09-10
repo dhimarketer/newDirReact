@@ -3,7 +3,7 @@
 
 import React from 'react';
 
-export type ViewMode = 'table' | 'svg-tree' | 'clean-reactflow';
+export type ViewMode = 'table' | 'svg-tree' | 'clean-reactflow' | 'connected-graph';
 
 interface FamilyViewToggleProps {
   currentView: ViewMode;
@@ -58,6 +58,20 @@ const FamilyViewToggle: React.FC<FamilyViewToggleProps> = ({
       >
         <span className="text-base">⚛️</span>
         <span>ReactFlow</span>
+      </button>
+
+      {/* Connected Graph Button - Phase 2 Feature */}
+      <button
+        onClick={() => onViewChange('connected-graph')}
+        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center space-x-2 ${
+          currentView === 'connected-graph'
+            ? 'bg-orange-100 text-orange-700 border-2 border-orange-300 shadow-sm'
+            : 'bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200 hover:text-gray-700'
+        }`}
+        title="Show connected family graph with global person registry and multi-generational support"
+      >
+        <span className="text-base">🌐</span>
+        <span>Connected</span>
       </button>
     </div>
   );

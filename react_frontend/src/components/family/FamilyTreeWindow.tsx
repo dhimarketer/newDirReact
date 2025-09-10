@@ -14,6 +14,7 @@ import FamilyTreeDownloadButton from './FamilyTreeDownloadButton';
 import FamilyTableView from './FamilyTableView';
 import FamilyViewToggle, { ViewMode } from './FamilyViewToggle';
 import EnhancedFamilyEditor from './EnhancedFamilyEditor';  // 2024-12-28: NEW - Enhanced family editor
+import ConnectedFamilyGraph from './ConnectedFamilyGraph';  // 2024-12-28: NEW - Phase 2 connected family graph
 import { PhoneBookEntry } from '../../types/directory';
 
 interface FamilyTreeWindowProps {
@@ -279,22 +280,22 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
           created_at: family.created_at,
           members: (family.members || []).map((member: any, index: number) => ({
             entry: {
-              pid: member.entry?.pid || member.entry_id || member.id || index + 1,
-              name: member.entry?.name || member.entry_name || member.name || '',
-              contact: member.entry?.contact || member.entry_contact || member.contact || '',
+              pid: member.entry || member.entry_id || member.id || index + 1,  // 2024-12-29: FIXED - entry is now just the ID
+              name: member.entry_name || member.entry?.name || member.name || '',
+              contact: member.entry_contact || member.entry?.contact || member.contact || '',
               address: member.entry?.address || member.entry_address || member.address || '',
               island: member.entry?.island || member.entry_island || member.island || '',
               atoll: member.entry?.atoll || '',
               street: member.entry?.street || '',
               ward: member.entry?.ward || '',
               party: member.entry?.party || '',
-              DOB: member.entry?.DOB || member.entry_dob || member.dob || member.entry?.dob || '',
+              DOB: member.entry_dob || member.entry?.DOB || member.dob || '',
               status: member.entry?.status || '',
               remark: member.entry?.remark || '',
               email: member.entry?.email || '',
-              gender: member.entry?.gender || '',
+              gender: member.entry_gender || member.entry?.gender || '',
               extra: member.entry?.extra || '',
-              profession: member.entry?.profession || '',
+              profession: member.entry_profession || member.entry?.profession || '',
               pep_status: member.entry?.pep_status || '',
               change_status: member.entry?.change_status || 'Active',
               requested_by: member.entry?.requested_by || '',
@@ -420,33 +421,33 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
         
         console.log('🔗 Raw API response relationships:', relationships);
         
-        // 2025-01-28: FIXED - Transform API data to match expected types
+        // 2024-12-29: FIXED - Transform API data to match expected types using new serializer structure
         const transformedMembers: FamilyMember[] = members.map((member: any, index: number) => ({
           entry: {
-            pid: member.entry?.pid || member.entry_id || member.id || index + 1, // Use index+1 as fallback for unique IDs
-            name: member.entry?.name || member.entry_name || member.name || '',
-            contact: member.entry?.contact || member.entry_contact || member.contact || '',
+            pid: member.entry || member.entry_id || member.id || index + 1,  // 2024-12-29: FIXED - entry is now just the ID
+            name: member.entry_name || member.entry?.name || member.name || '',
+            contact: member.entry_contact || member.entry?.contact || member.contact || '',
             address: member.entry?.address || member.entry_address || member.address || '',
             island: member.entry?.island || member.entry_island || member.island || '',
             atoll: member.entry?.atoll || '',
             street: member.entry?.street || '',
             ward: member.entry?.ward || '',
             party: member.entry?.party || '',
-            DOB: member.entry?.DOB || member.entry_dob || member.dob || member.entry?.dob || '',
+            DOB: member.entry_dob || member.entry?.DOB || member.dob || '',
             status: member.entry?.status || '',
             remark: member.entry?.remark || '',
             email: member.entry?.email || '',
-            gender: member.entry?.gender || '',
+            gender: member.entry_gender || member.entry?.gender || '',
             extra: member.entry?.extra || '',
-            profession: member.entry?.profession || '',
+            profession: member.entry_profession || member.entry?.profession || '',
             pep_status: member.entry?.pep_status || '',
             change_status: member.entry?.change_status || 'Active',
             requested_by: member.entry?.requested_by || '',
             batch: member.entry?.batch || '',
             image_status: member.entry?.image_status || '',
             family_group_id: member.entry?.family_group_id || undefined,
-            nid: member.entry?.nid || undefined,
-            age: member.entry?.age || undefined  // 2025-01-28: FIXED - Add age field to preserve backend-calculated ages
+            nid: member.entry_nid || member.entry?.nid || undefined,
+            age: member.entry_age || member.entry?.age || undefined  // 2024-12-29: FIXED - Use entry_age from new serializer
           },
           role: member.role_in_family || member.role || 'other',
           relationship: member.relationship || ''
@@ -503,22 +504,22 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                 created_at: family.created_at,
                 members: (family.members || []).map((member: any, index: number) => ({
                   entry: {
-                    pid: member.entry?.pid || member.entry_id || member.id || index + 1,
-                    name: member.entry?.name || member.entry_name || member.name || '',
-                    contact: member.entry?.contact || member.entry_contact || member.contact || '',
+                    pid: member.entry || member.entry_id || member.id || index + 1,  // 2024-12-29: FIXED - entry is now just the ID
+                    name: member.entry_name || member.entry?.name || member.name || '',
+                    contact: member.entry_contact || member.entry?.contact || member.contact || '',
                     address: member.entry?.address || member.entry_address || member.address || '',
                     island: member.entry?.island || member.entry_island || member.island || '',
                     atoll: member.entry?.atoll || '',
                     street: member.entry?.street || '',
                     ward: member.entry?.ward || '',
                     party: member.entry?.party || '',
-                    DOB: member.entry?.DOB || member.entry_dob || member.dob || member.entry?.dob || '',
+                    DOB: member.entry_dob || member.entry?.DOB || member.dob || '',
                     status: member.entry?.status || '',
                     remark: member.entry?.remark || '',
                     email: member.entry?.email || '',
-                    gender: member.entry?.gender || '',
+                    gender: member.entry_gender || member.entry?.gender || '',
                     extra: member.entry?.extra || '',
-                    profession: member.entry?.profession || '',
+                    profession: member.entry_profession || member.entry?.profession || '',
                     pep_status: member.entry?.pep_status || '',
                     change_status: member.entry?.change_status || 'Active',
                     requested_by: member.entry?.requested_by || '',
@@ -733,7 +734,10 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
         >
           <div className="family-tree-title">
             <h2>
-              {viewMode === 'table' ? 'Family Table' : viewMode === 'svg-tree' ? 'Family Tree (SVG)' : 'Family Tree (ReactFlow)'} - {address}, {island}
+              {viewMode === 'table' ? 'Family Table' : 
+               viewMode === 'svg-tree' ? 'Family Tree (SVG)' : 
+               viewMode === 'clean-reactflow' ? 'Family Tree (ReactFlow)' : 
+               'Connected Family Graph'} - {address}, {island}
             </h2>
             <div className="family-tree-subtitle">
               {hasMultipleFamilies ? (
@@ -930,6 +934,7 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                 viewMode === 'table' ? (
                   <FamilyTableView
                     familyMembers={familyMembers}
+                    relationships={familyRelationships}
                     address={address}
                     island={island}
                   />
@@ -946,6 +951,31 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                         familyMembers={familyMembers}
                         relationships={familyRelationships}
                         svgRef={svgRef as React.RefObject<SVGSVGElement>}
+                      />
+                    );
+                  })()
+                ) : viewMode === 'connected-graph' ? (
+                  (() => {
+                    console.log('🔍 FamilyTreeWindow: Rendering ConnectedFamilyGraph with:', {
+                      viewMode,
+                      familyMembersCount: familyMembers.length,
+                      relationshipsCount: familyRelationships.length,
+                      hasMultipleFamilies
+                    });
+                    // Get the first person's PID as root for the connected graph
+                    const rootPersonPid = familyMembers.length > 0 ? familyMembers[0].entry.pid : 0;
+                    return (
+                      <ConnectedFamilyGraph
+                        rootPersonPid={rootPersonPid}
+                        maxDepth={3}
+                        showNuclearFamilyGrouping={true}
+                        showNavigationControls={true}
+                        onPersonClick={(person) => {
+                          console.log('Person clicked in connected graph:', person);
+                        }}
+                        onRelationshipClick={(relationship) => {
+                          console.log('Relationship clicked in connected graph:', relationship);
+                        }}
                       />
                     );
                   })()

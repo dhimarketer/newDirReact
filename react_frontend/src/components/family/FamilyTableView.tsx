@@ -3,16 +3,12 @@
 // 2025-01-29: Provides alternative to family tree visualization
 
 import React, { useState, useMemo } from 'react';
-import { PhoneBookEntry } from '../../types/directory';
-
-interface FamilyMember {
-  entry: PhoneBookEntry;
-  role: 'parent' | 'child' | 'other';
-  relationship?: string;
-}
+import { FamilyMember, FamilyRelationship } from '../../types/family';
+import { detectMemberRole, getRoleDisplayText, getRoleBadgeColor, DetectedRole } from '../../utils/roleDetection';
 
 interface FamilyTableViewProps {
   familyMembers: FamilyMember[];
+  relationships?: FamilyRelationship[];
   address: string;
   island: string;
 }
@@ -22,11 +18,31 @@ type SortDirection = 'asc' | 'desc';
 
 const FamilyTableView: React.FC<FamilyTableViewProps> = ({ 
   familyMembers, 
+  relationships = [],
   address, 
   island 
 }) => {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  // 2024-12-29: DEBUG - Log the data being received
+  console.log('🔍 FamilyTableView DEBUG:', {
+    familyMembersCount: familyMembers.length,
+    relationshipsCount: relationships.length,
+    address,
+    island,
+    firstMember: familyMembers[0] ? {
+      name: familyMembers[0].entry?.name,
+      age: familyMembers[0].entry?.age,
+      gender: familyMembers[0].entry?.gender,
+      pid: familyMembers[0].entry?.pid
+    } : null,
+    firstRelationship: relationships[0] ? {
+      person1: relationships[0].person1,
+      person2: relationships[0].person2,
+      type: relationships[0].relationship_type
+    } : null
+  });
 
   // Sort family members based on current sort settings
   const sortedMembers = useMemo(() => {
@@ -52,8 +68,8 @@ const FamilyTableView: React.FC<FamilyTableViewProps> = ({
           bValue = b.entry.profession?.toLowerCase() || '';
           break;
         case 'role':
-          aValue = a.role;
-          bValue = b.role;
+          aValue = detectMemberRole(a, familyMembers, relationships);
+          bValue = detectMemberRole(b, familyMembers, relationships);
           break;
         default:
           aValue = '';
@@ -90,33 +106,7 @@ const FamilyTableView: React.FC<FamilyTableViewProps> = ({
     return `${age} years`;
   };
 
-  // Get role display text
-  const getRoleDisplay = (role: string): string => {
-    switch (role) {
-      case 'parent':
-        return 'Parent';
-      case 'child':
-        return 'Child';
-      case 'other':
-        return 'Other';
-      default:
-        return role.charAt(0).toUpperCase() + role.slice(1);
-    }
-  };
-
-  // Get role badge color
-  const getRoleBadgeColor = (role: string): string => {
-    switch (role) {
-      case 'parent':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'child':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'other':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
+  // 2024-12-29: Removed getMemberRole wrapper - using detectMemberRole directly
 
   if (familyMembers.length === 0) {
     return (
@@ -234,12 +224,35 @@ const FamilyTableView: React.FC<FamilyTableViewProps> = ({
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getRoleBadgeColor(member.role)}`}>
-                    {getRoleDisplay(member.role)}
-                  </span>
+                  {(() => {
+                    const detectedRole = detectMemberRole(member, familyMembers, relationships);
+                    console.log('🔍 Role Detection DEBUG:', {
+                      memberName: member.entry?.name,
+                      memberPid: member.entry?.pid,
+                      memberGender: member.entry?.gender,
+                      detectedRole,
+                      relationshipsForMember: relationships.filter(rel => 
+                        rel.person1 === member.entry?.pid || rel.person2 === member.entry?.pid
+                      )
+                    });
+                    return (
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getRoleBadgeColor(detectedRole)}`}>
+                        {getRoleDisplayText(detectedRole)}
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {formatAge(member.entry.age)}
+                  {(() => {
+                    const age = member.entry.age;
+                    console.log('🔍 Age Display DEBUG:', {
+                      memberName: member.entry?.name,
+                      rawAge: age,
+                      formattedAge: formatAge(age),
+                      entryObject: member.entry
+                    });
+                    return formatAge(age);
+                  })()}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                   {member.entry.contact || 'N/A'}

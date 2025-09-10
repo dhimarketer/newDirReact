@@ -17,6 +17,7 @@ import SearchPage from './pages/SearchPage';
 import DirectoryPage from './pages/DirectoryPage';
 import AddEntryPage from './pages/AddEntryPage';
 import FamilyPage from './pages/FamilyPage';
+import FamilyTreeDemoPage from './pages/FamilyTreeDemoPage';
 import AdminPage from './pages/AdminPage';
 
 import AdminUserManagementPage from './pages/AdminUserManagementPage';
@@ -48,6 +49,7 @@ function AppRoutes() {
         <Route path="directory" element={<DirectoryPage />} />
         <Route path="add-entry" element={<AddEntryPage />} />
         <Route path="family" element={<FamilyPage />} />
+        <Route path="family-tree-demo" element={<FamilyTreeDemoPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="admin" element={<AdminPage />} />
 

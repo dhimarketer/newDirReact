@@ -1,197 +1,201 @@
-# 2025-01-27: Family tree serializers for dirReactFinal migration project
-# Based on existing Flask family tree functionality
+# 2024-12-28: Phase 4 - Enhanced serializers for rich relationships, media, and events
 
 from rest_framework import serializers
+from django.db import models
+from .models import FamilyGroup, FamilyMember, FamilyRelationship, FamilyMedia, FamilyEvent
 from dirReactFinal_directory.models import PhoneBookEntry
-from .models import FamilyGroup, FamilyMember, FamilyRelationship
 
-class PhoneBookEntrySerializer(serializers.ModelSerializer):
-    """Serializer for phone book entries in family context"""
-    age = serializers.SerializerMethodField()  # 2025-01-28: Added age field for reliable age calculation
+class FamilyMediaSerializer(serializers.ModelSerializer):
+    """Serializer for family media attachments"""
     
     class Meta:
-        model = PhoneBookEntry
-        fields = ['pid', 'name', 'contact', 'island', 'address', 'party', 'DOB', 'gender', 'age']  # 2025-01-28: Added age field
-    
-    def get_age(self, obj):
-        """2025-01-28: Get age using reliable backend calculation method"""
-        return obj.get_age()
-
-class FamilyGroupSerializer(serializers.ModelSerializer):
-    """Basic serializer for family groups"""
-    created_by = serializers.ReadOnlyField(source='created_by.username')
-    member_count = serializers.SerializerMethodField()
-    parent_family = serializers.PrimaryKeyRelatedField(read_only=True)
-    parent_family_name = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = FamilyGroup
+        model = FamilyMedia
         fields = [
-            'id', 'name', 'description', 'address', 'island', 'parent_family', 'parent_family_name', 'created_by', 'created_at', 
-            'updated_at', 'member_count'
+            'id', 'person', 'relationship', 'family_group', 'media_type', 'title',
+            'description', 'file_path', 'file_size', 'mime_type', 'uploaded_by',
+            'upload_date', 'is_public', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
-    
-    def get_member_count(self, obj):
-        """Get the number of members in this family group"""
-        if hasattr(obj, 'member_count'):
-            return obj.member_count
-        return obj.members.count()
-    
-    def get_parent_family_name(self, obj):
-        """Get the name of the parent family if it exists"""
-        if obj.parent_family:
-            return obj.parent_family.name
-        return None
+        read_only_fields = ['id', 'upload_date', 'created_at', 'updated_at']
 
-class FamilyGroupDetailSerializer(FamilyGroupSerializer):
-    """Detailed serializer for family groups with nested members"""
-    members = serializers.SerializerMethodField()
-    relationships = serializers.SerializerMethodField()
+class FamilyEventSerializer(serializers.ModelSerializer):
+    """Serializer for family life events"""
     
-    class Meta(FamilyGroupSerializer.Meta):
-        fields = FamilyGroupSerializer.Meta.fields + ['members', 'relationships']
-    
-    def get_members(self, obj):
-        """Get detailed member information including full entry data"""
-        members = obj.members.all()  # 2025-01-30: FIXED - No limit on family members
-        return FamilyMemberDetailSerializer(members, many=True).data
-    
-    def get_relationships(self, obj):
-        """Get basic relationship information"""
-        relationships = obj.relationships.all()  # 2025-01-30: FIXED - No limit on relationships
-        return FamilyRelationshipSerializer(relationships, many=True).data
-
-class FamilyMemberSerializer(serializers.ModelSerializer):
-    """Basic serializer for family members"""
-    entry_name = serializers.ReadOnlyField(source='entry.name')
-    entry_phone = serializers.ReadOnlyField(source='entry.phone_number')
-    family_group_name = serializers.ReadOnlyField(source='family_group.name')
+    person_name = serializers.CharField(source='person.name', read_only=True)
+    related_person_name = serializers.CharField(source='related_person.name', read_only=True)
+    media_attachments = FamilyMediaSerializer(many=True, read_only=True)
     
     class Meta:
-        model = FamilyMember
+        model = FamilyEvent
         fields = [
-            'id', 'entry', 'entry_name', 'entry_phone', 'family_group', 
-            'family_group_name', 'role_in_family', 'joined_at'
+            'id', 'person', 'person_name', 'event_type', 'title', 'description',
+            'event_date', 'location', 'related_person', 'related_person_name',
+            'media_attachments', 'is_verified', 'source', 'notes',
+            'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'joined_at']
-    
-    def validate(self, data):
-        """Validate that the entry is not already a member of this family group"""
-        entry = data.get('entry')
-        family_group = data.get('family_group')
-        
-        if entry and family_group:
-            existing_member = FamilyMember.objects.filter(
-                entry=entry, 
-                family_group=family_group
-            ).exclude(id=self.instance.id if self.instance else None)
-            
-            if existing_member.exists():
-                raise serializers.ValidationError(
-                    "This person is already a member of this family group"
-                )
-        
-        return data
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
-class FamilyMemberDetailSerializer(FamilyMemberSerializer):
-    """Detailed serializer for family members with full entry information"""
-    entry = PhoneBookEntrySerializer(read_only=True)
+class EnhancedFamilyRelationshipSerializer(serializers.ModelSerializer):
+    """Enhanced serializer for family relationships with Phase 4 metadata"""
     
-    class Meta(FamilyMemberSerializer.Meta):
-        fields = FamilyMemberSerializer.Meta.fields + ['entry']
-
-class FamilyRelationshipSerializer(serializers.ModelSerializer):
-    """Basic serializer for family relationships"""
-    person1_name = serializers.ReadOnlyField(source='person1.name')
-    person2_name = serializers.ReadOnlyField(source='person2.name')
-    family_group_name = serializers.ReadOnlyField(source='family_group.name')
-    relationship_type_display = serializers.ReadOnlyField(source='get_relationship_type_display')
+    person1_name = serializers.CharField(source='person1.name', read_only=True)
+    person2_name = serializers.CharField(source='person2.name', read_only=True)
+    family_group_name = serializers.CharField(source='family_group.name', read_only=True)
+    media_attachments = FamilyMediaSerializer(many=True, read_only=True)
     
     class Meta:
         model = FamilyRelationship
         fields = [
-            'id', 'person1', 'person1_name', 'person2', 'person2_name',
-            'relationship_type', 'relationship_type_display', 'family_group',
-            'family_group_name', 'notes', 'is_active', 'created_at', 'updated_at'
+            'id', 'person1', 'person2', 'person1_name', 'person2_name',
+            'relationship_type', 'family_group', 'family_group_name',
+            'notes', 'is_active', 'start_date', 'end_date', 'relationship_status',
+            'is_biological', 'is_legal', 'confidence_level', 'media_attachments',
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
     
-    def validate(self, data):
-        """Validate relationship data"""
-        person1 = data.get('person1')
-        person2 = data.get('person2')
-        relationship_type = data.get('relationship_type')
-        family_group = data.get('family_group')
-        
-        # Ensure person1 and person2 are different
-        if person1 and person2 and person1 == person2:
-            raise serializers.ValidationError(
-                "A person cannot have a relationship with themselves"
-            )
-        
-        # Check if this relationship already exists
-        if person1 and person2 and family_group:
-            existing_relationship = FamilyRelationship.objects.filter(
-                person1=person1,
-                person2=person2,
-                family_group=family_group,
-                relationship_type=relationship_type
-            ).exclude(id=self.instance.id if self.instance else None)
-            
-            if existing_relationship.exists():
-                raise serializers.ValidationError(
-                    "This relationship already exists in this family group"
-                )
-        
-        return data
-
-class FamilyRelationshipDetailSerializer(FamilyRelationshipSerializer):
-    """Detailed serializer for family relationships with full person information"""
-    person1 = PhoneBookEntrySerializer(read_only=True)
-    person2 = PhoneBookEntrySerializer(read_only=True)
+    def validate_confidence_level(self, value):
+        """Validate confidence level is between 0 and 100"""
+        if value < 0 or value > 100:
+            raise serializers.ValidationError("Confidence level must be between 0 and 100")
+        return value
     
-    class Meta(FamilyRelationshipSerializer.Meta):
-        fields = FamilyRelationshipSerializer.Meta.fields + ['person1', 'person2']
+    def validate_relationship_status(self, value):
+        """Validate relationship status is valid"""
+        valid_statuses = ['active', 'inactive', 'ended', 'suspended', 'divorced']
+        if value not in valid_statuses:
+            raise serializers.ValidationError(f"Invalid relationship status: {value}. Must be one of: {', '.join(valid_statuses)}")
+        return value
 
-class FamilyGroupCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating family groups"""
-    class Meta:
-        model = FamilyGroup
-        fields = ['name', 'description', 'address', 'island']
+class FamilyMemberSerializer(serializers.ModelSerializer):
+    """Serializer for family members"""
     
-    def create(self, validated_data):
-        """Create a new family group"""
-        user = self.context['request'].user
-        return FamilyGroup.objects.create(
-            created_by=user,
-            **validated_data
-        )
-
-class FamilyMemberCreateSerializer(serializers.ModelSerializer):
-    """Serializer for adding family members"""
+    entry_name = serializers.CharField(source='entry.name', read_only=True)
+    family_group_name = serializers.CharField(source='family_group.name', read_only=True)
+    
     class Meta:
         model = FamilyMember
-        fields = ['entry', 'role_in_family']
-    
-    def create(self, validated_data):
-        """Create a new family member"""
-        family_group = self.context['family_group']
-        return FamilyMember.objects.create(
-            family_group=family_group,
-            **validated_data
-        )
+        fields = [
+            'id', 'entry', 'entry_name', 'family_group', 'family_group_name',
+            'role_in_family', 'joined_at'
+        ]
+        read_only_fields = ['id', 'joined_at']
 
-class FamilyRelationshipCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating family relationships"""
-    class Meta:
-        model = FamilyRelationship
-        fields = ['person1', 'person2', 'relationship_type', 'notes']
+class FamilyMemberWithEntrySerializer(serializers.ModelSerializer):
+    """Serializer for family members with full entry details including age"""
     
-    def create(self, validated_data):
-        """Create a new family relationship"""
-        family_group = self.context['family_group']
-        return FamilyRelationship.objects.create(
-            family_group=family_group,
-            **validated_data
-        )
+    entry_name = serializers.CharField(source='entry.name', read_only=True)
+    family_group_name = serializers.CharField(source='family_group.name', read_only=True)
+    entry_age = serializers.SerializerMethodField()
+    entry_contact = serializers.CharField(source='entry.contact', read_only=True)
+    entry_dob = serializers.CharField(source='entry.DOB', read_only=True)
+    entry_gender = serializers.CharField(source='entry.gender', read_only=True)
+    entry_profession = serializers.CharField(source='entry.profession', read_only=True)
+    entry_nid = serializers.CharField(source='entry.nid', read_only=True)
+    
+    class Meta:
+        model = FamilyMember
+        fields = [
+            'id', 'entry', 'entry_name', 'family_group', 'family_group_name',
+            'role_in_family', 'joined_at', 'entry_age', 'entry_contact', 
+            'entry_dob', 'entry_gender', 'entry_profession', 'entry_nid'
+        ]
+        read_only_fields = ['id', 'joined_at']
+    
+    def get_entry_age(self, obj):
+        """Get calculated age from entry"""
+        if obj.entry:
+            return obj.entry.get_age()
+        return None
+
+class FamilyGroupSerializer(serializers.ModelSerializer):
+    """Serializer for family groups"""
+    
+    members = FamilyMemberSerializer(many=True, read_only=True)
+    relationships = EnhancedFamilyRelationshipSerializer(many=True, read_only=True)
+    media_attachments = FamilyMediaSerializer(many=True, read_only=True)
+    member_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = FamilyGroup
+        fields = [
+            'id', 'name', 'description', 'address', 'island', 'is_public',
+            'created_by', 'members', 'relationships', 'media_attachments',
+            'member_count', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_member_count(self, obj):
+        return obj.members.count()
+
+class FamilyGroupWithEntryDetailsSerializer(serializers.ModelSerializer):
+    """Serializer for family groups with full entry details including ages"""
+    
+    members = FamilyMemberWithEntrySerializer(many=True, read_only=True)
+    relationships = EnhancedFamilyRelationshipSerializer(many=True, read_only=True)
+    media_attachments = FamilyMediaSerializer(many=True, read_only=True)
+    member_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = FamilyGroup
+        fields = [
+            'id', 'name', 'description', 'address', 'island', 'is_public',
+            'created_by', 'members', 'relationships', 'media_attachments',
+            'member_count', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_member_count(self, obj):
+        return obj.members.count()
+
+class PersonCentricFamilyGroupSerializer(serializers.ModelSerializer):
+    """Serializer for family groups with person-centric relationships (Phase 1 implementation)"""
+    
+    members = FamilyMemberWithEntrySerializer(many=True, read_only=True)
+    all_relationships = serializers.SerializerMethodField()
+    media_attachments = FamilyMediaSerializer(many=True, read_only=True)
+    member_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = FamilyGroup
+        fields = [
+            'id', 'name', 'description', 'address', 'island', 'is_public',
+            'created_by', 'members', 'all_relationships', 'media_attachments',
+            'member_count', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_member_count(self, obj):
+        return obj.members.count()
+    
+    def get_all_relationships(self, obj):
+        """Get ALL relationships for all members in this family group (person-centric approach)"""
+        from .models import FamilyRelationship
+        
+        # Get all PIDs of members in this family group
+        member_pids = [member.entry.pid for member in obj.members.all()]
+        
+        if not member_pids:
+            return []
+        
+        # Get ALL relationships involving any of these members (across all family groups)
+        all_relationships = FamilyRelationship.objects.filter(
+            models.Q(person1__pid__in=member_pids) | models.Q(person2__pid__in=member_pids)
+        ).select_related('person1', 'person2', 'family_group').distinct()
+        
+        # Serialize the relationships
+        serializer = EnhancedFamilyRelationshipSerializer(all_relationships, many=True)
+        return serializer.data
+
+class PhoneBookEntryWithMediaSerializer(serializers.ModelSerializer):
+    """Enhanced phone book entry serializer with media and events"""
+    
+    media_attachments = FamilyMediaSerializer(many=True, read_only=True)
+    life_events = FamilyEventSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = PhoneBookEntry
+        fields = [
+            'pid', 'name', 'contact', 'address', 'island',
+            'media_attachments', 'life_events'
+        ]
+        read_only_fields = ['pid']

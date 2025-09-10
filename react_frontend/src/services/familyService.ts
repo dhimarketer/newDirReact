@@ -662,28 +662,32 @@ class FamilyService {
       console.log('=== END FAMILY FETCH RESPONSE DEBUG ===');
       
       // 2025-01-28: FIXED - Django returns family data directly, not wrapped in success field
-      if (response.data && response.data.id) {
-        // Transform Django response to expected frontend format
-        const familyGroup = response.data;
+      if (response.data) {
+        // Handle both single family and multiple families response
+        const familyData = Array.isArray(response.data) ? response.data[0] : response.data;
         
-        // Extract members from the family group
-        const members = familyGroup.members || [];
-        const relationships = familyGroup.relationships || [];
-        
-        return {
-          success: true,
-          data: {
-            id: familyGroup.id,
-            name: familyGroup.name,
-            description: familyGroup.description,
-            address: familyGroup.address,
-            island: familyGroup.island,
-            members: members.map((member: any) => ({
+        if (familyData && familyData.id) {
+          // Transform Django response to expected frontend format
+          const familyGroup = familyData;
+          
+          // Extract members from the family group
+          const members = familyGroup.members || [];
+          const relationships = familyGroup.all_relationships || familyGroup.relationships || [];
+          
+          return {
+            success: true,
+            data: {
+              id: familyGroup.id,
+              name: familyGroup.name,
+              description: familyGroup.description,
+              address: familyGroup.address,
+              island: familyGroup.island,
+              members: members.map((member: any) => ({
               entry: {
-                pid: member.entry?.pid || member.entry_id || member.id,
-                name: member.entry?.name || member.entry_name || member.name || '',
-                contact: member.entry?.contact || member.entry_contact || member.contact || '',
-                dob: member.entry?.DOB || member.entry_dob || member.dob || '',
+                pid: member.entry || member.entry_id || member.id,  // 2024-12-29: FIXED - entry is now just the ID
+                name: member.entry_name || member.entry?.name || member.name || '',
+                contact: member.entry_contact || member.entry?.contact || member.contact || '',
+                dob: member.entry_dob || member.entry?.DOB || member.dob || '',
                 address: member.entry?.address || member.entry_address || member.address || '',
                 island: member.entry?.island || member.entry_island || member.island || '',
                 atoll: member.entry?.atoll || '',
@@ -693,17 +697,17 @@ class FamilyService {
                 status: member.entry?.status || '',
                 remark: member.entry?.remark || '',
                 email: member.entry?.email || '',
-                gender: member.entry?.gender || '',
+                gender: member.entry_gender || member.entry?.gender || '',
                 extra: member.entry?.extra || '',
-                profession: member.entry?.profession || '',
+                profession: member.entry_profession || member.entry?.profession || '',
                 pep_status: member.entry?.pep_status || '',
                 change_status: member.entry?.change_status || 'Active',
                 requested_by: member.entry?.requested_by || '',
                 batch: member.entry?.batch || '',
                 image_status: member.entry?.image_status || '',
                 family_group_id: member.entry?.family_group_id || undefined,
-                nid: member.entry?.nid || undefined,
-                age: member.entry?.age || undefined  // 2025-01-28: FIXED - Add age field from backend
+                nid: member.entry_nid || member.entry?.nid || undefined,
+                age: member.entry_age || member.entry?.age || undefined  // 2024-12-29: FIXED - Use entry_age from new serializer
               },
               role: member.role_in_family || member.role || 'other',
               relationship: member.relationship || ''
@@ -718,13 +722,14 @@ class FamilyService {
             }))
           }
         };
-      } else {
-        // 2025-01-28: NEW - Return not found instead of error for missing family groups
-        return {
-          success: false,
-          notFound: true,
-          error: 'No family group found for this address'
-        };
+        } else {
+          // 2025-01-28: NEW - Return not found instead of error for missing family groups
+          return {
+            success: false,
+            notFound: true,
+            error: 'No family group found for this address'
+          };
+        }
       }
     } catch (error: any) {
       console.error('Error fetching family by address:', error);

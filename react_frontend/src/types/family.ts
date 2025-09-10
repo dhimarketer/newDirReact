@@ -35,11 +35,19 @@ export interface FamilyRelationship extends BaseEntity {
   person2: number;
   person1_name?: string;  // 2025-01-29: Added to match backend serializer
   person2_name?: string;  // 2025-01-29: Added to match backend serializer
-  relationship_type: 'parent' | 'child' | 'spouse' | 'sibling' | 'grandparent' | 'grandchild' | 'aunt_uncle' | 'niece_nephew' | 'cousin' | 'other';
+  relationship_type: 'parent' | 'child' | 'spouse' | 'sibling' | 'grandparent' | 'grandchild' | 'aunt_uncle' | 'niece_nephew' | 'cousin' | 'step_parent' | 'step_child' | 'step_sibling' | 'half_sibling' | 'father_in_law' | 'mother_in_law' | 'son_in_law' | 'daughter_in_law' | 'brother_in_law' | 'sister_in_law' | 'adopted_parent' | 'adopted_child' | 'legal_guardian' | 'ward' | 'foster_parent' | 'foster_child' | 'godparent' | 'godchild' | 'sponsor' | 'other';
   relationship_type_display?: string;  // 2025-01-29: Added to match backend serializer
   family_group: number;
   notes?: string;
   is_active: boolean;
+  
+  // 2024-12-28: Phase 4 - Rich relationship metadata
+  start_date?: string;  // ISO date string
+  end_date?: string;    // ISO date string
+  relationship_status: 'active' | 'inactive' | 'ended' | 'suspended';
+  is_biological: boolean;
+  is_legal: boolean;
+  confidence_level: number;  // 0-100
 }
 
 export interface FamilyRole {
@@ -101,4 +109,34 @@ export interface FamilyStats {
   largest_family: number;
   families_this_month: number;
   active_families: number;
+}
+
+// 2024-12-28: Phase 4 - Media and Event types
+export interface FamilyMedia extends BaseEntity {
+  person?: number;
+  relationship?: number;
+  family_group?: number;
+  media_type: 'photo' | 'document' | 'certificate' | 'video' | 'audio' | 'other';
+  title: string;
+  description?: string;
+  file_path: string;
+  file_size?: number;
+  mime_type?: string;
+  uploaded_by?: string;
+  upload_date: string;
+  is_public: boolean;
+}
+
+export interface FamilyEvent extends BaseEntity {
+  person: number;
+  event_type: 'birth' | 'death' | 'marriage' | 'divorce' | 'adoption' | 'graduation' | 'migration' | 'religious_ceremony' | 'anniversary' | 'other';
+  title: string;
+  description?: string;
+  event_date: string;  // ISO date string
+  location?: string;
+  related_person?: number;
+  media_attachments?: number[];  // Array of media IDs
+  is_verified: boolean;
+  source?: string;
+  notes?: string;
 }

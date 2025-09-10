@@ -18,7 +18,8 @@ import {
   Settings, 
   Shield, 
   X,
-  Crown
+  Crown,
+  Network
 } from 'lucide-react';
 
 interface NavigationItem {
@@ -48,6 +49,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile = false }) => {
       { name: 'Home', href: '/home', icon: Home },
       { name: 'Add Entry', href: '/add-entry', icon: PlusCircle },
       { name: 'Family', href: '/family', icon: Users },
+      { name: 'Family Tree Demo', href: '/family-tree-demo', icon: Network },
     ];
 
     // Add image search if user has sufficient points

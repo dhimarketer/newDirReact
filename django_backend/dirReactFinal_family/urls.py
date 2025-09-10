@@ -2,13 +2,43 @@
 # Based on existing Flask family tree functionality
 
 from django.urls import path, include
+
+app_name = 'family'
 from rest_framework.routers import DefaultRouter
-from .views import FamilyGroupViewSet, FamilyMemberViewSet, FamilyRelationshipViewSet
+from .views import (
+    FamilyGroupViewSet, 
+    FamilyMemberViewSet, 
+    FamilyRelationshipViewSet,
+    GlobalRelationshipViewSet,
+    GlobalPersonFamilyContextViewSet
+)
+from dirReactFinal_api.views import PhoneBookEntryViewSet
+# 2024-12-28: Phase 4 - Import enhanced views
+from .phase4_views import (
+    FamilyMediaViewSet,
+    FamilyEventViewSet,
+    EnhancedFamilyRelationshipViewSet,
+    EnhancedFamilyGroupViewSet,
+    PersonWithMediaViewSet
+)
 
 router = DefaultRouter()
 router.register(r'groups', FamilyGroupViewSet)
 router.register(r'members', FamilyMemberViewSet)
-router.register(r'relationships', FamilyRelationshipViewSet)
+router.register(r'relationships', FamilyRelationshipViewSet, basename='family-relationships')
+# 2024-12-28: NEW - Global person registry endpoints for Phase 2 enhancement
+router.register(r'global-relationships', GlobalRelationshipViewSet, basename='global-relationship')
+router.register(r'global-person-contexts', GlobalPersonFamilyContextViewSet, basename='global-person-context')
+
+# 2024-12-28: Phase 4 - Enhanced endpoints for rich relationships, media, and events
+router.register(r'media', FamilyMediaViewSet, basename='family-media')
+router.register(r'events', FamilyEventViewSet, basename='family-events')
+router.register(r'enhanced-relationships', EnhancedFamilyRelationshipViewSet, basename='enhanced-relationship')
+router.register(r'enhanced-groups', EnhancedFamilyGroupViewSet, basename='enhanced-group')
+router.register(r'persons-with-media', PersonWithMediaViewSet)
+
+# Global person registry endpoints
+router.register(r'global-person-contexts', PhoneBookEntryViewSet, basename='global-person-contexts')
 
 urlpatterns = [
     path('', include(router.urls)),

@@ -9,7 +9,7 @@ from dirReactFinal_core.views import get_islands, get_parties, get_atolls
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('dirReactFinal_api.urls')),
-    path('api/family/', include('dirReactFinal_family.urls')),
+    path('api/family/', include('dirReactFinal_family.urls', namespace='family')),
     path('api/islands/', get_islands, name='get_islands'),
     path('api/atolls/', get_atolls, name='get_atolls'),
     path('api/parties/', get_parties, name='get_parties'),

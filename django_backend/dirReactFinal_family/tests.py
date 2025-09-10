@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
-from .models import FamilyGroup, FamilyMember, FamilyRelationship
+from .models import FamilyGroup, FamilyMember, FamilyRelationship, FamilyMedia, FamilyEvent
 from dirReactFinal_directory.models import PhoneBookEntry
 from dirReactFinal_core.models import Island
 

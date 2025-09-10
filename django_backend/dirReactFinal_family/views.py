@@ -13,9 +13,9 @@ from .models import FamilyGroup, FamilyMember, FamilyRelationship
 from .serializers import (
     FamilyGroupSerializer, 
     FamilyMemberSerializer, 
-    FamilyRelationshipSerializer,
-    FamilyGroupDetailSerializer,
-    FamilyMemberDetailSerializer
+    FamilyGroupWithEntryDetailsSerializer,
+    PersonCentricFamilyGroupSerializer,
+    EnhancedFamilyRelationshipSerializer
 )
 from dirReactFinal_directory.models import PhoneBookEntry
 
@@ -73,7 +73,7 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         """Use detailed serializer for retrieve actions"""
         if self.action in ['retrieve', 'list']:
-            return FamilyGroupDetailSerializer
+            return FamilyGroupSerializer
         return FamilyGroupSerializer
     
     def perform_create(self, serializer):
@@ -98,7 +98,7 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
         """Get all members of a family group"""
         family_group = self.get_object()
         members = FamilyMember.objects.filter(family_group=family_group)
-        serializer = FamilyMemberDetailSerializer(members, many=True)
+        serializer = FamilyMemberSerializer(members, many=True)
         return Response(serializer.data)
     
     # 2025-01-28: REMOVED: Conflicting relationships action - nested router provides full CRUD functionality
@@ -251,10 +251,10 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
                     'data': []
                 }, status=status.HTTP_404_NOT_FOUND)
             
-            # Serialize all families with their members and relationships
+            # Serialize all families with their members and relationships (person-centric approach)
             families_data = []
             for family_group in family_groups:
-                serializer = FamilyGroupDetailSerializer(family_group)
+                serializer = PersonCentricFamilyGroupSerializer(family_group)
                 families_data.append(serializer.data)
             
             return Response({
@@ -297,7 +297,7 @@ class FamilyGroupViewSet(viewsets.ModelViewSet):
             # Serialize all families with their members and relationships
             families_data = []
             for family_group in family_groups:
-                serializer = FamilyGroupDetailSerializer(family_group)
+                serializer = FamilyGroupSerializer(family_group)
                 families_data.append(serializer.data)
             
             return Response({
@@ -716,7 +716,7 @@ class FamilyMemberViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         """Use detailed serializer for retrieve actions"""
         if self.action in ['retrieve', 'list']:
-            return FamilyMemberDetailSerializer
+            return FamilyMemberSerializer
         return FamilyMemberSerializer
     
     def perform_create(self, serializer):
@@ -754,7 +754,7 @@ class FamilyRelationshipViewSet(viewsets.ModelViewSet):
     ViewSet for managing family relationships
     """
     queryset = FamilyRelationship.objects.all()
-    serializer_class = FamilyRelationshipSerializer
+    serializer_class = EnhancedFamilyRelationshipSerializer
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
@@ -796,5 +796,69 @@ class FamilyRelationshipViewSet(viewsets.ModelViewSet):
             raise permissions.PermissionDenied("Only the creator or admins can delete relationships")
         
         instance.delete()
+
+class GlobalRelationshipViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for global relationship queries by person PID
+    Implements Phase 1 of Family Tree Enhancement Plan
+    """
+    queryset = FamilyRelationship.objects.all()
+    serializer_class = EnhancedFamilyRelationshipSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter relationships by person PID (global scope)"""
+        queryset = FamilyRelationship.objects.select_related(
+            'person1', 'person2', 'family_group'
+        ).all()
+        
+        # Filter by person PID if provided
+        person_pid = self.request.query_params.get('person_pid')
+        if person_pid:
+            try:
+                person_pid = int(person_pid)
+                queryset = queryset.filter(
+                    Q(person1__pid=person_pid) | Q(person2__pid=person_pid)
+                )
+            except ValueError:
+                pass
+        
+        # Filter by relationship type if provided
+        relationship_type = self.request.query_params.get('relationship_type')
+        if relationship_type:
+            queryset = queryset.filter(relationship_type=relationship_type)
+        
+        # Filter by active status if provided
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+        
+        return queryset.order_by('person1__name')
+
+class GlobalPersonFamilyContextViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for getting family contexts for a person by PID
+    Implements Phase 1 of Family Tree Enhancement Plan
+    """
+    queryset = FamilyMember.objects.all()
+    serializer_class = FamilyMemberSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter family memberships by person PID"""
+        queryset = FamilyMember.objects.select_related(
+            'entry', 'family_group'
+        ).all()
+        
+        # Filter by person PID if provided
+        person_pid = self.request.query_params.get('person_pid')
+        if person_pid:
+            try:
+                person_pid = int(person_pid)
+                queryset = queryset.filter(entry__pid=person_pid)
+            except ValueError:
+                pass
+        
+        return queryset.order_by('family_group__name')
 
 print("=== DEBUG: views.py file loaded successfully ===")

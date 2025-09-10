@@ -81,33 +81,33 @@ const EmbeddedFamilyTree: React.FC<EmbeddedFamilyTreeProps> = ({
         const members = response.data.members || [];
         const relationships = response.data.relationships || [];
         
-        // Transform API data to match expected types
+        // 2024-12-29: FIXED - Transform API data to match expected types using new serializer structure
         const transformedMembers: FamilyMember[] = members.map((member: any, index: number) => ({
           entry: {
-            pid: member.entry?.pid || member.entry_id || member.id || index + 1,
-            name: member.entry?.name || member.entry_name || member.name || '',
-            contact: member.entry?.contact || member.entry_contact || member.contact || '',
+            pid: member.entry || member.entry_id || member.id || index + 1,  // 2024-12-29: FIXED - entry is now just the ID
+            name: member.entry_name || member.entry?.name || member.name || '',
+            contact: member.entry_contact || member.entry?.contact || member.contact || '',
             address: member.entry?.address || member.entry_address || member.address || '',
             island: member.entry?.island || member.entry_island || member.island || '',
             atoll: member.entry?.atoll || '',
             street: member.entry?.street || '',
             ward: member.entry?.ward || '',
             party: member.entry?.party || '',
-            DOB: member.entry?.DOB || member.entry_dob || member.dob || member.entry?.dob || '',
+            DOB: member.entry_dob || member.entry?.DOB || member.dob || '',
             status: member.entry?.status || '',
             remark: member.entry?.remark || '',
             email: member.entry?.email || '',
-            gender: member.entry?.gender || '',
+            gender: member.entry_gender || member.entry?.gender || '',
             extra: member.entry?.extra || '',
-            profession: member.entry?.profession || '',
+            profession: member.entry_profession || member.entry?.profession || '',
             pep_status: member.entry?.pep_status || '',
             change_status: member.entry?.change_status || 'Active',
             requested_by: member.entry?.requested_by || '',
             batch: member.entry?.batch || '',
             image_status: member.entry?.image_status || '',
             family_group_id: member.entry?.family_group_id || undefined,
-            nid: member.entry?.nid || undefined,
-            age: member.entry?.age || undefined
+            nid: member.entry_nid || member.entry?.nid || undefined,
+            age: member.entry_age || member.entry?.age || undefined  // 2024-12-29: FIXED - Use entry_age from new serializer
           },
           role: member.role_in_family || member.role || 'other',
           relationship: member.relationship || ''
@@ -211,6 +211,7 @@ const EmbeddedFamilyTree: React.FC<EmbeddedFamilyTreeProps> = ({
             {viewMode === 'table' ? (
               <FamilyTableView
                 familyMembers={familyMembers}
+                relationships={familyRelationships}
                 address={address}
                 island={island}
               />

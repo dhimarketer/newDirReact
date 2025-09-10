@@ -2,8 +2,32 @@
 # Based on existing Flask family tree functionality
 
 from django.db import models
+from django.core.files.storage import default_storage
 from dirReactFinal_directory.models import PhoneBookEntry
 import logging
+import os
+
+def family_media_upload_path(instance, filename):
+    """
+    Generate upload path for family media files using NID
+    Files are stored in Docker volume: /app/media/family_media/{nid}/{filename}
+    """
+    # Get NID from the person if available
+    nid = None
+    if instance.person and instance.person.nid:
+        nid = instance.person.nid
+    elif instance.family_group and instance.family_group.members.exists():
+        # Try to get NID from first family member
+        first_member = instance.family_group.members.first()
+        if first_member and first_member.entry.nid:
+            nid = first_member.entry.nid
+    
+    # Fallback to 'unknown' if no NID found
+    if not nid:
+        nid = 'unknown'
+    
+    # Create directory structure: family_media/{nid}/{filename}
+    return os.path.join('family_media', nid, filename)
 
 class FamilyGroup(models.Model):
     """
@@ -363,6 +387,17 @@ class FamilyGroup(models.Model):
                             except ValueError:
                                 continue
                         
+                        # 2024-12-29: FIXED - Also handle year-only format (e.g., "1970")
+                        if dob is None and len(entry.DOB) == 4 and entry.DOB.isdigit():
+                            try:
+                                birth_year = int(entry.DOB)
+                                current_year = datetime.now().year
+                                age = current_year - birth_year
+                                dob = datetime(birth_year, 1, 1)  # Use January 1st as default
+                                print(f"DEBUG: Parsed year-only DOB {entry.DOB} as {birth_year}, age {age}")
+                            except ValueError:
+                                pass
+                        
                         if dob and age is not None and 0 < age < 120:
                             entries_with_dob.append((entry, age))
                             print(f"DEBUG: Entry {entry.name} has age {age} (DOB: {entry.DOB})")
@@ -379,25 +414,66 @@ class FamilyGroup(models.Model):
             # Sort by age (oldest first)
             entries_with_dob.sort(key=lambda x: x[1], reverse=True)
             
-            # NUCLEAR FAMILY RULE: Select 2 oldest as potential parents (only if age gap is reasonable, 15–40 years)
-            potential_parents = entries_with_dob[:2]  # Take the 2 oldest
-            potential_children = entries_with_dob[2:]  # All others become children
+            # NUCLEAR FAMILY RULE: Find the most likely parent couple based on age and gender
+            potential_parents = []
+            potential_children = []
             
-            # CONSISTENCY RULE: Validate age gap between potential parents (15-40 years)
-            if len(potential_parents) == 2:
-                parent1_age, parent2_age = potential_parents[0][1], potential_parents[1][1]
-                age_gap = abs(parent1_age - parent2_age)
+            # 2024-12-29: NUCLEAR FAMILY ONLY - Find the most likely parent couple for nuclear family
+            # Strategy: Exclude grandparents (people much older than others) and find the most likely parent couple
+            # Multi-generational relationships should only be created through manual user editing
+            
+            # First, identify potential grandparents (people much older than the majority)
+            ages = [age for _, age in entries_with_dob]
+            if len(ages) >= 3:
+                # Calculate median age to identify outliers
+                sorted_ages = sorted(ages)
+                median_age = sorted_ages[len(sorted_ages) // 2]
                 
-                if age_gap > 40:
-                    print(f"DEBUG: Age gap too large between potential parents: {age_gap} years. Using only oldest as parent.")
-                    # Only use the oldest as parent
-                    potential_parents = [potential_parents[0]]
-                    potential_children = entries_with_dob[1:]
-                elif age_gap < 15:
-                    print(f"DEBUG: Age gap too small between potential parents: {age_gap} years. Using only oldest as parent.")
-                    # Only use the oldest as parent
-                    potential_parents = [potential_parents[0]]
-                    potential_children = entries_with_dob[1:]
+                # People more than 30 years older than median are likely grandparents
+                nuclear_family_entries = [(entry, age) for entry, age in entries_with_dob 
+                                        if age <= median_age + 30]
+                grandparent_entries = [(entry, age) for entry, age in entries_with_dob 
+                                     if age > median_age + 30]
+                
+                if grandparent_entries:
+                    print(f"DEBUG: Identified {len(grandparent_entries)} potential grandparents (excluded from nuclear family):")
+                    for entry, age in grandparent_entries:
+                        print(f"  - {entry.name} (age {age}) - will require manual relationship editing")
+            else:
+                # Not enough people to identify grandparents reliably
+                nuclear_family_entries = entries_with_dob
+                grandparent_entries = []
+            
+            # Now find the most likely parent couple from nuclear family entries
+            male_candidates = [(entry, age) for entry, age in nuclear_family_entries if entry.gender == 'M']
+            female_candidates = [(entry, age) for entry, age in nuclear_family_entries if entry.gender == 'F']
+            
+            if male_candidates and female_candidates:
+                # Sort by age (oldest first)
+                male_candidates.sort(key=lambda x: x[1], reverse=True)
+                female_candidates.sort(key=lambda x: x[1], reverse=True)
+                
+                # Try to pair the oldest male and female
+                oldest_male = male_candidates[0]
+                oldest_female = female_candidates[0]
+                age_gap = abs(oldest_male[1] - oldest_female[1])
+                
+                if age_gap <= 20:  # Reasonable age gap for parents
+                    potential_parents = [oldest_male, oldest_female]
+                    # All others in nuclear family become children
+                    potential_children = [(entry, age) for entry, age in nuclear_family_entries 
+                                        if entry.pid != oldest_male[0].pid and entry.pid != oldest_female[0].pid]
+                    print(f"DEBUG: Found nuclear parent couple: {oldest_male[0].name} ({oldest_male[1]}) and {oldest_female[0].name} ({oldest_female[1]})")
+                else:
+                    print(f"DEBUG: Age gap too large between oldest male and female: {age_gap} years. Using single parent approach.")
+                    # Fall back to single parent approach
+                    potential_parents = [oldest_male]
+                    potential_children = [(entry, age) for entry, age in nuclear_family_entries if entry.pid != oldest_male[0].pid]
+            else:
+                # No gender data or only one gender - use age-based approach
+                print(f"DEBUG: No suitable parent couple found. Using age-based single parent approach.")
+                potential_parents = [nuclear_family_entries[0]]  # Oldest person in nuclear family
+                potential_children = nuclear_family_entries[1:]  # All others
             
             # CONSISTENCY RULE: Parents must be older than their children (minimum 15 year gap)
             parents = []
@@ -407,12 +483,13 @@ class FamilyGroup(models.Model):
                 parents.append(parent_entry)
                 print(f"DEBUG: Selected parent: {parent_entry.name} (age {parent_age})")
             
+            # 2024-12-29: NUCLEAR FAMILY ONLY - Simple child selection for nuclear family
             for child_entry, child_age in potential_children:
-                # Validate that child is at least 15 years younger than any parent
+                # Check if child is at least 15 years younger than any parent
                 is_valid_child = True
                 for parent_entry, parent_age in potential_parents:
                     if parent_age - child_age < 15:
-                        print(f"DEBUG: Skipped child {child_entry.name} (age {child_age}) - too close in age to parent {parent_entry.name} (age {parent_age})")
+                        print(f"DEBUG: Skipped {child_entry.name} (age {child_age}) - too close in age to parent {parent_entry.name} (age {parent_age})")
                         is_valid_child = False
                         break
                 
@@ -420,7 +497,7 @@ class FamilyGroup(models.Model):
                     children.append(child_entry)
                     print(f"DEBUG: Selected child: {child_entry.name} (age {child_age})")
                 else:
-                    print(f"DEBUG: Child {child_entry.name} (age {child_age}) requires manual validation - age conflict with parents")
+                    print(f"DEBUG: {child_entry.name} (age {child_age}) requires manual validation - age conflict with parents")
             
             print(f"DEBUG: NUCLEAR family structure: {len(parents)} parents, {len(children)} children")
             print(f"DEBUG: Parents: {[p.name for p in parents]}")
@@ -500,14 +577,16 @@ class FamilyGroup(models.Model):
         try:
             # Filter entries with DOB and calculate ages
             entries_with_dob = []
+            print(f"DEBUG: Processing {len(entries)} entries for relationship inference")
             for entry in entries:
+                print(f"DEBUG: Processing entry {entry.name} with DOB: '{entry.DOB}'")
                 if entry.DOB:
                     try:
                         # 2025-01-31: FIXED - Support multiple DOB formats
                         dob = None
                         age = None
                         
-                        # Try different date formats
+                        # Try different date formats including year-only
                         date_formats = ['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%Y/%m/%d']
                         
                         for date_format in date_formats:
@@ -520,6 +599,17 @@ class FamilyGroup(models.Model):
                                 break
                             except ValueError:
                                 continue
+                        
+                        # 2024-12-29: FIXED - Also handle year-only format (e.g., "1970")
+                        if dob is None and len(entry.DOB) == 4 and entry.DOB.isdigit():
+                            try:
+                                birth_year = int(entry.DOB)
+                                current_year = datetime.now().year
+                                age = current_year - birth_year
+                                dob = datetime(birth_year, 1, 1)  # Use January 1st as default
+                                print(f"DEBUG: Parsed year-only DOB {entry.DOB} as {birth_year}, age {age}")
+                            except ValueError:
+                                pass
                         
                         if dob and age is not None:
                             # Skip entries with invalid ages (too old or too young)
@@ -778,6 +868,7 @@ class FamilyRelationship(models.Model):
     Family relationship model for defining connections between family members
     """
     RELATIONSHIP_TYPES = [
+        # Basic relationships
         ('parent', 'Parent'),
         ('child', 'Child'),
         ('spouse', 'Spouse'),
@@ -787,6 +878,35 @@ class FamilyRelationship(models.Model):
         ('aunt_uncle', 'Aunt/Uncle'),
         ('niece_nephew', 'Niece/Nephew'),
         ('cousin', 'Cousin'),
+        
+        # Extended family relationships
+        ('step_parent', 'Step-Parent'),
+        ('step_child', 'Step-Child'),
+        ('step_sibling', 'Step-Sibling'),
+        ('half_sibling', 'Half-Sibling'),
+        
+        # In-law relationships
+        ('father_in_law', 'Father-in-Law'),
+        ('mother_in_law', 'Mother-in-Law'),
+        ('son_in_law', 'Son-in-Law'),
+        ('daughter_in_law', 'Daughter-in-Law'),
+        ('brother_in_law', 'Brother-in-Law'),
+        ('sister_in_law', 'Sister-in-Law'),
+        
+        # Legal and formal relationships
+        ('adopted_parent', 'Adopted Parent'),
+        ('adopted_child', 'Adopted Child'),
+        ('legal_guardian', 'Legal Guardian'),
+        ('ward', 'Ward'),
+        ('foster_parent', 'Foster Parent'),
+        ('foster_child', 'Foster Child'),
+        
+        # Religious and ceremonial relationships
+        ('godparent', 'Godparent'),
+        ('godchild', 'Godchild'),
+        ('sponsor', 'Sponsor'),
+        
+        # Other relationships
         ('other', 'Other'),
     ]
     
@@ -798,6 +918,28 @@ class FamilyRelationship(models.Model):
     # Additional relationship details
     notes = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    
+    # 2024-12-28: Phase 4 - Rich relationship metadata
+    start_date = models.DateField(null=True, blank=True, help_text="When this relationship began (e.g., marriage date, adoption date)")
+    end_date = models.DateField(null=True, blank=True, help_text="When this relationship ended (e.g., divorce date, death date)")
+    relationship_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('active', 'Active'),
+            ('inactive', 'Inactive'),
+            ('ended', 'Ended'),
+            ('suspended', 'Suspended'),
+            ('divorced', 'Divorced'),
+        ],
+        default='active',
+        help_text="Current status of the relationship"
+    )
+    is_biological = models.BooleanField(default=True, help_text="Whether this is a biological relationship")
+    is_legal = models.BooleanField(default=False, help_text="Whether this relationship has legal recognition")
+    confidence_level = models.IntegerField(
+        default=100,
+        help_text="Confidence level in the accuracy of this relationship (0-100%)"
+    )
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -812,9 +954,30 @@ class FamilyRelationship(models.Model):
     def __str__(self):
         return f"{self.person1.name} is {self.get_relationship_type_display()} of {self.person2.name}"
     
+    def clean(self):
+        """Validate the relationship type, confidence level, and same-person relationships"""
+        from django.core.exceptions import ValidationError
+        valid_types = [choice[0] for choice in self.RELATIONSHIP_TYPES]
+        if self.relationship_type not in valid_types:
+            raise ValidationError(f"Invalid relationship type: {self.relationship_type}. Must be one of: {', '.join(valid_types)}")
+        
+        # Validate confidence level
+        if self.confidence_level < 0 or self.confidence_level > 100:
+            raise ValidationError(f"Confidence level must be between 0 and 100, got {self.confidence_level}")
+        
+        # Validate that person1 and person2 are different
+        if self.person1 and self.person2 and self.person1 == self.person2:
+            raise ValidationError("A person cannot have a relationship with themselves")
+    
+    def save(self, *args, **kwargs):
+        """Override save to run validation"""
+        self.full_clean()
+        super().save(*args, **kwargs)
+    
     def get_reciprocal_relationship(self):
         """Get the reciprocal relationship type"""
         reciprocal_map = {
+            # Basic relationships
             'parent': 'child',
             'child': 'parent',
             'spouse': 'spouse',
@@ -824,6 +987,35 @@ class FamilyRelationship(models.Model):
             'aunt_uncle': 'niece_nephew',
             'niece_nephew': 'aunt_uncle',
             'cousin': 'cousin',
+            
+            # Extended family relationships
+            'step_parent': 'step_child',
+            'step_child': 'step_parent',
+            'step_sibling': 'step_sibling',
+            'half_sibling': 'half_sibling',
+            
+            # In-law relationships
+            'father_in_law': 'son_in_law',  # Father-in-law <-> Son-in-law (through marriage)
+            'mother_in_law': 'daughter_in_law',  # Mother-in-law <-> Daughter-in-law (through marriage)
+            'son_in_law': 'father_in_law',  # Son-in-law <-> Father-in-law (through marriage)
+            'daughter_in_law': 'mother_in_law',  # Daughter-in-law <-> Mother-in-law (through marriage)
+            'brother_in_law': 'brother_in_law',  # Brother-in-law <-> Brother-in-law (through marriage)
+            'sister_in_law': 'sister_in_law',  # Sister-in-law <-> Sister-in-law (through marriage)
+            
+            # Legal and formal relationships
+            'adopted_parent': 'adopted_child',
+            'adopted_child': 'adopted_parent',
+            'legal_guardian': 'ward',
+            'ward': 'legal_guardian',
+            'foster_parent': 'foster_child',
+            'foster_child': 'foster_parent',
+            
+            # Religious and ceremonial relationships
+            'godparent': 'godchild',
+            'godchild': 'godparent',
+            'sponsor': 'sponsor',  # Sponsor relationship is typically reciprocal
+            
+            # Other relationships
             'other': 'other',
         }
         return reciprocal_map.get(self.relationship_type, 'other')
@@ -845,3 +1037,123 @@ class FamilyMember(models.Model):
     
     def __str__(self):
         return f"{self.entry.name} in {self.family_group.name}"
+
+
+class FamilyMedia(models.Model):
+    """
+    2024-12-28: Phase 4 - Media attachments for family members and relationships
+    """
+    MEDIA_TYPES = [
+        ('photo', 'Photo'),
+        ('document', 'Document'),
+        ('certificate', 'Certificate'),
+        ('video', 'Video'),
+        ('audio', 'Audio'),
+        ('other', 'Other'),
+    ]
+    
+    # What this media is attached to
+    person = models.ForeignKey(PhoneBookEntry, on_delete=models.CASCADE, related_name='media_attachments', null=True, blank=True)
+    relationship = models.ForeignKey(FamilyRelationship, on_delete=models.CASCADE, related_name='media_attachments', null=True, blank=True)
+    family_group = models.ForeignKey(FamilyGroup, on_delete=models.CASCADE, related_name='media_attachments', null=True, blank=True)
+    
+    # Media details
+    media_type = models.CharField(max_length=20, choices=MEDIA_TYPES)
+    title = models.CharField(max_length=200)
+    description = models.TextField(null=True, blank=True)
+    file = models.FileField(upload_to=family_media_upload_path, null=True, blank=True)  # Actual file upload using NID
+    file_path = models.CharField(max_length=500, null=True, blank=True)  # Path to the actual file
+    file_size = models.BigIntegerField(null=True, blank=True)  # File size in bytes
+    mime_type = models.CharField(max_length=100, null=True, blank=True)
+    tags = models.CharField(max_length=500, null=True, blank=True)  # Comma-separated tags
+    
+    # Metadata
+    uploaded_by = models.CharField(max_length=100, null=True, blank=True)  # User who uploaded
+    upload_date = models.DateTimeField(auto_now_add=True)
+    is_public = models.BooleanField(default=False)  # Whether this media is publicly visible
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'family_media'
+        verbose_name = 'Family Media'
+        verbose_name_plural = 'Family Media'
+    
+    def __str__(self):
+        return f"{self.title} ({self.get_media_type_display()})"
+    
+    def save(self, *args, **kwargs):
+        """Override save to update file_path and file_size when file is uploaded"""
+        if self.file:
+            # Update file_path to match the actual file location
+            self.file_path = self.file.name
+            # Update file_size if not already set
+            if not self.file_size and hasattr(self.file, 'size'):
+                self.file_size = self.file.size
+        super().save(*args, **kwargs)
+    
+    def delete(self, *args, **kwargs):
+        """Override delete to remove file from storage"""
+        if self.file:
+            try:
+                if default_storage.exists(self.file.name):
+                    default_storage.delete(self.file.name)
+            except Exception as e:
+                logging.error(f"Error deleting file {self.file.name}: {e}")
+        super().delete(*args, **kwargs)
+
+
+class FamilyEvent(models.Model):
+    """
+    2024-12-28: Phase 4 - Life events and milestones for family members
+    """
+    EVENT_TYPES = [
+        ('birth', 'Birth'),
+        ('death', 'Death'),
+        ('marriage', 'Marriage'),
+        ('divorce', 'Divorce'),
+        ('adoption', 'Adoption'),
+        ('graduation', 'Graduation'),
+        ('migration', 'Migration'),
+        ('religious_ceremony', 'Religious Ceremony'),
+        ('anniversary', 'Anniversary'),
+        ('employment', 'Employment'),
+        ('retirement', 'Retirement'),
+        ('illness', 'Illness'),
+        ('recovery', 'Recovery'),
+        ('other', 'Other'),
+    ]
+    
+    person = models.ForeignKey(PhoneBookEntry, on_delete=models.CASCADE, related_name='life_events')
+    event_type = models.CharField(max_length=30, choices=EVENT_TYPES)
+    title = models.CharField(max_length=200)
+    description = models.TextField(null=True, blank=True)
+    event_date = models.DateField()
+    location = models.CharField(max_length=200, null=True, blank=True)
+    
+    # Related people (e.g., spouse for marriage, parents for birth)
+    related_person = models.ForeignKey(PhoneBookEntry, on_delete=models.SET_NULL, null=True, blank=True, related_name='related_events')
+    
+    # Media attachments
+    media_attachments = models.ManyToManyField(FamilyMedia, blank=True, related_name='events')
+    
+    # Metadata
+    is_verified = models.BooleanField(default=False)  # Whether this event is verified
+    verification_source = models.CharField(max_length=200, null=True, blank=True)  # Source of verification
+    source = models.CharField(max_length=200, null=True, blank=True)  # Source of information
+    notes = models.TextField(null=True, blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'family_events'
+        verbose_name = 'Family Event'
+        verbose_name_plural = 'Family Events'
+        ordering = ['-event_date']
+    
+    def __str__(self):
+        return f"{self.person.name} - {self.title} ({self.event_date})"
