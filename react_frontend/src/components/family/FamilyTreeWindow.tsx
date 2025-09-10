@@ -303,7 +303,7 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
               image_status: member.entry?.image_status || '',
               family_group_id: member.entry?.family_group_id || undefined,
               nid: member.entry?.nid || undefined,
-              age: member.entry?.age || undefined
+              age: member.entry_age || member.entry?.age || undefined
             },
             role: member.role_in_family || member.role || 'other',
             relationship: member.relationship || ''
@@ -527,7 +527,7 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                     image_status: member.entry?.image_status || '',
                     family_group_id: member.entry?.family_group_id || undefined,
                     nid: member.entry?.nid || undefined,
-                    age: member.entry?.age || undefined
+                    age: member.entry_age || member.entry?.age || undefined
                   },
                   role: member.role_in_family || member.role || 'other',
                   relationship: member.relationship || ''

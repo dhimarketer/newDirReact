@@ -64,27 +64,25 @@ const EmbeddedFamilyTree: React.FC<EmbeddedFamilyTreeProps> = ({
     }
   }, [address, island]);
 
-  // Fetch family members for the given address
+  // 2024-12-29: UNIFIED - Use same data fetching method as FamilyTreeWindow for consistency
   const fetchFamilyMembers = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const response = await familyService.getFamilyByAddress(address, island);
+      // 2024-12-29: UNIFIED - Use getAllFamiliesByAddress like FamilyTreeWindow
+      const allFamiliesResponse = await familyService.getAllFamiliesByAddress(address, island);
       
-      if (response.notFound) {
-        console.log('Family not found for:', { address, island });
-        setFamilyGroupExists(false);
-        setFamilyMembers([]);
-        setFamilyRelationships([]);
-      } else if (response.success && response.data) {
-        const members = response.data.members || [];
-        const relationships = response.data.relationships || [];
+      if (allFamiliesResponse.success && allFamiliesResponse.data && allFamiliesResponse.data.length > 0) {
+        // 2024-12-29: UNIFIED - Use first family data (same as FamilyTreeWindow)
+        const family = allFamiliesResponse.data[0];
+        const members = family.members || [];
+        const relationships = family.all_relationships || [];
         
-        // 2024-12-29: FIXED - Transform API data to match expected types using new serializer structure
+        // 2024-12-29: UNIFIED - Use same transformation logic as FamilyTreeWindow
         const transformedMembers: FamilyMember[] = members.map((member: any, index: number) => ({
           entry: {
-            pid: member.entry || member.entry_id || member.id || index + 1,  // 2024-12-29: FIXED - entry is now just the ID
+            pid: member.entry || member.entry_id || member.id || index + 1,
             name: member.entry_name || member.entry?.name || member.name || '',
             contact: member.entry_contact || member.entry?.contact || member.contact || '',
             address: member.entry?.address || member.entry_address || member.address || '',
@@ -107,7 +105,7 @@ const EmbeddedFamilyTree: React.FC<EmbeddedFamilyTreeProps> = ({
             image_status: member.entry?.image_status || '',
             family_group_id: member.entry?.family_group_id || undefined,
             nid: member.entry_nid || member.entry?.nid || undefined,
-            age: member.entry_age || member.entry?.age || undefined  // 2024-12-29: FIXED - Use entry_age from new serializer
+            age: member.entry_age || member.entry?.age || undefined
           },
           role: member.role_in_family || member.role || 'other',
           relationship: member.relationship || ''
@@ -125,6 +123,11 @@ const EmbeddedFamilyTree: React.FC<EmbeddedFamilyTreeProps> = ({
         setFamilyMembers(transformedMembers);
         setFamilyRelationships(transformedRelationships);
         setFamilyGroupExists(true);
+      } else {
+        console.log('No families found for:', { address, island });
+        setFamilyGroupExists(false);
+        setFamilyMembers([]);
+        setFamilyRelationships([]);
       }
     } catch (error) {
       console.error('Failed to fetch family members:', error);

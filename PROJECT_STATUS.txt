@@ -216,3 +216,9 @@
 [2024-12-29 03:00] | project root | DEBUGGED API data flow - confirmed API returns perfect data with ages (51,29,54,45,86,58,41) and 6 relationships | ok
 [2024-12-29 03:05] | react_frontend/src/components/family/FamilyTableView.tsx | FIXED role detection - updated to use detectMemberRole() directly instead of getMemberRole() wrapper | ok
 [2024-12-29 03:10] | project root | RESTARTED React frontend - all fixes applied, ready for testing | ok
+[2024-12-29 03:15] | react_frontend/src/components/family/EmbeddedFamilyTree.tsx | UNIFIED data stream - updated to use getAllFamiliesByAddress like FamilyTreeWindow | ok
+[2024-12-29 03:20] | react_frontend/src/components/family/FamilyModal.tsx | UNIFIED data stream - updated to use getAllFamiliesByAddress like FamilyTreeWindow | ok
+[2024-12-29 03:25] | project root | UNIFIED all components to use same data stream as smart editor - all should now work consistently | ok
+[2024-12-29 03:30] | react_frontend/src/components/family/FamilyTreeWindow.tsx | FIXED age mapping - updated 2 instances to use entry_age instead of entry.age | ok
+[2024-12-29 03:35] | project root | VERIFIED API data flow - confirmed all data is correct and transformation should work | ok
+[2024-12-29 03:40] | project root | ALL FIXES COMPLETE - unified data streams, fixed age mapping, added debug logging | ok

@@ -110,33 +110,68 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
     });
   }, [user, isAdmin]);
 
+  // 2024-12-29: UNIFIED - Use same data fetching method as FamilyTreeWindow for consistency
   const fetchFamilyMembers = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const searchPayload = {
-        address: address,
-        island: island,
-        limit_results: true
-      };
-      console.log('Fetching family members with payload:', searchPayload);
-      const response = await fetch('/api/phonebook/advanced_search/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(searchPayload)
-      });
-      console.log('API response status:', response.status);
-      const data = await response.json();
-      console.log('API response data:', data);
+      // 2024-12-29: UNIFIED - Use getAllFamiliesByAddress like FamilyTreeWindow
+      const allFamiliesResponse = await familyService.getAllFamiliesByAddress(address, island);
       
-      if (data.results && data.results.length > 0) {
-        const members = processFamilyMembers(data.results);
-        setFamilyMembers(members);
+      if (allFamiliesResponse.success && allFamiliesResponse.data && allFamiliesResponse.data.length > 0) {
+        // 2024-12-29: UNIFIED - Use first family data (same as FamilyTreeWindow)
+        const family = allFamiliesResponse.data[0];
+        const members = family.members || [];
+        const relationships = family.all_relationships || [];
+        
+        // 2024-12-29: UNIFIED - Use same transformation logic as FamilyTreeWindow
+        const transformedMembers: FamilyMember[] = members.map((member: any, index: number) => ({
+          entry: {
+            pid: member.entry || member.entry_id || member.id || index + 1,
+            name: member.entry_name || member.entry?.name || member.name || '',
+            contact: member.entry_contact || member.entry?.contact || member.contact || '',
+            address: member.entry?.address || member.entry_address || member.address || '',
+            island: member.entry?.island || member.entry_island || member.island || '',
+            atoll: member.entry?.atoll || '',
+            street: member.entry?.street || '',
+            ward: member.entry?.ward || '',
+            party: member.entry?.party || '',
+            DOB: member.entry_dob || member.entry?.DOB || member.dob || '',
+            status: member.entry?.status || '',
+            remark: member.entry?.remark || '',
+            email: member.entry?.email || '',
+            gender: member.entry_gender || member.entry?.gender || '',
+            extra: member.entry?.extra || '',
+            profession: member.entry_profession || member.entry?.profession || '',
+            pep_status: member.entry?.pep_status || '',
+            change_status: member.entry?.change_status || 'Active',
+            requested_by: member.entry?.requested_by || '',
+            batch: member.entry?.batch || '',
+            image_status: member.entry?.image_status || '',
+            family_group_id: member.entry?.family_group_id || undefined,
+            nid: member.entry_nid || member.entry?.nid || undefined,
+            age: member.entry_age || member.entry?.age || undefined
+          },
+          role: member.role_in_family || member.role || 'other',
+          relationship: member.relationship || ''
+        }));
+        
+        const transformedRelationships: FamilyRelationship[] = relationships.map((rel: any) => ({
+          id: rel.id,
+          person1: rel.person1?.pid || rel.person1_id || rel.person1,
+          person2: rel.person2?.pid || rel.person2_id || rel.person2,
+          relationship_type: rel.relationship_type || 'other',
+          notes: rel.notes,
+          is_active: rel.is_active !== false
+        }));
+        
+        setFamilyMembers(transformedMembers);
+        setFamilyRelationships(transformedRelationships);
       } else {
+        console.log('No families found for:', { address, island });
         setFamilyMembers([]);
+        setFamilyRelationships([]);
       }
     } catch (error) {
       console.error('Failed to fetch family members:', error);
