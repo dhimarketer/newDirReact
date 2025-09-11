@@ -14,22 +14,9 @@ interface DeleteUpdatedFamilyModalProps {
 }
 
 interface DeleteResponse {
-  message: string;
-  details: {
-    family_name: string;
-    address: string;
-    island: string;
-    members_removed: number;
-    relationships_removed: number;
-    phonebook_entries_preserved: number;
-    preserved_members: Array<{
-      entry_id: number;
-      name: string;
-      phone: string;
-      address: string;
-      island: string;
-    }>;
-  };
+  success: boolean;
+  message?: string;
+  error?: string;
 }
 
 export const DeleteUpdatedFamilyModal: React.FC<DeleteUpdatedFamilyModalProps> = ({
@@ -80,7 +67,12 @@ export const DeleteUpdatedFamilyModal: React.FC<DeleteUpdatedFamilyModalProps> =
       }
 
       const response = await familyService.deleteUpdatedFamilies(params);
-      setSuccess(response);
+      
+      if (response.success) {
+        setSuccess(response);
+      } else {
+        throw new Error(response.error || 'Failed to delete family');
+      }
       
       // Call success callback after a short delay
       setTimeout(() => {
@@ -248,26 +240,10 @@ export const DeleteUpdatedFamilyModal: React.FC<DeleteUpdatedFamilyModalProps> =
               Family Deleted Successfully
             </h3>
             <div className="text-sm text-gray-600 space-y-1">
-              <p><strong>Family:</strong> {success.details.family_name}</p>
-              <p><strong>Location:</strong> {success.details.address}, {success.details.island}</p>
-              <p><strong>Members Removed:</strong> {success.details.members_removed}</p>
-              <p><strong>Relationships Removed:</strong> {success.details.relationships_removed}</p>
-              <p><strong>Phonebook Entries Preserved:</strong> {success.details.phonebook_entries_preserved}</p>
+              <p><strong>Status:</strong> {success.message}</p>
+              <p><strong>Result:</strong> Family relationships deleted successfully</p>
+              <p><strong>Note:</strong> Individual member data has been preserved</p>
             </div>
-            
-            {success.details.preserved_members.length > 0 && (
-              <div className="mt-4 text-left">
-                <p className="font-medium text-gray-700 mb-2">Preserved Members:</p>
-                <div className="max-h-32 overflow-y-auto">
-                  {success.details.preserved_members.map((member, index) => (
-                    <div key={index} className="text-xs text-gray-600 p-2 bg-gray-50 rounded mb-1">
-                      <strong>{member.name}</strong> - {member.phone}<br/>
-                      {member.address}, {member.island}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>

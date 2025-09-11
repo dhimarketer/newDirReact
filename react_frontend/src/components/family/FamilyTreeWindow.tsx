@@ -15,6 +15,7 @@ import FamilyTableView from './FamilyTableView';
 import FamilyViewToggle, { ViewMode } from './FamilyViewToggle';
 import EnhancedFamilyEditor from './EnhancedFamilyEditor';  // 2024-12-28: NEW - Enhanced family editor
 import ConnectedFamilyGraph from './ConnectedFamilyGraph';  // 2024-12-28: NEW - Phase 2 connected family graph
+import FamilyDeletionManager from './FamilyDeletionManager';  // 2024-12-29: NEW - Enhanced family deletion manager
 import { PhoneBookEntry } from '../../types/directory';
 
 interface FamilyTreeWindowProps {
@@ -100,6 +101,9 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   
   // 2024-12-28: NEW - State for enhanced family editor
   const [showEnhancedEditor, setShowEnhancedEditor] = useState(false);
+  
+  // 2024-12-29: NEW - State for family deletion manager
+  const [showDeletionManager, setShowDeletionManager] = useState(false);
   
   
   // 2025-01-29: NEW - State for tracking unsaved changes
@@ -816,7 +820,7 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
               {/* Delete Family button */}
               {familyGroupExists && familyGroupData?.id && (
                 <button
-                  onClick={handleDeleteFamily}
+                  onClick={() => setShowDeletionManager(true)}
                   className="delete-family-btn"
                   title="Delete saved family relationships (keeps individual members)"
                 >
@@ -1052,6 +1056,24 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
                 role: member.role as any // This will be mapped to specific role in EnhancedFamilyEditor
               }))
             } : undefined}
+          />
+        )}
+
+        {/* Family Deletion Manager Modal */}
+        {showDeletionManager && (
+          <FamilyDeletionManager
+            isOpen={showDeletionManager}
+            onClose={() => setShowDeletionManager(false)}
+            onSuccess={() => {
+              // Clear family data and refresh
+              setFamilyMembers([]);
+              setFamilyRelationships([]);
+              setFamilyGroupExists(false);
+              setFamilyGroupData(null);
+              fetchFamilyMembers();
+            }}
+            selectedFamily={familyGroupData}
+            mode="single"
           />
         )}
       </div>

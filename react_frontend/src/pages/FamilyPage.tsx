@@ -5,7 +5,8 @@
 import React, { useState, useEffect } from 'react';
 import SearchBar from '../components/directory/SearchBar';
 import SearchResults from '../components/directory/SearchResults';
-import { DeleteUpdatedFamilyModal, FamilyDetailsModal, BulkFamilyDeleteModal } from '../components/family';
+import { FamilyDetailsModal } from '../components/family';
+import FamilyDeletionManager from '../components/family/FamilyDeletionManager';
 import { PhoneBookEntry, SearchFilters } from '../types/directory';
 import { FamilyGroup } from '../types/family';
 import { useAuthStore } from '../store/authStore';
@@ -31,7 +32,6 @@ const FamilyPage: React.FC = () => {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   
   // 2025-01-28: Added state for delete updated families modal
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // 2025-01-29: Added state for saved families
   const [savedFamilies, setSavedFamilies] = useState<FamilyGroup[]>([]);
@@ -43,6 +43,10 @@ const FamilyPage: React.FC = () => {
 
   // 2025-01-31: Added state for bulk family delete modal
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  
+  // 2024-12-29: Added state for enhanced family deletion manager
+  const [showDeletionManager, setShowDeletionManager] = useState(false);
+  const [deletionMode, setDeletionMode] = useState<'single' | 'bulk' | 'admin'>('bulk');
 
   // Check if user is admin
   const isAdmin = user?.is_staff || user?.is_superuser;
@@ -428,16 +432,15 @@ const FamilyPage: React.FC = () => {
               </div>
               <div className="flex gap-3">
                 <button
-                  onClick={() => setShowDeleteModal(true)}
-                  className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors"
+                  onClick={() => {
+                    console.log('Enhanced Family Manager button clicked!');
+                    setDeletionMode('bulk');
+                    setShowDeletionManager(true);
+                    console.log('showDeletionManager set to true');
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
                 >
-                  Delete Updated Family
-                </button>
-                <button
-                  onClick={() => setShowBulkDeleteModal(true)}
-                  className="px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-md hover:bg-orange-700 transition-colors"
-                >
-                  Bulk Delete Families
+                  Enhanced Family Manager
                 </button>
               </div>
             </div>
@@ -569,17 +572,6 @@ const FamilyPage: React.FC = () => {
         )}
       </div>
 
-
-
-      {/* Delete Updated Families Modal */}
-      {showDeleteModal && (
-        <DeleteUpdatedFamilyModal
-          isOpen={showDeleteModal}
-          onClose={() => setShowDeleteModal(false)}
-          onSuccess={handleFamilyDeleted}
-        />
-      )}
-
       {/* Family Details Modal */}
       {selectedSavedFamily && showFamilyDetailsModal && (
         <FamilyDetailsModal
@@ -589,12 +581,13 @@ const FamilyPage: React.FC = () => {
         />
       )}
 
-      {/* Bulk Family Delete Modal */}
-      {showBulkDeleteModal && (
-        <BulkFamilyDeleteModal
-          isOpen={showBulkDeleteModal}
-          onClose={() => setShowBulkDeleteModal(false)}
+      {/* Enhanced Family Deletion Manager */}
+      {showDeletionManager && (
+        <FamilyDeletionManager
+          isOpen={showDeletionManager}
+          onClose={() => setShowDeletionManager(false)}
           onSuccess={handleFamilyDeleted}
+          mode={deletionMode}
         />
       )}
     </div>

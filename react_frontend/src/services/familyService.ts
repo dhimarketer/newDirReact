@@ -243,25 +243,106 @@ class FamilyService {
     address?: string;
     island?: string;
   }): Promise<{
-    message: string;
-    details: {
-      family_name: string;
-      address: string;
-      island: string;
-      members_removed: number;
-      relationships_removed: number;
-      phonebook_entries_preserved: number;
-              preserved_members: Array<{
-          entry_id: number;
-          name: string;
-          contact: string;
-          address: string;
-          island: string;
-        }>;
-    };
+    success: boolean;
+    message?: string;
+    error?: string;
   }> {
     const response = await apiService.post('/family/groups/delete_updated_families/', params);
     return response.data;
+  }
+
+  // 2025-01-29: NEW - Method to delete multiple families by IDs
+  async deleteMultipleFamilies(familyIds: number[]): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+    details?: any;
+  }> {
+    try {
+      const results = [];
+      let successCount = 0;
+      let errorCount = 0;
+      const errors = [];
+
+      for (const familyId of familyIds) {
+        try {
+          const result = await this.deleteUpdatedFamilies({ family_group_id: familyId });
+          if (result.success) {
+            successCount++;
+            results.push({ familyId, success: true });
+          } else {
+            errorCount++;
+            errors.push({ familyId, error: result.error });
+            results.push({ familyId, success: false, error: result.error });
+          }
+        } catch (error: any) {
+          errorCount++;
+          const errorMsg = error.response?.data?.error || 'Failed to delete family';
+          errors.push({ familyId, error: errorMsg });
+          results.push({ familyId, success: false, error: errorMsg });
+        }
+      }
+
+      return {
+        success: errorCount === 0,
+        message: `Deleted ${successCount} families successfully${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+        details: {
+          total: familyIds.length,
+          successful: successCount,
+          failed: errorCount,
+          results,
+          errors
+        }
+      };
+    } catch (error: any) {
+      console.error('Error in bulk family deletion:', error);
+      return {
+        success: false,
+        error: 'Failed to delete families'
+      };
+    }
+  }
+
+  // 2025-01-29: NEW - Method to delete all families (admin only)
+  async deleteAllFamilies(): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+    details?: any;
+  }> {
+    try {
+      // First get all families
+      const allFamiliesResponse = await this.debugAllFamilies();
+      if (!allFamiliesResponse.success || !allFamiliesResponse.families) {
+        return {
+          success: false,
+          error: 'Failed to retrieve families for deletion'
+        };
+      }
+
+      const familyIds = allFamiliesResponse.families.map(family => family.id);
+      
+      if (familyIds.length === 0) {
+        return {
+          success: true,
+          message: 'No families found to delete',
+          details: {
+            total: 0,
+            successful: 0,
+            failed: 0
+          }
+        };
+      }
+
+      // Delete all families using the bulk deletion method
+      return await this.deleteMultipleFamilies(familyIds);
+    } catch (error: any) {
+      console.error('Error deleting all families:', error);
+      return {
+        success: false,
+        error: 'Failed to delete all families'
+      };
+    }
   }
 
 

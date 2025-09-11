@@ -3,7 +3,7 @@
 import React from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../store/authStore';
-import { Users, Settings, Shield, Database, BarChart3, FileText, UserCheck } from 'lucide-react';
+import { Users, Settings, Shield, Database, BarChart3, FileText, UserCheck, Network } from 'lucide-react';
 
 const AdminPage: React.FC = () => {
   const { user, isLoading } = useAuth();
@@ -36,6 +36,13 @@ const AdminPage: React.FC = () => {
       icon: Database,
       href: '/admin/directory',
       color: 'bg-purple-500 hover:bg-purple-600'
+    },
+    {
+      title: 'Family Management',
+      description: 'Manage family relationships, delete families, and bulk operations',
+      icon: Network,
+      href: '/admin/families',
+      color: 'bg-blue-500 hover:bg-blue-600'
     },
     {
       title: 'System Settings',

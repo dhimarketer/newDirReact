@@ -22,6 +22,7 @@ import AdminPage from './pages/AdminPage';
 
 import AdminUserManagementPage from './pages/AdminUserManagementPage';
 import AdminPendingChangesPage from './pages/AdminPendingChangesPage';
+import AdminFamilyManagementPage from './pages/AdminFamilyManagementPage';
 import SettingsPage from './pages/SettingsPage';
 import PremiumImageSearchPage from './pages/PremiumImageSearchPage';
 
@@ -55,6 +56,7 @@ function AppRoutes() {
 
         <Route path="admin/users" element={<AdminUserManagementPage />} />
         <Route path="admin/pending-changes" element={<AdminPendingChangesPage />} />
+        <Route path="admin/families" element={<AdminFamilyManagementPage />} />
         <Route path="premium-image-search" element={<PremiumImageSearchPage />} />
       </Route>
 

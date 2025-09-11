@@ -23,18 +23,27 @@ class ApiService {
     this.api.interceptors.request.use(
       (config) => {
         const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-        if (token) {
+        console.log('=== API REQUEST DEBUG ===');
+        console.log('DEBUG: Token from localStorage:', token);
+        console.log('DEBUG: STORAGE_KEYS.AUTH_TOKEN:', STORAGE_KEYS.AUTH_TOKEN);
+        console.log('DEBUG: All localStorage keys:', Object.keys(localStorage));
+        
+        if (token && token !== 'undefined' && token !== 'null') {
           config.headers.Authorization = `Bearer ${token}`;
-          // 2025-01-28: DEBUG - Log the authorization header being added
-          console.log('=== API REQUEST DEBUG ===');
           console.log('DEBUG: Adding Authorization header:', `Bearer ${token.substring(0, 20)}...`);
-          console.log('DEBUG: Request URL:', config.url);
-          console.log('DEBUG: Request method:', config.method);
-          console.log('DEBUG: Full headers:', config.headers);
-          console.log('=== END API REQUEST DEBUG ===');
         } else {
-          console.log('DEBUG: No auth token found in localStorage');
+          console.log('DEBUG: No valid auth token found in localStorage');
+          // Try alternative token keys
+          const altToken = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('authToken');
+          if (altToken && altToken !== 'undefined' && altToken !== 'null') {
+            config.headers.Authorization = `Bearer ${altToken}`;
+            console.log('DEBUG: Using alternative token:', `Bearer ${altToken.substring(0, 20)}...`);
+          }
         }
+        console.log('DEBUG: Request URL:', config.url);
+        console.log('DEBUG: Request method:', config.method);
+        console.log('DEBUG: Full headers:', config.headers);
+        console.log('=== END API REQUEST DEBUG ===');
         return config;
       },
       (error) => {
