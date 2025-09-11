@@ -161,9 +161,6 @@ class DirectoryService {
     total_with_images: number;
   }> {
     try {
-      console.log('=== PREMIUM IMAGE SEARCH DEBUG ===');
-      console.log('Making API call to premium_image_search with params:', params);
-      
       const response = await apiService.get<{
         results: PhoneBookEntryWithImage[];
         total_count: number;
@@ -173,14 +170,6 @@ class DirectoryService {
         pep_count: number;
         total_with_images: number;
       }>(`${this.baseUrl}/premium_image_search/`, { params });
-      
-      console.log('API Response received:', response);
-      console.log('Response data:', response.data);
-      console.log('Results count:', response.data.results?.length || 0);
-      if (response.data.results && response.data.results.length > 0) {
-        console.log('First result sample:', response.data.results[0]);
-      }
-      console.log('=== END PREMIUM IMAGE SEARCH DEBUG ===');
       
       return response.data;
     } catch (error: any) {
@@ -198,16 +187,10 @@ class DirectoryService {
    */
   async getPersonDetails(pid: number): Promise<PhoneBookEntryWithImage> {
     try {
-      console.log('=== GET PERSON DETAILS DEBUG ===');
-      console.log('Fetching details for PID:', pid);
-      
       const response = await apiService.get<{ person: PhoneBookEntryWithImage }>(
         `${this.baseUrl}/get_person_details/`, 
         { params: { pid } }
       );
-      
-      console.log('Person details response:', response.data);
-      console.log('=== END GET PERSON DETAILS DEBUG ===');
       
       return response.data.person;
     } catch (error: any) {

@@ -23,27 +23,16 @@ class ApiService {
     this.api.interceptors.request.use(
       (config) => {
         const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-        console.log('=== API REQUEST DEBUG ===');
-        console.log('DEBUG: Token from localStorage:', token);
-        console.log('DEBUG: STORAGE_KEYS.AUTH_TOKEN:', STORAGE_KEYS.AUTH_TOKEN);
-        console.log('DEBUG: All localStorage keys:', Object.keys(localStorage));
         
         if (token && token !== 'undefined' && token !== 'null') {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('DEBUG: Adding Authorization header:', `Bearer ${token.substring(0, 20)}...`);
         } else {
-          console.log('DEBUG: No valid auth token found in localStorage');
           // Try alternative token keys
           const altToken = localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('authToken');
           if (altToken && altToken !== 'undefined' && altToken !== 'null') {
             config.headers.Authorization = `Bearer ${altToken}`;
-            console.log('DEBUG: Using alternative token:', `Bearer ${altToken.substring(0, 20)}...`);
           }
         }
-        console.log('DEBUG: Request URL:', config.url);
-        console.log('DEBUG: Request method:', config.method);
-        console.log('DEBUG: Full headers:', config.headers);
-        console.log('=== END API REQUEST DEBUG ===');
         return config;
       },
       (error) => {
@@ -57,16 +46,6 @@ class ApiService {
         return response;
       },
       async (error: AxiosError) => {
-        // 2025-01-28: DEBUG - Log error details
-        console.log('=== API RESPONSE ERROR DEBUG ===');
-        console.log('DEBUG: Error status:', error.response?.status);
-        console.log('DEBUG: Error message:', error.message);
-        console.log('DEBUG: Error response data:', error.response?.data);
-        console.log('DEBUG: Request URL:', error.config?.url);
-        console.log('DEBUG: Request method:', error.config?.method);
-        console.log('DEBUG: Request headers:', error.config?.headers);
-        console.log('=== END API RESPONSE ERROR DEBUG ===');
-        
         const originalRequest = error.config as any;
         
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -75,7 +54,6 @@ class ApiService {
           try {
             const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
             if (refreshToken) {
-              console.log('DEBUG: Attempting token refresh...');
               // 2025-01-28: FIXED - Remove /api prefix since base URL already includes it
               const response = await this.api.post('/auth/refresh/', {
                 refresh: refreshToken,
@@ -83,16 +61,12 @@ class ApiService {
               
               const { access } = response.data;
               localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, access);
-              console.log('DEBUG: Token refresh successful, new access token stored');
               
               // Retry original request
               originalRequest.headers.Authorization = `Bearer ${access}`;
               return this.api(originalRequest);
-            } else {
-              console.log('DEBUG: No refresh token available');
             }
           } catch (refreshError) {
-            console.log('DEBUG: Token refresh failed:', refreshError);
             // 2025-01-28: FIXED - Remove incorrect useAuthStore usage from interceptor
             // Clear tokens and let the component handle logout
             localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);

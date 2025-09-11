@@ -20,17 +20,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const navigate = useNavigate();
 
   // 2025-01-28: ADDED - Debug logging for authentication state
-  console.log('=== PROTECTED ROUTE DEBUG ===');
-  console.log('DEBUG: isAuthenticated:', isAuthenticated);
-  console.log('DEBUG: user:', user);
-  console.log('DEBUG: isLoading:', isLoading);
-  console.log('DEBUG: localStorage token:', !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN));
-  console.log('=== END PROTECTED ROUTE DEBUG ===');
+  // 2025-01-10: Removed excessive debug logs for cleaner console output
 
   // Handle authentication redirects
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      console.log('DEBUG: User not authenticated, redirecting to login');
       navigate(redirectTo, { replace: true });
     }
   }, [isAuthenticated, isLoading, navigate, redirectTo]);
@@ -63,7 +57,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Render children if all checks pass
-  console.log('DEBUG: User authenticated, rendering protected content');
   return <>{children}</>;
 };
 

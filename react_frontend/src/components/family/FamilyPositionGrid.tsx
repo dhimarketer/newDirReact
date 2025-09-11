@@ -13,6 +13,7 @@ interface FamilyPositionGridProps {
   onMemberRemove: (personId: number) => void;
   onAutoAssign?: () => void;
   className?: string;
+  onExternalMemberDrop?: (person: PhoneBookEntry, role: SpecificFamilyRole) => void; // 2025-01-10: NEW - For external member drops
 }
 
 interface PositionSlot {
@@ -31,7 +32,8 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
   onMemberAdd,
   onMemberRemove,
   onAutoAssign,
-  className = ''
+  className = '',
+  onExternalMemberDrop
 }) => {
   const [selectedPosition, setSelectedPosition] = useState<PositionSlot | null>(null);
   const [showRoleSelector, setShowRoleSelector] = useState(false);
@@ -90,7 +92,14 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
   const getAllPeople = () => {
     const assignedPeople = members.map(m => m.person);
     const unassignedPeople = availablePeople;
-    return [...assignedPeople, ...unassignedPeople];
+    
+    // Remove duplicates by PID
+    const allPeople = [...assignedPeople, ...unassignedPeople];
+    const uniquePeople = allPeople.filter((person, index, self) => 
+      index === self.findIndex(p => p.pid === person.pid)
+    );
+    
+    return uniquePeople;
   };
 
   // Get available people for selection (not already assigned)
@@ -302,6 +311,8 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
                         onDrop={(e) => {
                           e.preventDefault();
                           const personData = e.dataTransfer.getData('text/plain');
+                          const externalData = e.dataTransfer.getData('application/json');
+                          
                           if (personData) {
                             try {
                               const person = JSON.parse(personData);
@@ -315,6 +326,30 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
                               }
                             } catch (error) {
                               console.error('Error parsing dropped person data:', error);
+                            }
+                          } else if (externalData) {
+                            // Handle external member from search results
+                            try {
+                              const memberData = JSON.parse(externalData);
+                              console.log(`Dropping external member ${memberData.name} onto role: ${role}`);
+                              
+                              // Check if this is from search results
+                              if (memberData.dragSource === 'search_results') {
+                                if (onExternalMemberDrop) {
+                                  onExternalMemberDrop(memberData, role as SpecificFamilyRole);
+                                } else {
+                                  onMemberAdd(memberData, role as SpecificFamilyRole);
+                                }
+                              } else {
+                                // Handle other external sources
+                                if (onExternalMemberDrop) {
+                                  onExternalMemberDrop(memberData, role as SpecificFamilyRole);
+                                } else {
+                                  onMemberAdd(memberData, role as SpecificFamilyRole);
+                                }
+                              }
+                            } catch (error) {
+                              console.error('Error parsing external member data:', error);
                             }
                           }
                         }}
@@ -351,6 +386,8 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
                       onDrop={(e) => {
                         e.preventDefault();
                         const personData = e.dataTransfer.getData('text/plain');
+                        const externalData = e.dataTransfer.getData('application/json');
+                        
                         if (personData) {
                           try {
                             const person = JSON.parse(personData);
@@ -364,6 +401,30 @@ const FamilyPositionGrid: React.FC<FamilyPositionGridProps> = ({
                             }
                           } catch (error) {
                             console.error('Error parsing dropped person data:', error);
+                          }
+                        } else if (externalData) {
+                          // Handle external member from search results
+                          try {
+                            const memberData = JSON.parse(externalData);
+                            console.log(`Dropping external member ${memberData.name} onto role: ${role}`);
+                            
+                            // Check if this is from search results
+                            if (memberData.dragSource === 'search_results') {
+                              if (onExternalMemberDrop) {
+                                onExternalMemberDrop(memberData, role as SpecificFamilyRole);
+                              } else {
+                                onMemberAdd(memberData, role as SpecificFamilyRole);
+                              }
+                            } else {
+                              // Handle other external sources
+                              if (onExternalMemberDrop) {
+                                onExternalMemberDrop(memberData, role as SpecificFamilyRole);
+                              } else {
+                                onMemberAdd(memberData, role as SpecificFamilyRole);
+                              }
+                            }
+                          } catch (error) {
+                            console.error('Error parsing external member data:', error);
                           }
                         }
                       }}

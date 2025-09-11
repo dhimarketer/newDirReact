@@ -849,7 +849,6 @@ const FamilyModal: React.FC<FamilyModalProps> = ({ isOpen, onClose, address, isl
         const familyData = await response.json();
         console.log('Found existing custom family:', familyData);
         setHasCustomFamily(true);
-        console.log('2025-01-28: DEBUG: Set hasCustomFamily to true');
         setFamilyGroupId(familyData.id); // 2025-01-28: Store the family group ID
         
         // 2025-01-28: ENHANCED: Load existing family relationships for multi-generational display

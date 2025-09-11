@@ -5,6 +5,7 @@ import { PhoneBookEntry } from '../../types/directory';
 import { SpecificFamilyRole, EnhancedFamilyMember, FamilyValidationError } from '../../types/enhancedFamily';
 import { FAMILY_ROLE_DEFINITIONS, getRoleSuggestions } from '../../data/familyRoleDefinitions';
 import FamilyPositionGrid from './FamilyPositionGrid';
+import MemberSearchModal from './MemberSearchModal';
 import { useUI } from '../../store/uiStore';
 
 interface FamilyRelationship {
@@ -42,6 +43,7 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
   initialFamilyData,
   relationships = []
 }) => {
+  console.log('🔍 EnhancedFamilyEditor: Component is rendering!', { isOpen, address, island });
   const { setSidebarOpen } = useUI();
   const [familyMembers, setFamilyMembers] = useState<EnhancedFamilyMember[]>([]);
   const [validationErrors, setValidationErrors] = useState<FamilyValidationError[]>([]);
@@ -58,6 +60,243 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
     parentFamilyId?: number; // ID of the parent family
     parentMemberId?: number; // ID of the parent member who connects to this family
   }>>([]);
+  
+  // 2025-01-10: NEW - State for member search modal
+  const [showMemberSearch, setShowMemberSearch] = useState(false);
+
+  // Handle member selection from search
+  const handleMemberSelect = (member: PhoneBookEntry) => {
+    // Add the selected member to available people
+    const newMember: EnhancedFamilyMember = {
+      id: Date.now(),
+      person: member,
+      specific_role: 'other', // Default role, user can change it
+      generation_level: 1,
+      notes: `Added from ${member.address}, ${member.island}`
+    };
+    
+    setFamilyMembers(prev => [...prev, newMember]);
+    setSuccessMessage(`Added ${member.name} to family. You can now assign them a role.`);
+  };
+
+  // 2025-01-10: NEW - Check for selected member from search page
+  useEffect(() => {
+    const selectedMember = sessionStorage.getItem('selectedMember');
+    console.log('🔍 EnhancedFamilyEditor: Checking for selectedMember:', !!selectedMember);
+    
+    if (selectedMember) {
+      try {
+        const memberData = JSON.parse(selectedMember);
+        console.log('🔍 EnhancedFamilyEditor: Processing selectedMember:', memberData.name, 'with role:', memberData.selectedRole);
+        
+        // Check if member has a selected role
+        if (memberData.selectedRole) {
+          // Add member with specific role
+          const newMember: EnhancedFamilyMember = {
+            id: Date.now(), // Generate unique ID
+            person: {
+              pid: memberData.pid,
+              name: memberData.name,
+              contact: memberData.contact,
+              nid: memberData.nid,
+              address: memberData.address,
+              atoll: memberData.atoll,
+              island: memberData.island,
+              party: memberData.party,
+              profession: memberData.profession,
+              gender: memberData.gender,
+              age: memberData.age,
+              remark: memberData.remark,
+              pep_status: memberData.pep_status,
+              change_status: memberData.change_status || 'Active'
+            },
+            specific_role: memberData.selectedRole,
+            generation_level: 1, // Default generation level
+            notes: `Added from ${memberData.address}, ${memberData.island}`
+          };
+          
+          setFamilyMembers(prev => [...prev, newMember]);
+          setSuccessMessage(`Added ${memberData.name} as ${FAMILY_ROLE_DEFINITIONS[memberData.selectedRole as SpecificFamilyRole]?.label || memberData.selectedRole}`);
+        } else {
+          // Fallback to generic member selection
+          handleMemberSelect(memberData);
+        }
+        
+        // Clear the session storage
+        sessionStorage.removeItem('selectedMember');
+      } catch (error) {
+        console.error('Error parsing selected member:', error);
+      }
+    }
+  }, []);
+
+  // 2025-01-11: NEW - Function to save family data immediately
+  const saveFamilyData = async (members: EnhancedFamilyMember[]) => {
+    try {
+      const familyData = {
+        address,
+        island,
+        members: members.map(member => ({
+          entry_id: member.person.pid,
+          role: member.specific_role
+        })),
+        relationships: generateRelationshipsFromRoles(members)
+      };
+
+      await onSave(familyData);
+      console.log('🔍 EnhancedFamilyEditor: Family data saved successfully after adding member');
+    } catch (error) {
+      console.error('🔍 EnhancedFamilyEditor: Error saving family data:', error);
+      setError(`Failed to save family data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // 2025-01-10: NEW - Check for dragged member from search results
+  useEffect(() => {
+    console.log('🔍 EnhancedFamilyEditor: Component mounted, checking for dragged members');
+    console.log('🔍 EnhancedFamilyEditor: isOpen state:', isOpen);
+    
+    const checkForDraggedMember = () => {
+      // 2025-01-11: NEW - Check if member was already added to stop polling
+      const memberAdded = sessionStorage.getItem('memberAdded');
+      if (memberAdded === 'true') {
+        console.log('🔍 EnhancedFamilyEditor: Member already added, stopping polling');
+        return;
+      }
+      
+      // Check all possible sessionStorage keys
+      const draggedMember = sessionStorage.getItem('draggedMember');
+      const dragInProgress = sessionStorage.getItem('dragInProgress');
+      const selectedMember = sessionStorage.getItem('selectedMember');
+      const memberSelectionMode = sessionStorage.getItem('memberSelectionMode');
+      const memberSelectionCallback = sessionStorage.getItem('memberSelectionCallback');
+      
+      console.log('🔍 EnhancedFamilyEditor: Checking for dragged member:', { 
+        draggedMember: !!draggedMember, 
+        dragInProgress, 
+        selectedMember: !!selectedMember,
+        memberSelectionMode,
+        memberSelectionCallback: !!memberSelectionCallback
+      });
+      
+      // Debug: Log all sessionStorage keys
+      console.log('🔍 EnhancedFamilyEditor: All sessionStorage keys:', Object.keys(sessionStorage));
+      console.log('🔍 EnhancedFamilyEditor: Full sessionStorage content:', {
+        draggedMember: sessionStorage.getItem('draggedMember'),
+        dragInProgress: sessionStorage.getItem('dragInProgress'),
+        selectedMember: sessionStorage.getItem('selectedMember'),
+        memberSelectionMode: sessionStorage.getItem('memberSelectionMode'),
+        memberSelectionCallback: sessionStorage.getItem('memberSelectionCallback')
+      });
+      
+      // 2025-01-11: NEW - Check localStorage as well (more persistent)
+      const localStorageSelectedMember = localStorage.getItem('selectedMember');
+      console.log('🔍 EnhancedFamilyEditor: Checking localStorage for selectedMember:', !!localStorageSelectedMember);
+      
+      // Check for both draggedMember and selectedMember
+      let memberData = null;
+      if (draggedMember && dragInProgress === 'true') {
+        memberData = JSON.parse(draggedMember);
+        console.log('🔍 EnhancedFamilyEditor: Processing dragged member:', memberData.name);
+      } else if (selectedMember) {
+        memberData = JSON.parse(selectedMember);
+        console.log('🔍 EnhancedFamilyEditor: Processing selected member:', memberData.name);
+      } else if (localStorageSelectedMember) {
+        memberData = JSON.parse(localStorageSelectedMember);
+        console.log('🔍 EnhancedFamilyEditor: Processing localStorage selected member:', memberData.name);
+      } else {
+        // 2025-01-11: NEW - Check if there's any member data in sessionStorage
+        console.log('🔍 EnhancedFamilyEditor: No member data found in expected keys, checking all sessionStorage...');
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i);
+          if (key && (key.includes('member') || key.includes('selected') || key.includes('drag'))) {
+            const value = sessionStorage.getItem(key);
+            console.log(`🔍 EnhancedFamilyEditor: Found potential member data in key "${key}":`, value);
+            try {
+              const parsed = JSON.parse(value || '');
+              if (parsed && parsed.name && parsed.selectedRole) {
+                memberData = parsed;
+                console.log('🔍 EnhancedFamilyEditor: Found member data in unexpected key:', key, memberData.name);
+                break;
+              }
+            } catch (e) {
+              // Not JSON, skip
+            }
+          }
+        }
+      }
+      
+      if (memberData) {
+        try {
+          // Add member as generic member (user will assign role manually)
+          const newMember: EnhancedFamilyMember = {
+            id: Date.now(), // Generate unique ID
+            person: {
+              pid: memberData.pid,
+              name: memberData.name,
+              contact: memberData.contact,
+              nid: memberData.nid,
+              address: memberData.address,
+              atoll: memberData.atoll,
+              island: memberData.island,
+              party: memberData.party,
+              profession: memberData.profession,
+              gender: memberData.gender,
+              age: memberData.age,
+              remark: memberData.remark,
+              pep_status: memberData.pep_status,
+              change_status: memberData.change_status || 'Active'
+            },
+            specific_role: memberData.selectedRole || 'other', // Use selected role if available
+            generation_level: 1, // Default generation level
+            notes: `Added from search results (${memberData.address}, ${memberData.island})`
+          };
+          
+          console.log('🔍 EnhancedFamilyEditor: Adding new member to family:', newMember);
+          setSuccessMessage(`Added ${memberData.name} from search results - please assign a family role`);
+          
+          // 2025-01-11: NEW - Save family data immediately to make it permanent
+          // Use the updated state from setFamilyMembers callback to get all members
+          setFamilyMembers(prev => {
+            const updated = [...prev, newMember];
+            console.log('🔍 EnhancedFamilyEditor: Updated family members count:', updated.length);
+            // Save the complete family data including existing members
+            saveFamilyData(updated).catch(error => {
+              console.error('🔍 EnhancedFamilyEditor: Error saving family data after drag:', error);
+            });
+            return updated;
+          });
+          
+          // Clear the session storage
+          sessionStorage.removeItem('draggedMember');
+          sessionStorage.removeItem('dragInProgress');
+          sessionStorage.removeItem('selectedMember');
+          // 2025-01-11: NEW - Also clear localStorage
+          localStorage.removeItem('selectedMember');
+          
+          // 2025-01-11: NEW - Set a flag to stop polling
+          sessionStorage.setItem('memberAdded', 'true');
+        } catch (error) {
+          console.error('Error parsing dragged member:', error);
+        }
+      }
+    };
+
+    // 2025-01-11: NEW - Add delay to account for timing issues
+    const timeoutId = setTimeout(() => {
+      checkForDraggedMember();
+    }, 100);
+
+    // 2025-01-11: NEW - Set up polling to check for dragged members every 500ms
+    const interval = setInterval(checkForDraggedMember, 500);
+
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(interval);
+      // 2025-01-11: NEW - Clear the memberAdded flag when component unmounts
+      sessionStorage.removeItem('memberAdded');
+    };
+  }, []);
 
   // Map generic roles to specific roles
   const mapGenericRoleToSpecific = (genericRole: string, person: PhoneBookEntry): SpecificFamilyRole => {
@@ -514,6 +753,7 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
 
   // 2024-12-28: Hide sidebar when modal opens, restore when closed
   useEffect(() => {
+    console.log('🔍 EnhancedFamilyEditor: isOpen changed to:', isOpen);
     if (isOpen) {
       setSidebarOpen(false);
     } else {
@@ -760,6 +1000,21 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
+  // 2025-01-10: NEW - Handle external member drop from search results
+  const handleExternalMemberDrop = (person: PhoneBookEntry, role: SpecificFamilyRole) => {
+    const newMember: EnhancedFamilyMember = {
+      id: Date.now(),
+      person: person,
+      specific_role: role,
+      generation_level: 1,
+      notes: `Added from ${person.address}, ${person.island}`
+    };
+    
+    setFamilyMembers(prev => [...prev, newMember]);
+    setSuccessMessage(`Added ${person.name} as ${FAMILY_ROLE_DEFINITIONS[role].label}`);
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
   // Apply auto-suggestions
   const handleApplyAutoSuggestions = () => {
     const newMembers: EnhancedFamilyMember[] = autoSuggestedStructure.map((suggestion, index) => ({
@@ -906,10 +1161,28 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
 
   const getAvailablePeople = () => {
     const assignedPeople = familyMembers.map(m => m.person.pid);
-    return members.filter(person => !assignedPeople.includes(person.pid));
+    const originalMembers = members.filter(person => !assignedPeople.includes(person.pid));
+    
+    // Include dragged members that are not yet assigned to specific roles
+    const draggedMembers = familyMembers
+      .filter(member => member.specific_role === 'other' && member.notes?.includes('Dragged from search results'))
+      .map(member => member.person);
+    
+    // Combine original members with dragged members, removing duplicates
+    const allPeople = [...originalMembers, ...draggedMembers];
+    const uniquePeople = allPeople.filter((person, index, self) => 
+      index === self.findIndex(p => p.pid === person.pid)
+    );
+    
+    return uniquePeople;
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    console.log('🔍 EnhancedFamilyEditor: Modal is closed, not rendering');
+    return null;
+  }
+  
+  console.log('🔍 EnhancedFamilyEditor: Modal is open, rendering component');
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
@@ -995,6 +1268,7 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
             onMemberUpdate={handleMemberUpdate}
             onMemberAdd={handleMemberAdd}
             onMemberRemove={handleMemberRemove}
+            onExternalMemberDrop={handleExternalMemberDrop}
             onAutoAssign={handleManualAutoAssign}
           />
         </div>
@@ -1005,6 +1279,12 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
             {familyMembers.length} members
           </div>
           <div className="flex space-x-1">
+            <button
+              onClick={() => setShowMemberSearch(true)}
+              className="px-2 py-1 border border-gray-300 text-black hover:bg-gray-100 text-xs"
+            >
+              Search Members
+            </button>
             <button
               onClick={onClose}
               className="px-2 py-1 border border-gray-300 text-black hover:bg-gray-100 text-xs"
@@ -1262,6 +1542,17 @@ const EnhancedFamilyEditor: React.FC<EnhancedFamilyEditorProps> = ({
           </div>
         </div>
       )}
+
+      {/* Member Search Modal */}
+      <MemberSearchModal
+        isOpen={showMemberSearch}
+        onClose={() => setShowMemberSearch(false)}
+        onSelectMember={handleMemberSelect}
+        currentAddress={address}
+        currentIsland={island}
+        familyName={`${address} Family`}
+        excludePids={familyMembers.map(m => m.person.pid)}
+      />
     </div>
   );
 };

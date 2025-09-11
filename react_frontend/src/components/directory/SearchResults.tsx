@@ -24,6 +24,7 @@ interface SearchResultsProps {
   onExport: () => void;
   isLoading?: boolean;
   searchFilters?: SearchParams;  // 2025-01-28: Add search filters to preserve island parameter
+  onMemberSelect?: (member: PhoneBookEntry) => void; // 2025-01-10: NEW - For member selection in family editor
 }
 
 const SearchResults: React.FC<SearchResultsProps> = ({
@@ -35,7 +36,8 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   onPageSizeChange,
   onExport,
   isLoading = false,
-  searchFilters  // 2025-01-28: Add search filters parameter
+  searchFilters,  // 2025-01-28: Add search filters parameter
+  onMemberSelect  // 2025-01-10: NEW - For member selection in family editor
 }) => {
   const { user } = useAuth();
   const { adminSearchFieldSettings, fetchAdminSearchFieldSettings } = useSettingsStore();
@@ -47,9 +49,11 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     currentPage,
     pageSize,
     isLoading,
-    searchFilters
+    searchFilters,
+    onMemberSelect: !!onMemberSelect
   });
   console.log('🔍 SearchResults: Results array:', results);
+  console.log('🔍 SearchResults: onMemberSelect prop:', onMemberSelect);
   
   // Family tree window state
   const [familyTreeWindowOpen, setFamilyTreeWindowOpen] = useState(false);
@@ -67,9 +71,47 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<PhoneBookEntry | null>(null);
   
+  
   const totalPages = Math.ceil(totalCount / pageSize);
   const userType = getUserType(user!);
   const visibleFields = getVisibleFields(adminSearchFieldSettings?.search_fields, userType);
+
+  // 2025-01-10: NEW - Drag and drop functionality
+  const handleDragStart = (e: React.DragEvent, member: PhoneBookEntry) => {
+    console.log('🔍 SearchResults: Drag started for member:', member.name);
+    
+    // Store member data with family context for external drops
+    const memberWithContext = {
+      ...member,
+      dragSource: 'search_results',
+      timestamp: Date.now()
+    };
+    
+    e.dataTransfer.setData('application/json', JSON.stringify(memberWithContext));
+    e.dataTransfer.effectAllowed = 'copy';
+    
+    // Store in sessionStorage for cross-window communication
+    sessionStorage.setItem('draggedMember', JSON.stringify(memberWithContext));
+    sessionStorage.setItem('dragInProgress', 'true');
+    
+    console.log('🔍 SearchResults: Stored dragged member in sessionStorage:', member.name);
+    
+    // Add visual feedback
+    const target = e.target as HTMLElement;
+    target.style.opacity = '0.5';
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    // Remove visual feedback
+    const target = e.target as HTMLElement;
+    target.style.opacity = '1';
+    
+    // Clean up sessionStorage after a short delay to allow for drop processing
+    setTimeout(() => {
+      sessionStorage.removeItem('draggedMember');
+      sessionStorage.removeItem('dragInProgress');
+    }, 1000);
+  };
 
   // Fallback fields if settings haven't loaded yet
   const fallbackFields = [
@@ -406,7 +448,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
             Search Results
           </h2>
           <p className="text-sm text-blue-600">
-            Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} entries
+            Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, results.length)} of {results.length} entries
           </p>
         </div>
         
@@ -448,7 +490,33 @@ const SearchResults: React.FC<SearchResultsProps> = ({
       </div>
       
       {/* Results Table */}
-      <div className="table-container bg-white shadow-xl border border-blue-200 rounded-lg overflow-hidden">
+      <div 
+        className={`table-container bg-white shadow-xl border border-blue-200 rounded-lg overflow-hidden ${onMemberSelect ? 'border-dashed border-2 border-blue-300 hover:border-blue-400 transition-colors duration-200' : ''}`}
+        onDrop={onMemberSelect ? (e) => {
+          e.preventDefault();
+          e.currentTarget.classList.remove('border-blue-500', 'bg-blue-50');
+          // Handle drop - this will be handled by the individual family role drop zones
+        } : undefined}
+        onDragOver={onMemberSelect ? (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+        } : undefined}
+        onDragEnter={onMemberSelect ? (e) => {
+          e.preventDefault();
+          e.currentTarget.classList.add('border-blue-500', 'bg-blue-50');
+        } : undefined}
+        onDragLeave={onMemberSelect ? (e) => {
+          e.preventDefault();
+          e.currentTarget.classList.remove('border-blue-500', 'bg-blue-50');
+        } : undefined}
+      >
+        {onMemberSelect && (
+          <div className="bg-blue-50 border-b border-blue-200 p-3 text-center">
+            <p className="text-sm text-blue-700 font-medium">
+              💡 Drag any person from the table below to the family roles area to add them to the family
+            </p>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="table-header">
@@ -472,16 +540,23 @@ const SearchResults: React.FC<SearchResultsProps> = ({
             </thead>
             <tbody className="bg-white">
               {results.map((entry, index) => (
-                <tr key={entry.pid} className={`table-row ${index < results.length - 1 ? 'border-b border-blue-200' : ''}`}>
+                <tr 
+                  key={entry.pid} 
+                  className={`table-row ${index < results.length - 1 ? 'border-b border-blue-200' : ''} ${onMemberSelect ? 'cursor-grab hover:bg-gray-50' : ''}`}
+                  draggable={!!onMemberSelect}
+                  onDragStart={onMemberSelect ? (e) => handleDragStart(e, entry) : undefined}
+                  onDragEnd={onMemberSelect ? handleDragEnd : undefined}
+                >
                   {displayFields.map((field) => (
                     <td key={field.field_name} className="table-cell">
                       {renderFieldCell(entry, field)}
                     </td>
                   ))}
-                  {user && (
+                  {user && !onMemberSelect && (
                     <td className="table-cell">
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent row click when clicking button
                           setSelectedEntry(entry);
                           setShowEditModal(true);
                         }}
@@ -489,6 +564,16 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                       >
                         Edit
                       </button>
+                    </td>
+                  )}
+                  {onMemberSelect && (
+                    <td className="table-cell">
+                      <div className="flex items-center justify-center text-blue-600">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+                        </svg>
+                        <span className="ml-2 text-sm font-medium">Drag to Family</span>
+                      </div>
                     </td>
                   )}
                 </tr>

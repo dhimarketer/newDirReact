@@ -104,7 +104,6 @@ const FamilyDeletionManager: React.FC<FamilyDeletionManagerProps> = ({
     setMessage(null);
     
     try {
-      console.log('DEBUG: Getting all families in database for debugging');
       const response = await familyService.debugAllFamilies();
       if (response.success && response.families) {
         setSearchResults(response.families);

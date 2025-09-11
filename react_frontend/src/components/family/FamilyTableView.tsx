@@ -25,10 +25,8 @@ const FamilyTableView: React.FC<FamilyTableViewProps> = ({
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
-  // 2024-12-29: DEBUG - Log the data being received
-  console.log('🔍 FamilyTableView DEBUG:', {
-    familyMembersCount: familyMembers.length,
-    relationshipsCount: relationships.length,
+  // 2024-12-29: Process family data
+  const familyData = {
     address,
     island,
     firstMember: familyMembers[0] ? {
@@ -42,7 +40,7 @@ const FamilyTableView: React.FC<FamilyTableViewProps> = ({
       person2: relationships[0].person2,
       type: relationships[0].relationship_type
     } : null
-  });
+  };
 
   // Sort family members based on current sort settings
   const sortedMembers = useMemo(() => {
@@ -226,15 +224,6 @@ const FamilyTableView: React.FC<FamilyTableViewProps> = ({
                 <td className="px-4 py-3 whitespace-nowrap">
                   {(() => {
                     const detectedRole = detectMemberRole(member, familyMembers, relationships);
-                    console.log('🔍 Role Detection DEBUG:', {
-                      memberName: member.entry?.name,
-                      memberPid: member.entry?.pid,
-                      memberGender: member.entry?.gender,
-                      detectedRole,
-                      relationshipsForMember: relationships.filter(rel => 
-                        rel.person1 === member.entry?.pid || rel.person2 === member.entry?.pid
-                      )
-                    });
                     return (
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getRoleBadgeColor(detectedRole)}`}>
                         {getRoleDisplayText(detectedRole)}
@@ -245,12 +234,6 @@ const FamilyTableView: React.FC<FamilyTableViewProps> = ({
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                   {(() => {
                     const age = member.entry.age;
-                    console.log('🔍 Age Display DEBUG:', {
-                      memberName: member.entry?.name,
-                      rawAge: age,
-                      formattedAge: formatAge(age),
-                      entryObject: member.entry
-                    });
                     return formatAge(age);
                   })()}
                 </td>

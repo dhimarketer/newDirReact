@@ -102,6 +102,11 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
   // 2024-12-28: NEW - State for enhanced family editor
   const [showEnhancedEditor, setShowEnhancedEditor] = useState(false);
   
+  // Debug: Log when showEnhancedEditor changes
+  useEffect(() => {
+    console.log('🔍 FamilyTreeWindow: showEnhancedEditor state changed to:', showEnhancedEditor);
+  }, [showEnhancedEditor]);
+  
   // 2024-12-29: NEW - State for family deletion manager
   const [showDeletionManager, setShowDeletionManager] = useState(false);
   
@@ -254,14 +259,10 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
     setError(null);
     
     // 2024-12-28: CRITICAL FIX - Clear all family data when switching addresses
-    console.log('🔍 FamilyTreeWindow: Clearing previous family data for new address:', { address, island, isOpen });
     setFamilyMembers([]);
     setFamilyRelationships([]);
     setFamilies([]);
     setHasMultipleFamilies(false);
-    
-    // 2025-01-31: DEBUG - Log the parameters being passed
-    console.log('🔍 FamilyTreeWindow: fetchFamilyMembers called with:', { address, island, isOpen });
     
     try {
       // 2025-01-31: ENHANCED - Try to get all families at the address first
@@ -810,7 +811,12 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
               
               {/* 2024-12-28: NEW - Enhanced Family Editor button */}
               <button
-                onClick={() => setShowEnhancedEditor(true)}
+                onClick={() => {
+                  console.log('🎯🎯🎯 SMART EDITOR BUTTON CLICKED! 🎯🎯🎯');
+                  console.log('🔍 FamilyTreeWindow: Smart Editor button clicked!');
+                  console.log('🔍 FamilyTreeWindow: Setting showEnhancedEditor to true');
+                  setShowEnhancedEditor(true);
+                }}
                 className="enhanced-edit-family-btn"
                 title="Open Enhanced Family Role Editor"
               >
@@ -1013,11 +1019,18 @@ const FamilyTreeWindow: React.FC<FamilyTreeWindowProps> = ({
         />
         
         {/* 2024-12-28: NEW - Enhanced Family Editor Modal */}
+        {console.log('🔍 FamilyTreeWindow: Rendering modal check - showEnhancedEditor:', showEnhancedEditor)}
+        {showEnhancedEditor && (
+          console.log('🎯🎯🎯 RENDERING ENHANCED FAMILY EDITOR MODAL! 🎯🎯🎯')
+        )}
         {showEnhancedEditor && (
           <EnhancedFamilyEditor
             key={`${address}-${island}`} // Force re-render when address changes
             isOpen={showEnhancedEditor}
-            onClose={() => setShowEnhancedEditor(false)}
+            onClose={() => {
+              console.log('🔍 FamilyTreeWindow: EnhancedFamilyEditor onClose called');
+              setShowEnhancedEditor(false);
+            }}
             address={address}
             island={island}
             members={familyMembers.map(m => m.entry)}

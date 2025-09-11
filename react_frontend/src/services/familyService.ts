@@ -45,8 +45,6 @@ class FamilyService {
     error?: string;
   }> {
     try {
-      console.log('DEBUG: Deleting family group:', id);
-      
       const response = await apiService.delete(`/family/groups/${id}/`);
       
       return {
@@ -354,10 +352,6 @@ class FamilyService {
     error?: string;
   }> {
     try {
-      console.log('DEBUG: Saving family changes for:', { address, island });
-      console.log('DEBUG: Members to save:', members);
-      console.log('DEBUG: Relationships to save:', relationships);
-      
       // Use the create_or_update_by_address endpoint with explicit data
       const response = await apiService.post('/family/groups/create_or_update_by_address/', {
         address,
@@ -373,8 +367,6 @@ class FamilyService {
           notes: rel.notes || ''
         }))
       });
-      
-      console.log('DEBUG: Save response:', response);
       
       if (response.data) {
         return {
@@ -429,26 +421,13 @@ class FamilyService {
     error?: string;
   }> {
     try {
-      // 2025-01-28: IMMEDIATE DEBUG - Log everything to identify the issue
-      console.log('=== FAMILY CREATION DEBUG START ===');
-      console.log('DEBUG: Auth token exists:', !!localStorage.getItem('dirfinal_auth_token'));
-      console.log('DEBUG: Refresh token exists:', !!localStorage.getItem('dirfinal_refresh_token'));
-      console.log('DEBUG: Auth token length:', localStorage.getItem('dirfinal_auth_token')?.length || 0);
-      console.log('DEBUG: Auth token preview:', localStorage.getItem('dirfinal_auth_token')?.substring(0, 20) + '...');
-      console.log('=== FAMILY CREATION DEBUG END ===');
-      
       // 2025-01-28: ENHANCED - Use the new family inference endpoint for automatic family creation
       const response = await apiService.post('/family/groups/infer_family/', {
         address,
         island
       });
       
-      // 2025-01-28: DEBUG - Log the actual response received
-      console.log('=== FAMILY CREATION RESPONSE DEBUG ===');
-      console.log('DEBUG: Response received:', response);
-      console.log('DEBUG: Response status:', response.status);
-      console.log('DEBUG: Response data:', response.data);
-      console.log('=== END FAMILY CREATION RESPONSE DEBUG ===');
+      // 2025-01-28: Process response
       
       if (response.data && response.data.success && response.data.data) {
         return {
@@ -484,8 +463,6 @@ class FamilyService {
     error?: string;
   }> {
     try {
-      console.log('DEBUG: Using family inference endpoint for:', { address, island });
-      
       const response = await apiService.post('/family/groups/infer_family/', {
         address,
         island
@@ -535,8 +512,6 @@ class FamilyService {
     error?: string;
   }> {
     try {
-      console.log('DEBUG: Creating sub-family for:', data);
-      
       const response = await apiService.post('/family/groups/create_sub_family/', data);
       
       if (response.data && response.data.success) {
@@ -569,19 +544,14 @@ class FamilyService {
     error?: string;
   }> {
     try {
-      console.log('DEBUG: Getting all families for:', { address, island });
-      console.log('DEBUG: Island type:', typeof island, 'Island value:', JSON.stringify(island));
-      
       // 2025-01-31: DEBUG - Check if island is undefined or empty
       if (!island || island.trim() === '') {
-        console.error('DEBUG: Island parameter is missing or empty:', { address, island });
+        console.error('Island parameter is missing or empty:', { address, island });
         return {
           success: false,
           error: 'Island parameter is required but was not provided'
         };
       }
-      
-      console.log('DEBUG: Making API call to /family/groups/by_address/ with params:', { address, island });
       const response = await apiService.get('/family/groups/by_address/', {
         params: { address, island }
       });
@@ -617,8 +587,6 @@ class FamilyService {
     error?: string;
   }> {
     try {
-      console.log('DEBUG: Getting all families by address only for:', { address });
-      
       const response = await apiService.get('/family/groups/by_address_only/', {
         params: { address }
       });
@@ -653,8 +621,6 @@ class FamilyService {
     error?: string;
   }> {
     try {
-      console.log('DEBUG: Getting all families in database for debugging');
-      
       const response = await apiService.get('/family/groups/debug_all_families/');
       
       if (response.data && response.data.success) {
@@ -734,13 +700,7 @@ class FamilyService {
         params: { address, island }
       });
       
-      // 2025-01-28: DEBUG - Log the actual response received
-      console.log('=== FAMILY FETCH RESPONSE DEBUG ===');
-      console.log('DEBUG: Response received:', response);
-      console.log('DEBUG: Response data:', response.data);
-      console.log('DEBUG: Members array:', response.data?.members);
-      console.log('DEBUG: Relationships array:', response.data?.relationships);
-      console.log('=== END FAMILY FETCH RESPONSE DEBUG ===');
+      // 2025-01-28: Process response
       
       // 2025-01-28: FIXED - Django returns family data directly, not wrapped in success field
       if (response.data) {

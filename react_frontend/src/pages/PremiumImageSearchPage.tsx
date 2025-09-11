@@ -75,9 +75,6 @@ const PremiumImageSearchPage: React.FC<PremiumImageSearchPageProps> = () => {
 
     setIsLoading(true);
     try {
-      console.log('=== PREMIUM IMAGE SEARCH PAGE DEBUG ===');
-      console.log('Calling directoryService.premiumImageSearch...');
-      
       // Search for active PEP entries with images only
       const response = await directoryService.premiumImageSearch({
         query: '',
@@ -90,14 +87,6 @@ const PremiumImageSearchPage: React.FC<PremiumImageSearchPageProps> = () => {
         page: reset ? 1 : currentPage,
         page_size: pageSize,
       });
-      
-      console.log('Response received in page:', response);
-      console.log('Results count:', response.results?.length || 0);
-      if (response.results && response.results.length > 0) {
-        console.log('First result in page:', response.results[0]);
-        console.log('First result fields:', Object.keys(response.results[0]));
-      }
-      console.log('=== END PREMIUM IMAGE SEARCH PAGE DEBUG ===');
       
       if (reset) {
         setSearchResults(response.results);
@@ -131,11 +120,6 @@ const PremiumImageSearchPage: React.FC<PremiumImageSearchPageProps> = () => {
 
   // Handle image click to show modal
   const handleImageClick = async (entry: PhoneBookEntryWithImage) => {
-    console.log('=== IMAGE CLICK DEBUG ===');
-    console.log('Entry clicked:', entry);
-    console.log('Entry fields:', Object.keys(entry));
-    console.log('Entry values:', entry);
-    console.log('=== END IMAGE CLICK DEBUG ===');
     
     try {
       // First set the basic entry to show the modal immediately

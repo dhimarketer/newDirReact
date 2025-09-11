@@ -10,12 +10,7 @@ export const API_CONFIG = {
   RETRY_DELAY: parseInt(import.meta.env.VITE_API_RETRY_DELAY || '1000'),
 } as const;
 
-// 2025-01-28: DEBUG - Log the API config when constants are loaded
-console.log('=== CONSTANTS DEBUG ===');
-console.log('API_CONFIG.BASE_URL:', API_CONFIG.BASE_URL);
-console.log('Environment:', import.meta.env.MODE);
-console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
-console.log('=== END CONSTANTS DEBUG ===');
+// 2025-01-28: API configuration loaded
 
 // Application Configuration
 export const APP_CONFIG = {
